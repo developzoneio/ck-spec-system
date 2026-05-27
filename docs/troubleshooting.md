@@ -1,0 +1,349 @@
+# Troubleshooting
+
+Common issues and fixes. Skim the table of contents first; the fix you need is usually one section away.
+
+## Contents
+
+- [Install issues](#install-issues)
+- [Hooks not firing](#hooks-not-firing)
+- [Workflow issues](#workflow-issues)
+- [Spec issues](#spec-issues)
+- [Spec-gate blocking unexpectedly](#spec-gate-blocking-unexpectedly)
+- [MCP issues](#mcp-issues)
+- [Resetting](#resetting)
+
+---
+
+## Install issues
+
+### `Missing required source directories`
+
+```
+[FAIL] commands
+[FAIL] agents
+...
+Missing required source directories. Are you running this from a clean ck-spec-system checkout?
+```
+
+**Cause**: you ran the installer from outside the repo root.
+
+**Fix**: `cd` to the repo root (the directory containing `install/`, `commands/`, etc.) and re-run. The installer derives the repo root from its own location, so it must be invoked as `.\install\install.ps1` or `./install/install.sh`, not from inside `install/`.
+
+### `install.ps1 cannot be loaded because running scripts is disabled`
+
+**Cause**: PowerShell execution policy restricts script files.
+
+**Fix**: invoke with bypass:
+```powershell
+powershell -ExecutionPolicy Bypass -File install\install.ps1
+```
+Or persist the policy for your user:
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+### `bash: ./install/install.sh: Permission denied`
+
+**Cause**: `+x` bit not set on the installer (e.g. after extracting a `.zip` on macOS).
+
+**Fix**:
+```bash
+chmod +x install/install.sh
+./install/install.sh
+```
+
+### `jq: command not found` (Unix only, when hooks run)
+
+**Cause**: bash hooks use `jq` for JSON parsing. Without it, hooks exit `0` silently - your workflow still functions, but the hooks contribute nothing.
+
+**Fix**:
+```bash
+# macOS
+brew install jq
+# Debian/Ubuntu
+sudo apt install jq
+# Fedora
+sudo dnf install jq
+```
+
+### Hooks installed but `~/.claude/hooks/ck/*.sh` not executable
+
+**Cause**: rare - the installer ran with an unusual umask or as a different user than expected.
+
+**Fix**:
+```bash
+chmod +x ~/.claude/hooks/ck/*.sh
+```
+
+---
+
+## Hooks not firing
+
+If `/ck:*` commands work but `<context-router>` blocks never appear, run through these checks in order.
+
+### Check 1: `settings.json` wires hooks for THIS project
+
+`/ck:setup` writes `.claude/settings.json` per project. Without it, Claude Code does not invoke any hooks. Verify:
+
+```bash
+cat .claude/settings.json
+```
+
+The file should contain `hooks` entries for `UserPromptSubmit`, `PreToolUse`, and `SubagentStop`. If empty or missing, re-run `/ck:setup`.
+
+### Check 2: Hook scripts are executable (Unix)
+
+```bash
+ls -l ~/.claude/hooks/ck/
+```
+
+All three should have `-rwxr-xr-x`. If not:
+```bash
+chmod +x ~/.claude/hooks/ck/*.sh
+```
+
+### Check 3: Hooks are enabled in project-config
+
+```bash
+cat .claude/project-config.json
+```
+
+Look at the `hooks` section:
+```json
+"hooks": {
+  "userPromptRouter": { "enabled": true },
+  "specGate":         { "enabled": true, "mode": "warn" },
+  "subagentRetro":    { "enabled": true, "retroStaleMinutes": 30, "debounceMinutes": 10 }
+}
+```
+
+If any is `"enabled": false`, that hook is intentionally silent.
+
+### Check 4: PowerShell execution policy (Windows)
+
+Even when invoked via `powershell -NoProfile -ExecutionPolicy Bypass`, some systems are locked down further. Test manually:
+
+```powershell
+'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -NoProfile -ExecutionPolicy Bypass -File $env:USERPROFILE\.claude\hooks\ck\prompt-router.ps1
+```
+
+If this errors with execution policy complaints, your system's group policy may be overriding the `-ExecutionPolicy Bypass`. Talk to your admin.
+
+### Manually verify a hook works
+
+Pipe a JSON payload to the hook and check the output:
+
+**Unix:**
+```bash
+echo '{"prompt":"fix bug INV-2501","cwd":"'"$PWD"'"}' | ~/.claude/hooks/ck/prompt-router.sh
+```
+
+**Windows:**
+```powershell
+'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -File "$env:USERPROFILE\.claude\hooks\ck\prompt-router.ps1"
+```
+
+Expect a `<context-router>` block on stdout. Empty output means no signal was detected (which is correct behavior for prompts without keywords or tickets).
+
+---
+
+## Workflow issues
+
+### Phase 0 aborts: "Constitution not found"
+
+**Cause**: `.specs/constitution.md` does not exist in the project.
+
+**Fix**: run `/ck:setup`. If it ran before but the constitution was deleted, re-run `/ck:setup` - it will detect `partial` state and recreate the missing file.
+
+### Workflow refuses to proceed at a hard gate
+
+This is **by design**. Hard gates exist precisely to prevent skipping steps. The workflow tells you what is missing. Options:
+
+1. **Provide what's missing.** For `/ck:bug` Gate 2 (Reproduction), gather telemetry or reproduce locally. For `/ck:perf` Gate 2 (Baseline), run the benchmark and check in the artifact.
+2. **Log a constitution exception.** If you have a defensible reason to skip, the workflow accepts that with explicit acknowledgement and logs to `05-retro.md`. The exception is visible at audit time.
+3. **Abort.** Spec stays at its current state; you can resume later by re-running the command.
+
+The system surfaces the choice. The human decides.
+
+### Workflow restarts from Phase 1 when I want to resume
+
+**Cause**: the state-machine detection saw something it interpreted as "fresh start" - usually because a key file is missing.
+
+**Fix**: check `.specs/<ID>/` for the expected files. Each workflow's state-machine table lists what should be present at each state. If a file is missing (e.g. you deleted `02-tasks.md` thinking it was scratch), the workflow correctly detects the earlier state. Restore the file or accept the restart.
+
+### Subagent invocation errors
+
+```
+The spec-architect agent failed due to a model access issue.
+```
+
+**Cause**: the agent's `model:` field in frontmatter is invalid OR your account doesn't have access to that model.
+
+**Fix**: agents must use **aliases** (`sonnet`, `haiku`, `opus`, `inherit`). If the file has a full model ID like `claude-sonnet-4-7` or `claude-sonnet-4-6`, replace with the alias:
+
+```yaml
+model: sonnet   # NOT model: claude-sonnet-4-7
+```
+
+If aliases also fail, verify your Claude Code account has access to the relevant model tier.
+
+---
+
+## Spec issues
+
+### `.specs/index.md` is out of sync with folder contents
+
+**Cause**: a spec was moved, archived, or status-changed by a tool that didn't update the index (e.g. you manually edited a file's frontmatter).
+
+**Fix**:
+```
+/ck:spec validate --all
+```
+
+This lists every inconsistency. Then fix manually (recommended) or remove the misaligned row from the index and re-add via `/ck:spec status`.
+
+### "Illegal status transition: draft -> done"
+
+**Cause**: skipping intermediate states.
+
+**Fix**: lifecycle is `draft -> approved -> in-progress -> done`. Use `/ck:spec status <ID> approved` then `in-progress` then `done`. If you're closing a spec that genuinely had no execution (e.g. an RCA that documents itself), `/ck:rca` flows directly to `done` at workflow end - don't manually transition.
+
+### A spec is stuck in `in-progress` for weeks
+
+**Cause**: workflow aborted mid-execution; nothing pulled it forward to `done`.
+
+**Fix**:
+- Re-run the original command: `/ck:feature <arg>`. The state machine resumes at the right phase.
+- If the work was abandoned, transition to `done` with a retro note explaining why: `/ck:spec status <ID> done` and edit `05-retro.md`.
+
+### `/ck:spec stats` shows aging warnings
+
+The aging report flags specs in `in-progress` > 7 days and `draft` > 14 days (defaults). These are signals, not errors. Decide per case: resume, close, or archive.
+
+---
+
+## Spec-gate blocking unexpectedly
+
+### Editing a file that should be safe and getting `decision=block`
+
+**Cause**: the file matches `paths.protected` in `.claude/project-config.json`.
+
+**Fix**: check the list:
+```bash
+jq '.paths.protected' .claude/project-config.json
+```
+
+If a path is there by mistake, remove it. If it should stay protected, update the file via a refactor spec (the protection exists for a reason).
+
+### Spec-gate blocks me even when I HAVE a spec in progress
+
+**Cause**: most often, the in-progress spec is recorded in `00-spec.md` frontmatter but **not** mirrored in `.specs/index.md`. The hook reads the index.
+
+**Fix**:
+```
+/ck:spec validate --all
+```
+If the index row is missing or has the wrong status, fix it via `/ck:spec status <ID> in-progress` or by editing `.specs/index.md` directly to add the row.
+
+### I want to disable spec-gate temporarily
+
+Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't forget to flip back. A separate setting `hooks.specGate.enabled: false` disables it entirely.
+
+---
+
+## MCP issues
+
+### Atlassian: "Failed to fetch ticket"
+
+**Cause**: MCP server not configured OR authentication expired OR ticket ID outside the configured project.
+
+**Fix**:
+1. Verify the server is installed and connected in Claude Code (settings -> MCP).
+2. Re-authenticate the Atlassian connector if the auth flow has expired.
+3. Check `ticket.baseUrl` and `ticket.pattern` in `.claude/project-config.json` match the ticket you provided.
+
+### Context7: docs feel stale
+
+**Cause**: Context7 indexes versioned docs. If your project pins an old version, that's what you'll get (correct behavior).
+
+**Fix**: in the implementer or debugger invocation, specify the version explicitly via the `resolve-library-id` call. Or - better - check that your project's stated library version in `CLAUDE.md` matches reality.
+
+### GitNexus: "No index for this repo"
+
+**Cause**: GitNexus indexes on first run; large repos take time. Or your `.gitnexus/` directory was cleared.
+
+**Fix**: trigger a re-index from the GitNexus client. While indexing, code-explorer falls back to grep with a noted caveat.
+
+### MSSQL: "Cannot execute UPDATE / DELETE / INSERT"
+
+**Cause**: this is the intended behavior. The debugger has read-only access by constitution.
+
+**Fix**: if you need to mutate state to test a hypothesis, do it outside the workflow (your DB client, a migration, a feature spec). Then re-run the debugger to verify.
+
+---
+
+## Resetting
+
+### Reset a single spec
+
+Delete the folder and the index row:
+```bash
+rm -rf .specs/FEAT-INV-2501
+# manually remove the row in .specs/index.md (or use editor)
+```
+
+You can then re-run `/ck:feature INV-2501` from scratch.
+
+### Reset the engine for one project
+
+Remove `CLAUDE.md`, `.specs/`, `.claude/`:
+```bash
+rm -rf CLAUDE.md .specs .claude
+/ck:setup
+```
+
+Backups created during the last `/ck:setup` run can be found at `CLAUDE.md.bak.<timestamp>` if you want to recover.
+
+### Reset the engine globally
+
+```bash
+# Unix
+rm -rf ~/.claude/commands/ck \
+       ~/.claude/agents/ck \
+       ~/.claude/hooks/ck \
+       ~/.claude/templates/ck
+./install/install.sh
+
+# Windows
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\ck
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\ck
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\ck
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\ck
+.\install\install.ps1
+```
+
+This leaves your per-project specs untouched.
+
+### Nuclear: remove everything
+
+```bash
+# from a project
+rm -rf CLAUDE.md .specs .claude
+# globally
+rm -rf ~/.claude/commands/ck ~/.claude/agents/ck ~/.claude/hooks/ck ~/.claude/templates/ck
+```
+
+You're back to plain Claude Code.
+
+---
+
+## When all else fails
+
+Open an issue at the project repository with:
+- OS + shell version.
+- Claude Code version (`claude --version`).
+- The exact command you ran.
+- The error message verbatim.
+- The output of `/ck:spec validate --all` (if relevant).
+
+Smaller reproductions are easier to fix.
