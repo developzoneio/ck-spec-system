@@ -1,0 +1,126 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Developzone/ck-spec-system/main/schema/project-config.schema.json",
+  "version": "1.0.0",
+
+  "project": {
+    "name": "<<project-name>>",
+    "description": "<<one-line-description>>",
+    "owner": "<<team-or-person>>",
+    "repo": "<<https://github.com/org/repo>>"
+  },
+
+  "ticket": {
+    "system": "<<jira|github|linear|none>>",
+    "pattern": "<<e.g. ^[A-Z]+-[0-9]+$ for JIRA, ^#[0-9]+$ for GitHub>>",
+    "baseUrl": "<<e.g. https://yourorg.atlassian.net/browse>>"
+  },
+
+  "spec": {
+    "dir": ".specs",
+    "indexFile": ".specs/index.md",
+    "constitutionFile": ".specs/constitution.md",
+    "prefixes": {
+      "feature": "FEAT",
+      "bug": "BUG",
+      "refactor": "REF",
+      "perf": "PERF",
+      "rca": "RCA"
+    },
+    "lifecycle": ["draft", "approved", "in-progress", "done", "archived"],
+    "archiveAfterDays": 90
+  },
+
+  "commands": {
+    "build": "<<e.g. dotnet build -c Release>>",
+    "test": "<<e.g. dotnet test --no-build>>",
+    "lint": "<<e.g. dotnet format --verify-no-changes>>",
+    "coverage": "<<e.g. dotnet test /p:CollectCoverage=true>>",
+    "run": "<<e.g. dotnet run --project src/WebServer>>"
+  },
+
+  "paths": {
+    "src": "<<e.g. src>>",
+    "tests": "<<e.g. tests>>",
+    "docs": "<<e.g. docs>>",
+    "protected": [
+      ".specs/constitution.md",
+      ".specs/index.md",
+      "LICENSE"
+    ]
+  },
+
+  "workflow": {
+    "keywords": {
+      "bug": ["bug", "fix", "broken", "error", "crash", "regression", "defect"],
+      "feature": ["feature", "add", "implement", "new", "support"],
+      "refactor": ["refactor", "restructure", "clean up", "extract", "rename"],
+      "perf": ["perf", "performance", "slow", "optimize", "latency", "throughput"],
+      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"]
+    },
+    "gates": {
+      "feature": ["spec-approved", "plan-approved", "review-pass", "integration-pass"],
+      "bug": ["symptom-captured", "reproduction-confirmed", "root-cause-confirmed", "failing-test-written", "regression-pass"],
+      "rca": ["evidence-gathered", "hypotheses-enumerated", "root-cause-confirmed"],
+      "refactor": ["spec-approved", "coverage-threshold-met", "post-test-added", "plan-approved", "batch-tests-green", "holistic-review-pass"],
+      "perf": ["target-defined", "baseline-measured", "hotspot-identified", "hypothesis-selected", "correctness-verified", "keep-or-revert-decided", "regression-pass", "final-review-pass"]
+    }
+  },
+
+  "models": {
+    "main": "claude-sonnet-4-6",
+    "subagent_default": "claude-haiku-4-5-20251001",
+    "subagent_reasoning": "claude-sonnet-4-6",
+    "subagent_execution": "claude-haiku-4-5-20251001",
+    "_comment": "Used by orchestration logic when overriding agent default model. Agents themselves use portable aliases (sonnet/haiku) in frontmatter for auto-update."
+  },
+
+  "mcp": {
+    "atlassian": {
+      "enabled": false,
+      "_use": "Fetch JIRA tickets in /ck:feature and /ck:bug"
+    },
+    "context7": {
+      "enabled": false,
+      "_use": "Up-to-date library docs for ck:spec-architect and ck:implementer"
+    },
+    "sequential-thinking": {
+      "enabled": false,
+      "_use": "Structured hypothesis enumeration in ck:debugger and ck:reviewer"
+    },
+    "gitnexus": {
+      "enabled": false,
+      "_use": "Fast symbol search, callers, call graph for ck:code-explorer"
+    },
+    "mssql": {
+      "enabled": false,
+      "_use": "Read-only schema and query-plan inspection in ck:debugger (SELECT/EXPLAIN only)"
+    },
+    "playwright": {
+      "enabled": false,
+      "_use": "E2E reproduction for /ck:bug"
+    },
+    "tavily": {
+      "enabled": false,
+      "_use": "Web search for error signatures / library issues in ck:debugger"
+    }
+  },
+
+  "hooks": {
+    "userPromptRouter": {
+      "enabled": true,
+      "_use": "Keyword routing + spec-context injection on every user prompt"
+    },
+    "specGate": {
+      "enabled": true,
+      "mode": "warn",
+      "_modes": "block = refuse Edit/Write on code without in-progress spec; warn = log to stderr only; off = skip",
+      "_use": "Guard rail blocking code edits when no spec is in-progress"
+    },
+    "subagentRetro": {
+      "enabled": true,
+      "retroStaleMinutes": 30,
+      "debounceMinutes": 10,
+      "_use": "Reminder to update stale retros after subagent runs"
+    }
+  }
+}
