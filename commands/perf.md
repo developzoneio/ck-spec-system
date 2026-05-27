@@ -1,0 +1,249 @@
+---
+description: Baseline-first performance workflow. Target -> baseline -> hotspot -> per-hotspot loop (hypothesize / apply / measure / keep-or-revert) -> regression -> final review. 8 hard gates.
+argument-hint: <endpoint or slug>
+---
+
+# /ck:perf
+
+Drives an optimization from a measured baseline to a measured improvement, with one change at a time and a keep-or-revert decision per change. Result under `.specs/PERF-<slug>-<YYYYMMDD>/`.
+
+**Argument**: `$ARGUMENTS` -> spec ID = `PERF-<slug>-<YYYYMMDD>`.
+
+---
+
+## HARD RULES (read before every phase)
+
+1. **NEVER optimize without a measured baseline.** "It feels slow" is not a baseline. The number must be reproducible.
+2. **One change at a time, each measured.** Multiple simultaneous changes invalidate attribution.
+3. **Revert if no measurable improvement.** Keep only changes that move the metric beyond measurement noise.
+4. **Correctness > speed.** A faster wrong answer is still wrong. All functional tests must continue to pass.
+5. **Don't optimize what already meets SLA.** If the target already meets the goal, the workflow exits at Gate 2 with no work done.
+
+---
+
+## State machine (resume behavior)
+
+| Detected state | Action |
+|---|---|
+| Folder not found | Start at Phase 1 |
+| `00-spec.md` Target filled, "Current observed" empty | Resume Phase 2 |
+| Baseline measured (Results log has row 0), no hypothesis tree | Resume Phase 3 |
+| Hotspot identified, no per-hotspot rows attempted | Resume Phase 4 |
+| At least one attempted row, no keep/revert decision | Resume Phase 4 (mid-loop) |
+| Decisions complete, no Phase 5 regression run | Resume Phase 5 |
+| Regression passed, no final review | Resume Phase 6 |
+| status `done` | Refuse |
+
+---
+
+## Phase 0 - Bootstrap
+
+1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
+2. Compute UTC date for spec ID.
+3. Detect state. Print resume plan.
+
+---
+
+## Phase 1 - Define target
+
+1. Invoke `ck:spec-architect` with:
+   - `TASK = create`
+   - `TEMPLATE = perf.template.md`
+   - `SPEC_ID = PERF-<slug>-<YYYYMMDD>`
+2. Architect fills Target (metric, goal SLA, environment, load profile, workload type), Measurement methodology, Constraints, Out of scope.
+3. Architect leaves **Current observed EMPTY** and **Results log EMPTY**. These are filled by measurement, not by assumption.
+
+### ⛔ Gate 1 - Target defined
+
+STOP. Display Target + Methodology. Ask:
+
+> Target and methodology approved? Note: nothing is optimized until baseline is measured. (yes / refine / abort)
+
+- `yes` -> status=`approved`, append to index, proceed.
+
+---
+
+## Phase 2 - Baseline measurement (HARD)
+
+1. Set up the measurement per "Measurement methodology" (tool, test script, warm-up, duration, reps, DB state, cache state).
+2. Run the measurement. Save raw output to `.specs/PERF-<slug>-<YYYYMMDD>/04-artifacts/baseline-<YYYYMMDD-HHmm>.json` (or .txt for human-readable summary).
+3. Fill `00-spec.md` Target "Current observed" with measured numbers (p50, p95, p99, req/s, CPU, memory).
+4. Add **row 0** to the Results log:
+
+```
+| 0 | <date> | baseline (no change) | <p50> | <p95> | <p99> | <req/s> | <CPU> | <mem> | baseline |
+```
+
+### ⛔ Gate 2 - Baseline measured (HARD)
+
+STOP. Two cases:
+
+**Case A: baseline already meets SLA goal.**
+> Baseline p95=<X> already meets SLA goal p95<<goal>. No optimization needed. Close PERF-<slug> as 'done' with no changes? (yes / proceed anyway / abort)
+- `yes` -> jump to Phase 6 close-out with summary "no work needed".
+- `proceed anyway` -> requires explicit constitution exception ("optimizing past SLA"). Log to retro.
+
+**Case B: baseline below SLA goal.**
+> Baseline p95=<X>, goal p95<<goal>. Proceed to hotspot analysis? (yes / refine methodology / abort)
+
+This gate is HARD - the workflow CANNOT enter Phase 3 without a checked-in baseline artifact and a filled Results log row 0.
+
+---
+
+## Phase 3 - Identify hotspot
+
+1. Invoke `ck:debugger` with:
+   - `TASK = hotspot-analysis`
+   - `SUB_MODE = A`
+   - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
+   - `BASELINE_ARTIFACT = .specs/PERF-<slug>-<YYYYMMDD>/04-artifacts/baseline-<...>.json`
+2. Debugger's job: identify the 80/20 hotspots from profile data, query plans, or code reads. Output: ranked list of hotspots with file:line citations and contribution percentage to total latency / CPU / memory.
+3. Append hotspot ranking to `03-decisions.md`.
+
+### ⛔ Gate 3 - Hotspot identified
+
+STOP. Display hotspot ranking. Ask:
+
+> Select hotspot to attack first: <H1>, <H2>, ... (choose / refine / abort)
+
+- `choose <H#>` -> proceed with that hotspot.
+- `refine` -> loop with debugger for more data.
+
+---
+
+## Phase 4 - Per-hotspot loop
+
+For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple loop iterations.
+
+### 4a. Deep dive
+
+1. Invoke `ck:debugger` with:
+   - `TASK = hotspot-analysis`
+   - `SUB_MODE = B`
+   - `HOTSPOT = <H# details>`
+2. Debugger produces 2-4 optimization hypotheses (not a single answer), each with:
+   - Expected impact (e.g. "p95 -200ms based on current 350ms in this function").
+   - Implementation cost (S / M / L).
+   - Risk profile (correctness risk, scope of change, reversibility).
+3. Append hypotheses to `03-decisions.md`.
+
+### ⛔ Gate 4 - Select hypothesis
+
+STOP. Display hypotheses. Ask:
+
+> Select hypothesis to apply: <H#a>, <H#b>, ... (choose / abort hotspot / abort workflow)
+
+- `choose` -> proceed to 4b.
+- `abort hotspot` -> mark hotspot as deferred, return to Phase 3 with remaining hotspots.
+
+### 4b. Apply
+
+1. Invoke `ck:implementer` with:
+   - `TASK_DETAILS = <hypothesis details + target files>`
+   - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
+   - `WORKFLOW_TYPE = perf`
+   - `CONSTRAINTS = <Constraints section: correctness must hold>`
+2. Implementer applies the change. ONE hypothesis at a time - no bundling.
+
+### 4c. Correctness tests
+
+1. Run the full test suite via `commands.test`.
+
+### ⛔ Gate 5 - Correctness verified
+
+STOP. Display test results.
+
+- All green -> proceed to 4d.
+- Any red -> REVERT immediately. Log failed attempt to Results log with `reverted` decision. Loop back to Gate 4 to select a different hypothesis.
+
+### 4d. Re-measure
+
+1. Re-run the baseline measurement under IDENTICAL conditions to Phase 2.
+2. Save artifact to `04-artifacts/attempt-<N>-<YYYYMMDD-HHmm>.json`.
+3. Add row to Results log:
+
+```
+| <N> | <date> | <hypothesis short name> | <p50> | <p95> | <p99> | <req/s> | <CPU> | <mem> | pending |
+```
+
+### ⛔ Gate 6 - Keep or revert decision
+
+STOP. Compare new measurement to previous best in Results log. Display:
+- Previous p95 -> new p95 (delta).
+- Whether improvement exceeds measurement noise (rule of thumb: must be > 5% AND >= absolute noise floor of the methodology).
+
+Ask:
+
+> Keep change or revert? (keep / revert)
+
+- `keep` -> update row decision to `kept`. Commit. Loop back to Gate 4 with the next hypothesis OR finalize this hotspot if SLA now met.
+- `revert` -> update row decision to `reverted`. Revert the code. Loop back to Gate 4.
+
+**Discipline note**: A "keep" decision without measurable improvement (i.e. within noise) is a constitution violation. Either the improvement is real and measurable, or it does not exist.
+
+Continue the loop until:
+- SLA goal is met (jump to Phase 5), OR
+- All hypotheses exhausted without meeting SLA (jump to Phase 5 with documented gap), OR
+- User aborts the workflow.
+
+---
+
+## Phase 5 - Regression check
+
+1. Run the full test suite via `commands.test` (one more time, as the final pre-close gate).
+2. Run lint via `commands.lint`.
+3. Re-run baseline measurement one final time to confirm the kept improvements are stable.
+4. Add a final row to Results log labeled "final".
+
+### ⛔ Gate 7 - Regression pass
+
+STOP. Display final test results + final measurement. Ask:
+
+> All clean and stable for final review? (yes / investigate / abort)
+
+- `yes` -> proceed.
+- `investigate` -> drop back to debugger if a regression appeared.
+
+---
+
+## Phase 6 - Final review + Close-out
+
+1. Invoke `ck:reviewer` with:
+   - `TASK_TYPE = perf-final`
+   - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
+   - `CHANGED_FILES = <all files touched across kept attempts>`
+   - `RESULTS_LOG = <Results log>`
+2. Reviewer checks: correctness preserved (no test edits to make them pass), no behavior change beyond what spec accepted under "Trade-offs", no new constitution exceptions, no static state introduced, no `dynamic` (C#) / `any` (TS) sneaked in.
+
+### ⛔ Gate 8 - Final review pass
+
+STOP. Display reviewer verdict. Ask:
+
+> PERF-<slug> close-out? (yes / address findings / abort)
+
+- `yes` -> proceed to close-out.
+- Any 🔴 BLOCK -> loop to implementer or revert.
+
+### Close-out
+
+1. Fill "Trade-offs accepted" section in `00-spec.md` (what generality / simplicity / freshness / memory was given up for the speed).
+2. Append to `05-retro.md`:
+   - Baseline -> final measurement.
+   - Kept changes (with file references).
+   - Reverted attempts (with reasoning).
+   - Hotspots deferred (if any).
+   - Constitution exceptions (should be none).
+3. Set status=`done`. Update index.
+4. Print 5-line summary: target, baseline, final, kept attempts, deferred hotspots.
+
+---
+
+## Rules (hard constraints)
+
+- Gate 2 (Baseline) is HARD. No optimization work without a checked-in baseline artifact.
+- One change per attempt. Bundled changes invalidate measurement.
+- Revert on no measurable improvement. The Results log is the source of truth.
+- Reverted attempts are LOGGED, not deleted. They are knowledge.
+- Correctness tests must remain unchanged. If the optimization requires changing a test, it changes behavior - that needs a FEAT-* or BUG-* spec, not PERF-*.
+- MSSQL access (via MCP) for hotspot analysis is SELECT / EXPLAIN only.
+- If SLA cannot be met after exhausting hypotheses, close the PERF spec with the documented gap and lessons. Do not "ship anyway".

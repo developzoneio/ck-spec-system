@@ -1,0 +1,56 @@
+{
+  "_comment_top": "Claude Code project settings - hook wiring for ck-spec-system. PowerShell version (Windows). For bash adaptation, see _bash_adaptation at bottom.",
+
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/ck/prompt-router.ps1",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/ck/spec-gate.ps1",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/ck/subagent-retro.ps1",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+
+  "_bash_adaptation": {
+    "_comment": "On macOS/Linux replace PowerShell command lines with bash invocations. Make hooks executable (chmod +x) and adjust file extension.",
+    "UserPromptSubmit_command_example": "bash ${HOME}/.claude/hooks/ck/prompt-router.sh",
+    "PreToolUse_command_example": "bash ${HOME}/.claude/hooks/ck/spec-gate.sh",
+    "SubagentStop_command_example": "bash ${HOME}/.claude/hooks/ck/subagent-retro.sh",
+    "_note_powershell_on_unix": "PowerShell 7+ is available on Unix; if installed, the PowerShell command above works as-is. Otherwise switch to the bash variants."
+  },
+
+  "_timeout_notes": {
+    "userPromptSubmit": "5s - inject routing hints and spec context",
+    "preToolUse": "5s - check spec-gate before code edits",
+    "subagentStop": "3s - debounced retro reminder"
+  }
+}
