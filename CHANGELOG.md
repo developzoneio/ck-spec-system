@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **ck-spec-system** will be documented in this file.
+All notable changes to **specwright** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -10,9 +10,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Optional `/ck:release` workflow for release-note generation from closed specs.
-- Optional `ck:docs-writer` agent for ADR generation.
+- Optional `/sd:release` workflow for release-note generation from closed specs.
+- Optional `sd-docs-writer` agent for ADR generation.
 - Telemetry-free usage analytics (opt-in, local only).
+
+---
+
+## [1.1.0] - 2026-06-03
+
+Architecture refresh. Adds an Agent Skills layer and upgrades the `spec-gate` hook to the CLI's new permission-decision schema (forward-compatible, no break for older CLIs).
+
+### Added
+
+#### Skills (5, new `skills/sd/` layer)
+A skill is a markdown rule pack referenced by agents from their YAML frontmatter (`skills: [...]`). Skills de-duplicate rules shared across multiple agents, keep agent prompts smaller, and make the rules auditable in one place.
+
+- `sd-severity-taxonomy` - Severity rules (BLOCK / WARN / SUGGEST / PASS) and the mandatory review output format. Applied by `sd-reviewer`.
+- `sd-hypothesis-tree` - Enumerate / verify protocol with the 5 mental models, `(L × I) / C` score formula, and the proximate-vs-root "why" ladder. Applied by `sd-debugger`.
+- `sd-atomic-task-format` - The 9-field atomic task block plus canonical enums (`Step type`, `Complexity`, `Reversibility`). Applied by `sd-spec-architect` (authoring) and `sd-implementer` (consuming).
+- `sd-evidence-citation` - `file:line` citation discipline, snippet length rules, evidence taxonomy, grouping. Applied by `sd-code-explorer`, `sd-debugger`, `sd-reviewer`.
+- `sd-spec-templates` - Per-template authoring rules (feature / bug / refactor / perf / rca). Applied by `sd-spec-architect`.
+
+#### Agent frontmatter
+- All 5 agents now declare a `skills: [...]` list in frontmatter.
+- All 5 agents now declare a `color:` field for terminal rendering.
+- Agent body sizes reduced where content moved into a referenced skill.
+
+#### Installers
+- `install/install.ps1` and `install/install.sh` now install `skills/<prefix>/` alongside `commands/<prefix>/`, `agents/<prefix>/`, `hooks/<prefix>/`, `templates/<prefix>/`.
+
+### Changed
+
+#### Hooks - dual-format block output
+Both `spec-gate.ps1` and `spec-gate.sh` now emit a single JSON object that carries **both** the new and legacy schemas. The CLI reads whichever it understands:
+
+```json
+{
+  "decision": "block",
+  "reason": "...",
+  "hookSpecificOutput": {
+    "permissionDecision": "deny",
+    "reason": "..."
+  }
+}
+```
+
+This is forward-compatible with CLI builds that read `hookSpecificOutput.permissionDecision` and backward-compatible with builds that read the top-level `decision` field. No version probing needed.
+
+#### Documentation
+- `README.md` - Added Skills section and updated Layer 1 diagram to include `skills/sd/`.
+- `docs/architecture.md` - Added "Agent skills" section explaining the rule-pack pattern; added the dual-format block-output schema to the `spec-gate` description.
 
 ---
 
@@ -22,23 +69,23 @@ Initial public release.
 
 ### Added
 
-#### Slash commands (9, all under `ck:` namespace)
-- `/ck:feature` - Spec-driven feature workflow with 4 hard gates (spec, plan, review, integration).
-- `/ck:bug` - Root-cause-first bug fix workflow with 5 hard gates (symptom, reproduction, root cause, failing test, regression).
-- `/ck:rca` - Incident root-cause analysis (output IS the spec; no code change).
-- `/ck:refactor` - Coverage-gated refactor workflow with 6 hard gates (spec, coverage threshold, post-test, plan, per-batch tests, holistic review).
-- `/ck:perf` - Baseline-first performance workflow with 8 hard gates (target, baseline, hotspot, hypothesis, correctness, keep/revert, regression, final review).
-- `/ck:spec` - Spec registry management (list / show / status / link / archive / revive / search / validate / stats / help).
-- `/ck:explore` - Read-only code exploration via the `ck:code-explorer` agent.
-- `/ck:review` - Standalone constitution-compliance review on a path, recent edits, or a spec.
-- `/ck:setup` - Idempotent project scaffold (CLAUDE.md + .claude/ + .specs/ + project-config.json).
+#### Slash commands (9, all under `sd:` namespace)
+- `/sd:feature` - Spec-driven feature workflow with 4 hard gates (spec, plan, review, integration).
+- `/sd:bug` - Root-cause-first bug fix workflow with 5 hard gates (symptom, reproduction, root cause, failing test, regression).
+- `/sd:rca` - Incident root-cause analysis (output IS the spec; no code change).
+- `/sd:refactor` - Coverage-gated refactor workflow with 6 hard gates (spec, coverage threshold, post-test, plan, per-batch tests, holistic review).
+- `/sd:perf` - Baseline-first performance workflow with 8 hard gates (target, baseline, hotspot, hypothesis, correctness, keep/revert, regression, final review).
+- `/sd:spec` - Spec registry management (list / show / status / link / archive / revive / search / validate / stats / help).
+- `/sd:explore` - Read-only code exploration via the `sd-code-explorer` agent.
+- `/sd:review` - Standalone constitution-compliance review on a path, recent edits, or a spec.
+- `/sd:setup` - Idempotent project scaffold (CLAUDE.md + .claude/ + .specs/ + project-config.json).
 
 #### Subagents (5, cost-aware model assignment)
-- `ck:spec-architect` (sonnet) - Creates and refines specs / plans / tasks.
-- `ck:code-explorer` (haiku) - Read-only code navigation with citation discipline.
-- `ck:debugger` (sonnet) - Hypothesis-tree investigation with sequential-thinking.
-- `ck:implementer` (haiku) - Executes ONE atomic task with scope discipline.
-- `ck:reviewer` (sonnet) - Severity-tagged compliance review (BLOCK / WARN / SUGGEST / PASS).
+- `sd-spec-architect` (sonnet) - Creates and refines specs / plans / tasks.
+- `sd-code-explorer` (haiku) - Read-only code navigation with citation discipline.
+- `sd-debugger` (sonnet) - Hypothesis-tree investigation with sequential-thinking.
+- `sd-implementer` (haiku) - Executes ONE atomic task with scope discipline.
+- `sd-reviewer` (sonnet) - Severity-tagged compliance review (BLOCK / WARN / SUGGEST / PASS).
 
 All agents use **portable model aliases** (`sonnet`, `haiku`) - they auto-update with the latest Anthropic models and are not pinned to specific versions.
 
@@ -92,5 +139,6 @@ Each hook ships in two flavours:
 - Operating systems: Windows 11 + PowerShell 5.1 / 7.x, macOS 13+, Ubuntu 22.04+.
 - Optional MCP servers: Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily.
 
-[Unreleased]: https://github.com/developzoneio/ck-spec-system/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/developzoneio/ck-spec-system/releases/tag/v1.0.0
+[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/developzoneio/specwright/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/developzoneio/specwright/releases/tag/v1.0.0
