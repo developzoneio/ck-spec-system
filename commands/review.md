@@ -3,9 +3,9 @@ description: Standalone constitution-compliance review. Severity-tagged findings
 argument-hint: [path | "recent" | "spec <ID>" | (interactive)]
 ---
 
-# /ck:review
+# /sd:review
 
-Standalone review via `ck:reviewer`. Does NOT modify code. Produces severity-tagged findings with file:line citations.
+Standalone review via `sd-reviewer`. Does NOT modify code. Produces severity-tagged findings with file:line citations.
 
 **Argument formats**:
 - `<path>` (file or directory) -> review the contents of that path.
@@ -18,7 +18,7 @@ Standalone review via `ck:reviewer`. Does NOT modify code. Produces severity-tag
 ## Phase 0 - Bootstrap (always)
 
 1. Read `CLAUDE.md`.
-2. Read `.specs/constitution.md`. **If missing, ABORT** with: "Constitution is required for compliance review. Run `/ck:setup` first."
+2. Read `.specs/constitution.md`. **If missing, ABORT** with: "Constitution is required for compliance review. Run `/sd:setup` first."
 3. Read `.claude/project-config.json` for path conventions.
 4. Read `.specs/index.md` if mode is `spec <ID>`.
 
@@ -64,7 +64,7 @@ After resolution, print: "Reviewing <N> files in mode <A|B|C|D>."
 
 ---
 
-## Phase 2 - Invoke `ck:reviewer`
+## Phase 2 - Invoke `sd-reviewer`
 
 Invoke with:
 - `TASK_TYPE = standalone`
@@ -120,8 +120,8 @@ Print the saved path.
 
 This command does NOT auto-fix. It surfaces. If the user wants to act on BLOCKs:
 
-- For findings related to an active spec -> route to that spec's workflow (e.g. `/ck:bug <ID>` continuation, or a new fix-up task).
-- For findings independent of any spec -> suggest `/ck:bug <slug>` if the finding is a defect, or `/ck:refactor <slug>` if structural.
+- For findings related to an active spec -> route to that spec's workflow (e.g. `/sd:bug <ID>` continuation, or a new fix-up task).
+- For findings independent of any spec -> suggest `/sd:bug <slug>` if the finding is a defect, or `/sd:refactor <slug>` if structural.
 - For constitution-design issues (the rule itself needs amending) -> suggest an ADR via a `REF-*` spec.
 
 ---

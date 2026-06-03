@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Developzone/ck-spec-system/main/schema/project-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/Developzone/specwright/main/schema/project-config.schema.json",
   "version": "1.0.0",
 
   "project": {
@@ -67,41 +67,41 @@
   },
 
   "models": {
-    "main": "claude-sonnet-4-6",
-    "subagent_default": "claude-haiku-4-5-20251001",
-    "subagent_reasoning": "claude-sonnet-4-6",
-    "subagent_execution": "claude-haiku-4-5-20251001",
-    "_comment": "Used by orchestration logic when overriding agent default model. Agents themselves use portable aliases (sonnet/haiku) in frontmatter for auto-update."
+    "main": "sonnet",
+    "subagent_default": "haiku",
+    "subagent_reasoning": "sonnet",
+    "subagent_execution": "haiku",
+    "_comment": "Portable aliases (sonnet/haiku) — resolved to the current recommended version by Claude Code at runtime. Agents also use these aliases in frontmatter."
   },
 
   "mcp": {
     "atlassian": {
       "enabled": false,
-      "_use": "Fetch JIRA tickets in /ck:feature and /ck:bug"
+      "_use": "Fetch JIRA tickets in /sd:feature and /sd:bug"
     },
     "context7": {
       "enabled": false,
-      "_use": "Up-to-date library docs for ck:spec-architect and ck:implementer"
+      "_use": "Up-to-date library docs for sd-spec-architect and sd-implementer"
     },
     "sequential-thinking": {
       "enabled": false,
-      "_use": "Structured hypothesis enumeration in ck:debugger and ck:reviewer"
+      "_use": "Structured hypothesis enumeration in sd-debugger and sd-reviewer"
     },
     "gitnexus": {
       "enabled": false,
-      "_use": "Fast symbol search, callers, call graph for ck:code-explorer"
+      "_use": "Fast symbol search, callers, call graph for sd-code-explorer"
     },
     "mssql": {
       "enabled": false,
-      "_use": "Read-only schema and query-plan inspection in ck:debugger (SELECT/EXPLAIN only)"
+      "_use": "Read-only schema and query-plan inspection in sd-debugger (SELECT/EXPLAIN only)"
     },
     "playwright": {
       "enabled": false,
-      "_use": "E2E reproduction for /ck:bug"
+      "_use": "E2E reproduction for /sd:bug"
     },
     "tavily": {
       "enabled": false,
-      "_use": "Web search for error signatures / library issues in ck:debugger"
+      "_use": "Web search for error signatures / library issues in sd-debugger"
     }
   },
 

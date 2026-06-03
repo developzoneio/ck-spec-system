@@ -3,7 +3,7 @@ description: Spec-driven feature workflow. Spec -> impact -> plan -> execute -> 
 argument-hint: <JIRA-ID or slug>
 ---
 
-# /ck:feature
+# /sd:feature
 
 Drives a feature from a one-line ask to closed-out, reviewed, tested code with searchable spec artifacts under `.specs/FEAT-<arg>/`.
 
@@ -40,7 +40,7 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
 ## Phase 1 - Spec
 
 1. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via `mcp__atlassian__getJiraIssue`. If MCP unavailable, ask user for a paste or proceed with slug.
-2. Invoke `ck:spec-architect` with:
+2. Invoke `sd-spec-architect` with:
    - `TASK = create`
    - `TEMPLATE = feature`
    - `TICKET_DATA = <fetched or pasted>`
@@ -55,14 +55,14 @@ STOP. Present the spec to the user. Ask:
 > Approve spec FEAT-<arg>? (yes / refine <feedback> / abort)
 
 - `yes` -> set status=`approved`, proceed.
-- `refine` -> invoke `ck:spec-architect` with `TASK = refine`, `FEEDBACK = <user feedback>`. Loop.
+- `refine` -> invoke `sd-spec-architect` with `TASK = refine`, `FEEDBACK = <user feedback>`. Loop.
 - `abort` -> set status=`archived`, exit.
 
 ---
 
 ## Phase 2 - Impact analysis
 
-1. Invoke `ck:code-explorer` with:
+1. Invoke `sd-code-explorer` with:
    - `TASK_TYPE = impact-map`
    - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
    - `OUTPUT_APPEND_TO = .specs/FEAT-<arg>/03-decisions.md`
@@ -75,7 +75,7 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
 
 ## Phase 3 - Plan + tasks
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = plan`
    - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
    - `IMPACT_REF = .specs/FEAT-<arg>/03-decisions.md`
@@ -87,13 +87,13 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
 ### T<NN> - <title>
 - Files: <list of files to touch>
 - Layer: <Domain | Application | Infrastructure | Presentation>
-- Step type: <create | modify | wire | config>
+- Step type: <foundation | behavior | wiring | polish | test>
 - Test: <test file/method to create or update>
 - Acceptance: <one-line criterion>
 - Depends on: <T## or "none">
 - Conflicts with: <T## or "none">
-- Estimated complexity: <trivial | low | medium | high>
-- Reversibility: <safe | caution | irreversible>
+- Complexity: <S | M | L>
+- Reversibility: <trivial | moderate | hard>
 ```
 
 3. Set status=`in-progress` in `00-spec.md` and `index.md`.
@@ -105,7 +105,7 @@ STOP. Present the plan and task list. Ask:
 > Approve plan for FEAT-<arg>? (<N> tasks, estimated <complexity>) (yes / refine <feedback> / abort)
 
 - `yes` -> proceed.
-- `refine` -> invoke `ck:spec-architect` with `TASK = refine`. Loop.
+- `refine` -> invoke `sd-spec-architect` with `TASK = refine`. Loop.
 - `abort` -> set status=`archived`, exit.
 
 ---
@@ -117,7 +117,7 @@ Process tasks from `02-tasks.md` in dependency order.
 For each unchecked task:
 
 1. **Pre-flight**: re-read `00-spec.md`, the specific task block, and the constitution sections cited under the spec's "Constitution check".
-2. **Invoke `ck:implementer`** with:
+2. **Invoke `sd-implementer`** with:
    - `TASK_DETAILS = <full task block>`
    - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
    - `WORKFLOW_TYPE = feature`
@@ -146,7 +146,7 @@ Move to next task. Repeat until all tasks checked.
 
 ### 5b. Batch review (single reviewer invocation for ALL changes)
 
-Invoke `ck:reviewer` with:
+Invoke `sd-reviewer` with:
    - `TASK_TYPE = holistic`
    - `CHANGED_FILES = <all files changed across all tasks in Phase 4>`
    - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`

@@ -48,7 +48,7 @@ created: <<YYYY-MM-DD>>
 ## Root cause
 
 <!-- DO NOT FILL until Phase 3 (Investigate). -->
-<!-- Filled by ck:debugger output after hypothesis verification. -->
+<!-- Filled by sd-debugger output after hypothesis verification. -->
 <!-- Must be: a named, fixable cause. NOT a symptom restatement. -->
 <!-- Format: "X happens because Y, which violates assumption Z." -->
 

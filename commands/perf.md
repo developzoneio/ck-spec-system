@@ -3,7 +3,7 @@ description: Baseline-first performance workflow. Target -> baseline -> hotspot 
 argument-hint: <endpoint or slug>
 ---
 
-# /ck:perf
+# /sd:perf
 
 Drives an optimization from a measured baseline to a measured improvement, with one change at a time and a keep-or-revert decision per change. Result under `.specs/PERF-<slug>-<YYYYMMDD>/`.
 
@@ -46,7 +46,7 @@ Drives an optimization from a measured baseline to a measured improvement, with 
 
 ## Phase 1 - Define target
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = create`
    - `TEMPLATE = perf.template.md`
    - `SPEC_ID = PERF-<slug>-<YYYYMMDD>`
@@ -92,7 +92,7 @@ This gate is HARD - the workflow CANNOT enter Phase 3 without a checked-in basel
 
 ## Phase 3 - Identify hotspot
 
-1. Invoke `ck:debugger` with:
+1. Invoke `sd-debugger` with:
    - `TASK = hotspot-analysis`
    - `SUB_MODE = A`
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
@@ -117,7 +117,7 @@ For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple
 
 ### 4a. Deep dive
 
-1. Invoke `ck:debugger` with:
+1. Invoke `sd-debugger` with:
    - `TASK = hotspot-analysis`
    - `SUB_MODE = B`
    - `HOTSPOT = <H# details>`
@@ -138,7 +138,7 @@ STOP. Display hypotheses. Ask:
 
 ### 4b. Apply
 
-1. Invoke `ck:implementer` with:
+1. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <hypothesis details + target files>`
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `WORKFLOW_TYPE = perf`
@@ -208,7 +208,7 @@ STOP. Display final test results + final measurement. Ask:
 
 ## Phase 6 - Final review + Close-out
 
-1. Invoke `ck:reviewer` with:
+1. Invoke `sd-reviewer` with:
    - `TASK_TYPE = perf-final`
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `CHANGED_FILES = <all files touched across kept attempts>`

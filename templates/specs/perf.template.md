@@ -53,7 +53,7 @@ created: <<YYYY-MM-DD>>
 ## Hypothesis tree
 
 <!-- TBD - filled by Phase 3 (Hotspot identification) and Phase 4 (Deep dive). -->
-<!-- ck:debugger in hotspot-analysis mode populates this. Format: ranked hypotheses with expected impact. -->
+<!-- sd-debugger in hotspot-analysis mode populates this. Format: ranked hypotheses with expected impact. -->
 
 **Status**: TBD - filled by Phase 3 hotspot analysis.
 

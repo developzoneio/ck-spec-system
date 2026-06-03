@@ -66,7 +66,7 @@ created: <<YYYY-MM-DD>>
 
 ## Constitution check
 
-<!-- Which constitution sections apply. Filled by ck:spec-architect. -->
+<!-- Which constitution sections apply. Filled by sd-spec-architect. -->
 
 - **§1.1 Layer rules**: <<how this feature respects layer boundaries>>
 - **§2.3 Error handling**: <<which custom exceptions are introduced or reused>>

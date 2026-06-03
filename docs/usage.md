@@ -1,6 +1,6 @@
 # Usage guide
 
-Command-by-command reference for ck-spec-system. For the why and how it fits together, see [`architecture.md`](architecture.md). For a fully-worked example, see [`walkthrough.md`](walkthrough.md).
+Command-by-command reference for specwright. For the why and how it fits together, see [`architecture.md`](architecture.md). For a fully-worked example, see [`walkthrough.md`](walkthrough.md).
 
 ---
 
@@ -10,12 +10,12 @@ Command-by-command reference for ck-spec-system. For the why and how it fits tog
 cd <your-project>
 claude
 > /init                # Standard Claude Code init (writes a basic CLAUDE.md)
-> /ck:setup            # ck-spec-system scaffold
+> /sd:setup            # specwright scaffold
 ```
 
-`/init` is optional but recommended. It creates a baseline `CLAUDE.md` that `/ck:setup` can parse for stack hints.
+`/init` is optional but recommended. It creates a baseline `CLAUDE.md` that `/sd:setup` can parse for stack hints.
 
-`/ck:setup` is interactive and asks **at most 3 questions**:
+`/sd:setup` is interactive and asks **at most 3 questions**:
 
 1. Ticket system (JIRA / GitHub / Linear / none).
 2. Ticket pattern (regex like `^[A-Z]+-[0-9]+$`).
@@ -29,65 +29,65 @@ It generates:
 ├── .specs/
 │   ├── constitution.md                  (with <<placeholder>> tokens to fill)
 │   ├── index.md                         (empty registry)
-│   ├── _explorations/                   (scratchpad for /ck:explore saves)
-│   ├── _reviews/                        (scratchpad for /ck:review saves)
+│   ├── _explorations/                   (scratchpad for /sd:explore saves)
+│   ├── _reviews/                        (scratchpad for /sd:review saves)
 │   └── _adr/                            (architecture decision records)
 └── .claude/
     ├── project-config.json
     └── settings.json
 ```
 
-After running, **open `CLAUDE.md` and `.specs/constitution.md` in your editor** and fill the placeholders. `/ck:setup` does not infer your conventions; you declare them.
+After running, **open `CLAUDE.md` and `.specs/constitution.md` in your editor** and fill the placeholders. `/sd:setup` does not infer your conventions; you declare them.
 
 ---
 
 ## Workflow commands
 
-### `/ck:feature <ID-or-slug>`
+### `/sd:feature <ID-or-slug>`
 
 Spec-driven feature workflow.
 
 | Phase | Subagent / Actor | Gate |
 |---|---|---|
 | 0 - Bootstrap | main thread | - |
-| 1 - Spec | `ck:spec-architect` | ⛔ Gate 1 (spec approval) |
-| 2 - Impact | `ck:code-explorer` | - |
-| 3 - Plan + tasks | `ck:spec-architect` | ⛔ Gate 2 (plan approval) |
-| 4 - Execute | `ck:implementer` per task + main thread self-check | - |
-| 5 - Integration + batch review | main thread + `ck:reviewer` (holistic, once) | ⛔ Gate 3 (integration + review) |
+| 1 - Spec | `sd-spec-architect` | ⛔ Gate 1 (spec approval) |
+| 2 - Impact | `sd-code-explorer` | - |
+| 3 - Plan + tasks | `sd-spec-architect` | ⛔ Gate 2 (plan approval) |
+| 4 - Execute | `sd-implementer` per task + main thread self-check | - |
+| 5 - Integration + batch review | main thread + `sd-reviewer` (holistic, once) | ⛔ Gate 3 (integration + review) |
 | 6 - Close-out | main thread | - |
 
 **Spec ID**: `FEAT-<arg>`. State machine on re-invocation: detected state -> resume at next phase.
 
 Example:
 ```
-/ck:feature INV-2501
+/sd:feature INV-2501
 ```
 With JIRA enabled and ticket pattern matching `INV-2501`, the architect fetches the ticket and includes it in the spec context.
 
-### `/ck:bug <ID-or-slug>`
+### `/sd:bug <ID-or-slug>`
 
 Root-cause-first bug fix. **Refuses to fix without reproduction confirmed AND root cause documented.**
 
 | Phase | Subagent / Actor | Gate |
 |---|---|---|
 | 0 - Bootstrap | main thread | - |
-| 1 - Capture symptoms | `ck:spec-architect` | ⛔ Gate 1 |
+| 1 - Capture symptoms | `sd-spec-architect` | ⛔ Gate 1 |
 | 2 - Reproduce | main thread (interactive) | ⛔ Gate 2 (HARD - no override) |
-| 3 - Investigate | `ck:debugger` (enumerate + verify) | ⛔ Gate 3 (root cause confirmed) |
+| 3 - Investigate | `sd-debugger` (enumerate + verify) | ⛔ Gate 3 (root cause confirmed) |
 | 4 - Write failing test FIRST | main thread | ⛔ Gate 4 (test fails as expected) |
-| 5 - Minimal fix | `ck:implementer` | - |
-| 6 - Regression + review | `ck:reviewer` (bug-fix-final) | ⛔ Gate 5 |
+| 5 - Minimal fix | `sd-implementer` | - |
+| 6 - Regression + review | `sd-reviewer` (bug-fix-final) | ⛔ Gate 5 |
 | 7 - Close-out | main thread | - |
 
 **Spec ID**: `BUG-<arg>`.
 
 Example:
 ```
-/ck:bug 1247
+/sd:bug 1247
 ```
 
-### `/ck:rca <slug>`
+### `/sd:rca <slug>`
 
 Incident analysis. **No code is changed in this workflow.** Output IS the spec.
 
@@ -95,8 +95,8 @@ Incident analysis. **No code is changed in this workflow.** Output IS the spec.
 |---|---|---|
 | 0 - Bootstrap | main thread | - |
 | 1 - Gather signals | main thread (interactive) | ⛔ Gate 1 (evidence gathered) |
-| 2 - Hypothesis enumeration | `ck:debugger` (enumerate, incident mode) | ⛔ Gate 2 |
-| 3 - Verify loop | `ck:debugger` (verify) | ⛔ Gate 3 (root cause confirmed) |
+| 2 - Hypothesis enumeration | `sd-debugger` (enumerate, incident mode) | ⛔ Gate 2 |
+| 3 - Verify loop | `sd-debugger` (verify) | ⛔ Gate 3 (root cause confirmed) |
 | 4 - Isolate + document | main thread | - |
 | 5 - Follow-up actions | main thread | - |
 
@@ -106,57 +106,57 @@ Fixes spawn separate `BUG-*`, `REF-*`, or `PERF-*` specs (reserved IDs listed un
 
 Example:
 ```
-/ck:rca payment-outage-jan8
+/sd:rca payment-outage-jan8
 ```
 
-### `/ck:refactor <slug> [smell-type]`
+### `/sd:refactor <slug> [smell-type]`
 
 Coverage-gated refactor. **Refuses to touch code if coverage on affected files is below threshold (default 80%).**
 
 | Phase | Subagent / Actor | Gate |
 |---|---|---|
 | 0 - Bootstrap | main thread | - |
-| 1 - Spec | `ck:spec-architect` | ⛔ Gate 1 |
-| 2 - Impact | `ck:code-explorer` | - |
+| 1 - Spec | `sd-spec-architect` | ⛔ Gate 1 |
+| 2 - Impact | `sd-code-explorer` | - |
 | 3 - Coverage | main thread (runs `commands.coverage`) | ⛔ Gate 2 (threshold) + ⛔ Gate 3 (post-tests) |
-| 4 - Plan parallel-safe tasks | `ck:spec-architect` | ⛔ Gate 4 |
-| 5 - Execute batched (max 3 parallel) | `ck:implementer` per task | ⛔ Gate 5 (per-batch tests green) |
-| 6 - Holistic review | `ck:reviewer` (holistic) | ⛔ Gate 6 |
+| 4 - Plan parallel-safe tasks | `sd-spec-architect` | ⛔ Gate 4 |
+| 5 - Execute batched (max 3 parallel) | `sd-implementer` per task | ⛔ Gate 5 (per-batch tests green) |
+| 6 - Holistic review | `sd-reviewer` (holistic) | ⛔ Gate 6 |
 | 7 - Close-out | main thread | - |
 
 **Spec ID**: `REF-<slug>-<YYYYMMDD>`.
 
 Example:
 ```
-/ck:refactor extract-pricing-service extract-class
+/sd:refactor extract-pricing-service extract-class
 ```
 
-### `/ck:perf <endpoint-or-slug>`
+### `/sd:perf <endpoint-or-slug>`
 
 Baseline-first optimization. **Refuses to optimize without a measured baseline.**
 
 | Phase | Subagent / Actor | Gate |
 |---|---|---|
 | 0 - Bootstrap | main thread | - |
-| 1 - Define target | `ck:spec-architect` | ⛔ Gate 1 |
+| 1 - Define target | `sd-spec-architect` | ⛔ Gate 1 |
 | 2 - Baseline measurement | main thread | ⛔ Gate 2 (HARD) |
-| 3 - Identify hotspot | `ck:debugger` (hotspot-analysis A) | ⛔ Gate 3 |
-| 4 - Per-hotspot loop | `ck:debugger` (sub B) + `ck:implementer` + re-measure | ⛔ Gates 4-6 (hypothesis / correctness / keep-or-revert) |
+| 3 - Identify hotspot | `sd-debugger` (hotspot-analysis A) | ⛔ Gate 3 |
+| 4 - Per-hotspot loop | `sd-debugger` (sub B) + `sd-implementer` + re-measure | ⛔ Gates 4-6 (hypothesis / correctness / keep-or-revert) |
 | 5 - Regression check | main thread | ⛔ Gate 7 |
-| 6 - Final review + close | `ck:reviewer` (perf-final) | ⛔ Gate 8 |
+| 6 - Final review + close | `sd-reviewer` (perf-final) | ⛔ Gate 8 |
 
 **Spec ID**: `PERF-<slug>-<YYYYMMDD>`.
 
 Example:
 ```
-/ck:perf search-endpoint-latency
+/sd:perf search-endpoint-latency
 ```
 
 ---
 
 ## Utility commands
 
-### `/ck:spec <subcommand>`
+### `/sd:spec <subcommand>`
 
 Spec registry. **No code is changed. No subagent is invoked.**
 
@@ -175,17 +175,17 @@ Spec registry. **No code is changed. No subagent is invoked.**
 
 Examples:
 ```
-/ck:spec list bug in-progress
-/ck:spec show FEAT-INV-2501
-/ck:spec status BUG-1247 done
-/ck:spec link FEAT-INV-2501 depends-on REF-extract-pricing-20260112
-/ck:spec search "low-stock"
-/ck:spec stats
+/sd:spec list bug in-progress
+/sd:spec show FEAT-INV-2501
+/sd:spec status BUG-1247 done
+/sd:spec link FEAT-INV-2501 depends-on REF-extract-pricing-20260112
+/sd:spec search "low-stock"
+/sd:spec stats
 ```
 
-### `/ck:explore <target-or-query>`
+### `/sd:explore <target-or-query>`
 
-Read-only code navigation. Single `ck:code-explorer` invocation. No spec created.
+Read-only code navigation. Single `sd-code-explorer` invocation. No spec created.
 
 The command parses your query for intent:
 - "where is X" / "define X" -> definition mode.
@@ -199,13 +199,13 @@ Output includes `file:line` citations for every finding. Offers to save to `.spe
 
 Examples:
 ```
-/ck:explore where is PaymentHandler defined
-/ck:explore who calls UserService.GetById
-/ck:explore impact of changing StockReservation
-/ck:explore show all places that use Redis
+/sd:explore where is PaymentHandler defined
+/sd:explore who calls UserService.GetById
+/sd:explore impact of changing StockReservation
+/sd:explore show all places that use Redis
 ```
 
-### `/ck:review [path | "recent" | "spec <ID>"]`
+### `/sd:review [path | "recent" | "spec <ID>"]`
 
 Standalone compliance review. Constitution required - aborts if missing.
 
@@ -220,12 +220,12 @@ Output: severity-tagged findings 🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PA
 
 Examples:
 ```
-/ck:review src/Application/Payment
-/ck:review recent 4h
-/ck:review spec BUG-1247
+/sd:review src/Application/Payment
+/sd:review recent 4h
+/sd:review spec BUG-1247
 ```
 
-### `/ck:setup`
+### `/sd:setup`
 
 Already covered above. Re-runnable. Detects state (fresh / post-init / partial / complete) and only fills gaps. Backs up any file before overwriting.
 
@@ -237,18 +237,18 @@ Already covered above. Re-runnable. Detects state (fresh / post-init / partial /
 
 | You have | Use |
 |---|---|
-| "Add a new endpoint / behavior / capability" | `/ck:feature` |
-| "Something is broken; need to investigate then fix" | `/ck:bug` |
-| "Production incident; need a post-mortem with no code change" | `/ck:rca` |
-| "This file / module is too tangled; need to restructure" | `/ck:refactor` |
-| "X is too slow; need to optimize with measurements" | `/ck:perf` |
-| "I just want to navigate the code" | `/ck:explore` |
-| "Review this change for compliance" | `/ck:review` |
-| "Manage / browse the spec registry" | `/ck:spec` |
+| "Add a new endpoint / behavior / capability" | `/sd:feature` |
+| "Something is broken; need to investigate then fix" | `/sd:bug` |
+| "Production incident; need a post-mortem with no code change" | `/sd:rca` |
+| "This file / module is too tangled; need to restructure" | `/sd:refactor` |
+| "X is too slow; need to optimize with measurements" | `/sd:perf` |
+| "I just want to navigate the code" | `/sd:explore` |
+| "Review this change for compliance" | `/sd:review` |
+| "Manage / browse the spec registry" | `/sd:spec` |
 
 ### Resuming a workflow
 
-Workflow commands are **resumable**. Re-running `/ck:feature INV-2501` after closing your terminal mid-execution detects the current state of `.specs/FEAT-INV-2501/` and jumps to the next phase. The state machine is documented at the top of each command file.
+Workflow commands are **resumable**. Re-running `/sd:feature INV-2501` after closing your terminal mid-execution detects the current state of `.specs/FEAT-INV-2501/` and jumps to the next phase. The state machine is documented at the top of each command file.
 
 The main heuristic: workflow checks for the presence and contents of `00-spec.md`, `01-plan.md`, `02-tasks.md` (with task completion ratio), and `05-retro.md` to determine where you are.
 
@@ -257,13 +257,13 @@ The main heuristic: workflow checks for the presence and contents of `00-spec.md
 When an RCA spawns fixes, link them so the registry knows:
 
 ```
-/ck:rca payment-outage-jan8         # produces RCA-payment-outage-jan8-20260108
+/sd:rca payment-outage-jan8         # produces RCA-payment-outage-jan8-20260108
 # ...RCA filled in, spawned specs listed...
-/ck:bug 1310                        # produces BUG-1310
-/ck:spec link BUG-1310 spawned-by RCA-payment-outage-jan8-20260108
+/sd:bug 1310                        # produces BUG-1310
+/sd:spec link BUG-1310 spawned-by RCA-payment-outage-jan8-20260108
 ```
 
-Now `/ck:spec show BUG-1310` reveals the parent RCA.
+Now `/sd:spec show BUG-1310` reveals the parent RCA.
 
 ### When a workflow can't make progress
 
@@ -285,10 +285,10 @@ Hooks emit output inline during a session. Examples:
 
 ```
 <context-router>
-Routing hints from ck-spec-system (UserPromptSubmit hook):
+Routing hints from specwright (UserPromptSubmit hook):
 
 Workflow keyword matches:
-  - /ck:bug  (matched: bug, fix)
+  - /sd:bug  (matched: bug, fix)
 
 Ticket IDs detected: INV-2501
 Matching spec folders under .specs/:
@@ -302,7 +302,7 @@ Specs currently in-progress (from .specs/index.md):
 **spec-gate** when editing `src/Stock.cs` with no in-progress spec, `mode: warn`:
 
 ```
-[WARN] spec-gate: editing code file 'src/Stock.cs' but no in-progress spec is recorded in .specs/index.md. Run /ck:feature, /ck:bug, /ck:refactor, or /ck:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable.
+[WARN] spec-gate: editing code file 'src/Stock.cs' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable.
 ```
 
 **spec-gate** in `mode: block`:

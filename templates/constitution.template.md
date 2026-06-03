@@ -11,7 +11,7 @@ review_cadence: quarterly
 
 The constitution is the **single source of truth** for architectural and quality rules in this project. Subagents read this file at runtime; if a rule is not here, it is not enforced.
 
-**Mutation protocol:** changes require a `/ck:refactor` spec or an ADR under `.specs/_adr/`. Never edit silently.
+**Mutation protocol:** changes require a `/sd:refactor` spec or an ADR under `.specs/_adr/`. Never edit silently.
 
 ---
 
@@ -64,7 +64,7 @@ The constitution is the **single source of truth** for architectural and quality
 | Metric | Threshold | Enforcement |
 |---|---|---|
 | Test coverage (line) | >= <<80>>% on changed lines | CI gate |
-| Integration tests | Required for any change crossing layer boundaries | `/ck:reviewer` checks |
+| Integration tests | Required for any change crossing layer boundaries | `sd-reviewer` checks |
 | Mutation tests | Optional, >= <<60>>% if used | Manual |
 | Build warnings | Zero `CS####` warnings as errors | csproj `TreatWarningsAsErrors` |
 | API response time | p95 < <<200>>ms for read endpoints | Synthetic test in CI |

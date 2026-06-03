@@ -2,8 +2,8 @@
 
 This is a fictional but realistic example. The project is `inventory-service`, an ASP.NET Core 8 + PostgreSQL backend with JIRA tickets matching `^INV-\d+$`. The walkthrough covers:
 
-1. First-time setup with `/ck:setup`.
-2. A feature workflow (`/ck:feature INV-2501`) end-to-end.
+1. First-time setup with `/sd:setup`.
+2. A feature workflow (`/sd:feature INV-2501`) end-to-end.
 3. A batch review catching a layer violation.
 4. Cost breakdown (with batch vs per-task comparison).
 5. Cost breakdown.
@@ -13,18 +13,18 @@ Output is illustrative - exact wording will differ from your runs.
 
 ---
 
-## Step 1: `/ck:setup` (one-time per project)
+## Step 1: `/sd:setup` (one-time per project)
 
 ```
 $ cd ~/repos/inventory-service
 $ claude
-> /ck:setup
+> /sd:setup
 ```
 
 Bootstrap detects `partial` state because the project already has a `CLAUDE.md` from a prior `/init`:
 
 ```
-ck-spec-system: setup
+specwright: setup
   State detected: post-init (has CLAUDE.md, no .specs/, no .claude/)
   Plan:
     - Backup CLAUDE.md to CLAUDE.md.bak.20260114-090015
@@ -98,12 +98,12 @@ Trong Tran also fills `CLAUDE.md` with build/test/lint commands and points to th
 
 ---
 
-## Step 2: `/ck:feature INV-2501`
+## Step 2: `/sd:feature INV-2501`
 
 The ticket: "Add low-stock alert webhook. When inventory drops below threshold, POST to subscriber webhooks."
 
 ```
-> /ck:feature INV-2501
+> /sd:feature INV-2501
 ```
 
 ### Phase 0 - Bootstrap
@@ -195,7 +195,7 @@ Status: draft -> approved. Added to .specs/index.md.
 The code-explorer maps impact:
 
 ```markdown
-## Impact analysis (ck:code-explorer)
+## Impact analysis (sd-code-explorer)
 
 ### Direct callers (1-hop)
 - src/Application/Inventory/UpdateStockHandler.cs:42 - this is where threshold
@@ -271,20 +271,20 @@ Status: approved -> in-progress.
 
 ### Phase 4 - Execute (no per-task reviewer)
 
-Tasks are executed in dependency order. For each task, the main thread invokes `ck:implementer`, runs the task's test, and does a lightweight self-check (scope, test pass, obvious violations). No reviewer subagent is spawned per-task.
+Tasks are executed in dependency order. For each task, the main thread invokes `sd-implementer`, runs the task's test, and does a lightweight self-check (scope, test pass, obvious violations). No reviewer subagent is spawned per-task.
 
 Sample output for T03:
 
 ```
 T03: Add threshold-breach detector
-  Invoking ck:implementer...
+  Invoking sd-implementer...
   Files touched: LowStockDetector.cs, UpdateStockHandler.cs
   Running scoped test... PASS
   Self-check: scope OK, test OK, no obvious violations.
   [x] T03 checked off in 02-tasks.md.
 
 T04: Add webhook delivery client with HMAC signing
-  Invoking ck:implementer...
+  Invoking sd-implementer...
   ...
 ```
 
@@ -406,7 +406,7 @@ Compare with the per-task reviewer approach (~$2.45): the batch pattern saves ~3
 Fast-forward to April 2026. A new engineer joins the team. They're tasked with adding email notifications. They run:
 
 ```
-> /ck:spec search "webhook"
+> /sd:spec search "webhook"
 ```
 
 Output:
@@ -423,7 +423,7 @@ Output:
 Now they can read prior decisions instead of re-deriving them:
 
 ```
-> /ck:spec show FEAT-INV-2501
+> /sd:spec show FEAT-INV-2501
 ```
 
 The new engineer sees the architecture: subscriptions, HMAC signing, retry strategy, why per-product thresholds were out of scope, why a separate spec (FEAT-INV-2503) handles clock-skew tolerance. They author FEAT-INV-2510 (email notifications) with `linked-to FEAT-INV-2501` and reuse the subscription model.
@@ -454,4 +454,4 @@ The fact that the implementer is `haiku` shapes the workflow: tasks must be atom
 
 ### When to skip
 
-This workflow is **overkill for a 50-line endpoint that ships in 20 minutes**. The author would have used `/ck:explore` to locate the right file and edited directly. The system rewards proportionate use: heavy machinery for changes that earn it.
+This workflow is **overkill for a 50-line endpoint that ships in 20 minutes**. The author would have used `/sd:explore` to locate the right file and edited directly. The system rewards proportionate use: heavy machinery for changes that earn it.

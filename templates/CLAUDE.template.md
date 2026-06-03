@@ -13,15 +13,15 @@
 
 | Command | Use when |
 |---|---|
-| `/ck:feature <ID-or-slug>` | New behavior or non-trivial change. |
-| `/ck:bug <ID-or-slug>` | Defect with reproduction; root-cause-first. |
-| `/ck:rca <slug>` | Incident analysis. **No code change.** Output is the spec. |
-| `/ck:refactor <slug>` | Restructure without behavior change. Requires test coverage. |
-| `/ck:perf <slug>` | Optimization. Requires measured baseline. |
-| `/ck:spec <subcommand>` | Spec registry management (list, show, status, link, ...). |
-| `/ck:explore <query>` | Read-only code navigation. |
-| `/ck:review <target>` | Standalone compliance review. |
-| `/ck:setup` | Idempotent project scaffold. |
+| `/sd:feature <ID-or-slug>` | New behavior or non-trivial change. |
+| `/sd:bug <ID-or-slug>` | Defect with reproduction; root-cause-first. |
+| `/sd:rca <slug>` | Incident analysis. **No code change.** Output is the spec. |
+| `/sd:refactor <slug>` | Restructure without behavior change. Requires test coverage. |
+| `/sd:perf <slug>` | Optimization. Requires measured baseline. |
+| `/sd:spec <subcommand>` | Spec registry management (list, show, status, link, ...). |
+| `/sd:explore <query>` | Read-only code navigation. |
+| `/sd:review <target>` | Standalone compliance review. |
+| `/sd:setup` | Idempotent project scaffold. |
 
 ## Stack
 
@@ -66,6 +66,6 @@
 
 ## When ambiguous
 
-1. Constitution silent and no precedent? -> `/ck:explore` to find precedent in repo.
+1. Constitution silent and no precedent? -> `/sd:explore` to find precedent in repo.
 2. Still unclear? -> Spec it under "Open questions" and ask before implementing.
 3. Two equally valid options? -> Pick the one that minimizes future churn; document the choice in `03-decisions.md`.

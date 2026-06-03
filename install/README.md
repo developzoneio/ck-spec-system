@@ -1,13 +1,13 @@
-# Installing ck-spec-system
+# Installing specwright
 
-The installer copies the engine (commands, agents, hooks, templates) into a Claude Code base directory, under the `ck/` subfolder of each engine directory:
+The installer copies the engine (commands, agents, hooks, templates) into a Claude Code base directory, under the `sd/` subfolder of each engine directory:
 
 ```
 <base>/
-├── commands/ck/        9 slash commands
-├── agents/ck/          5 subagent definitions
-├── hooks/ck/           3 hook scripts (.ps1 on Windows, .sh on Unix)
-└── templates/ck/       9 templates (4 setup + 5 spec)
+├── commands/sd/        9 slash commands
+├── agents/sd/          5 subagent definitions
+├── hooks/sd/           3 hook scripts (.ps1 on Windows, .sh on Unix)
+└── templates/sd/       9 templates (4 setup + 5 spec)
 ```
 
 Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
@@ -44,11 +44,11 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 
 | Source (in repo) | Target (under `<base>/`) | Files | Notes |
 |---|---|---|---|
-| `commands/` | `commands/ck/` | 9 | `feature`, `bug`, `rca`, `refactor`, `perf`, `spec`, `explore`, `review`, `setup` |
-| `agents/` | `agents/ck/` | 5 | `ck:spec-architect`, `ck:code-explorer`, `ck:debugger`, `ck:implementer`, `ck:reviewer` |
-| `hooks/powershell/` (Windows installer) | `hooks/ck/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
-| `hooks/bash/` (Unix installer) | `hooks/ck/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
-| `templates/` | `templates/ck/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
+| `commands/` | `commands/sd/` | 9 | `feature`, `bug`, `rca`, `refactor`, `perf`, `spec`, `explore`, `review`, `setup` |
+| `agents/` | `agents/sd/` | 5 | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
+| `hooks/powershell/` (Windows installer) | `hooks/sd/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
+| `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
+| `templates/` | `templates/sd/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
 
 **Total**: 21 files per OS.
 
@@ -78,30 +78,30 @@ After install, check the target directories:
 
 **Windows:**
 ```powershell
-Get-ChildItem $env:USERPROFILE\.claude\commands\ck\     # expect 9 .md files
-Get-ChildItem $env:USERPROFILE\.claude\agents\ck\       # expect 5 .md files
-Get-ChildItem $env:USERPROFILE\.claude\hooks\ck\        # expect 3 .ps1 files
-Get-ChildItem $env:USERPROFILE\.claude\templates\ck\    # expect 4 files + specs\ folder
+Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 9 .md files
+Get-ChildItem $env:USERPROFILE\.claude\agents\sd\       # expect 5 .md files
+Get-ChildItem $env:USERPROFILE\.claude\hooks\sd\        # expect 3 .ps1 files
+Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 4 files + specs\ folder
 ```
 
 **Unix:**
 ```bash
-ls ~/.claude/commands/ck/      # 9 .md files
-ls ~/.claude/agents/ck/        # 5 .md files
-ls ~/.claude/hooks/ck/         # 3 .sh files (executable)
-ls -l ~/.claude/hooks/ck/      # confirm +x bits set
-ls ~/.claude/templates/ck/     # 4 files + specs/ folder
+ls ~/.claude/commands/sd/      # 9 .md files
+ls ~/.claude/agents/sd/        # 5 .md files
+ls ~/.claude/hooks/sd/         # 3 .sh files (executable)
+ls -l ~/.claude/hooks/sd/      # confirm +x bits set
+ls ~/.claude/templates/sd/     # 4 files + specs/ folder
 ```
 
 Then in a real project:
 ```
 cd <your-project>
 claude
-> /ck:setup
-> /ck:explore "where is the entrypoint"
+> /sd:setup
+> /sd:explore "where is the entrypoint"
 ```
 
-If `/ck:explore` returns findings with `file:line` citations, the install is working.
+If `/sd:explore` returns findings with `file:line` citations, the install is working.
 
 ---
 
@@ -111,18 +111,18 @@ The installer does not ship an uninstall script (the install is just files in kn
 
 **Windows:**
 ```powershell
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\ck
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\sd
 ```
 
 **Unix:**
 ```bash
-rm -rf ~/.claude/commands/ck \
-       ~/.claude/agents/ck \
-       ~/.claude/hooks/ck \
-       ~/.claude/templates/ck
+rm -rf ~/.claude/commands/sd \
+       ~/.claude/agents/sd \
+       ~/.claude/hooks/sd \
+       ~/.claude/templates/sd
 ```
 
 Per-project artifacts (`.specs/`, `.claude/project-config.json`, `.claude/settings.json`, `CLAUDE.md`) remain in your projects until you remove them manually.
@@ -136,7 +136,7 @@ Per-project artifacts (`.specs/`, `.claude/project-config.json`, `.claude/settin
 | `install.ps1 cannot be loaded ... execution policy` | PS execution policy | Run: `powershell -ExecutionPolicy Bypass -File install\install.ps1` |
 | `bash: ./install/install.sh: Permission denied` | Missing +x on the installer itself | `chmod +x install/install.sh` then re-run |
 | `Missing required source directories` | Running from wrong directory | `cd` to the repo root (the parent of `install/`) and re-run |
-| Hooks not firing in Claude Code after install | settings.json not wired in the project | Run `/ck:setup` in the project; it writes `.claude/settings.json` |
+| Hooks not firing in Claude Code after install | settings.json not wired in the project | Run `/sd:setup` in the project; it writes `.claude/settings.json` |
 | `jq: command not found` warnings in hook output | `jq` not installed (Unix only) | Install via `brew install jq` (macOS) or `apt install jq` (Linux). Hooks exit 0 silently without it. |
 
 Further troubleshooting in [`docs/troubleshooting.md`](../docs/troubleshooting.md).

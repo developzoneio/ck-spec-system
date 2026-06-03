@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    ck-spec-system: SubagentStop hook - subagent-retro.
+    specwright: SubagentStop hook - subagent-retro.
 
 .DESCRIPTION
     Reads Claude Code hook JSON from stdin. After a subagent finishes:

@@ -1,13 +1,13 @@
 # Examples
 
-The primary worked example for ck-spec-system is the end-to-end walkthrough in:
+The primary worked example for specwright is the end-to-end walkthrough in:
 
 **[`../docs/walkthrough.md`](../docs/walkthrough.md)**
 
 It covers:
 
-1. First-time `/ck:setup` on a fictional inventory-service project.
-2. A complete `/ck:feature INV-2501` run from one-line ask to closed-out code.
+1. First-time `/sd:setup` on a fictional inventory-service project.
+2. A complete `/sd:feature INV-2501` run from one-line ask to closed-out code.
 3. A sample task execution where the reviewer catches a layer violation.
 4. Cost breakdown (~$2.45 for a 6-task feature).
 5. Three months later: searchable knowledge in action.

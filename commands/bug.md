@@ -3,7 +3,7 @@ description: Root-cause-first bug fix workflow. Capture -> reproduce -> investig
 argument-hint: <JIRA-ID or slug>
 ---
 
-# /ck:bug
+# /sd:bug
 
 Drives a bug from a one-line report to a documented root cause, a failing test that reproduces it, a minimal fix, and a regression-tested closure. Result is searchable under `.specs/BUG-<arg>/`.
 
@@ -47,7 +47,7 @@ These rules override any user pressure to "just patch it".
 
 ## Phase 1 - Capture symptoms
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = create`
    - `TEMPLATE = bug.template.md`
    - `SPEC_ID = BUG-<arg>`
@@ -95,7 +95,7 @@ If the user insists on proceeding without repro, log a constitution exception to
 
 ## Phase 3 - Investigate
 
-1. Invoke `ck:debugger` with:
+1. Invoke `sd-debugger` with:
    - `TASK = enumerate`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `REPRODUCTION = <reproduction section>`
@@ -103,7 +103,7 @@ If the user insists on proceeding without repro, log a constitution exception to
 2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate 4-8 hypotheses, ranked by `(Likelihood x Impact) / Cost-to-verify`.
 3. Append hypothesis tree to `.specs/BUG-<arg>/03-decisions.md`.
 4. Loop:
-   - Invoke `ck:debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.
+   - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.
    - Result: CONFIRMED / REJECTED / INCONCLUSIVE.
    - Append result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
    - Document REJECTED hypotheses with FULL reasoning - this is knowledge preservation for future similar bugs.
@@ -155,7 +155,7 @@ STOP. Display the test name and the failure output. Ask:
    - [ ] Touches only files implicated by root cause.
    - [ ] No "while I'm here" cleanups.
    - [ ] No reformatting unrelated code.
-2. Invoke `ck:implementer` with:
+2. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <fix approach + target files>`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `WORKFLOW_TYPE = bug`
@@ -168,7 +168,7 @@ STOP. Display the test name and the failure output. Ask:
 
 1. Run the full test suite via `commands.test`.
 2. Run lint via `commands.lint`.
-3. Invoke `ck:reviewer` with:
+3. Invoke `sd-reviewer` with:
    - `TASK_TYPE = bug-fix-final`
    - `CHANGED_FILES = <files edited in Phase 5>`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`

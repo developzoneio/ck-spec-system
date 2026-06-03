@@ -3,7 +3,7 @@ description: Coverage-gated refactor workflow. Spec -> impact -> coverage -> pla
 argument-hint: <slug> [smell-type]
 ---
 
-# /ck:refactor
+# /sd:refactor
 
 Drives a behavior-preserving restructure. Refuses to touch code until coverage on affected files meets threshold. Each step keeps all tests green. Result under `.specs/REF-<slug>-<YYYYMMDD>/`.
 
@@ -50,7 +50,7 @@ Spec ID = `REF-<slug>-<YYYYMMDD>`.
 
 ## Phase 1 - Spec
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = create`
    - `TEMPLATE = refactor.template.md`
    - `SPEC_ID = REF-<slug>-<YYYYMMDD>`
@@ -71,7 +71,7 @@ STOP. Display spec summary, especially Invariants and Out-of-scope. Ask:
 
 ## Phase 2 - Impact
 
-1. Invoke `ck:code-explorer` with:
+1. Invoke `sd-code-explorer` with:
    - `TASK = impact-map`
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
    - `OUTPUT_APPEND_TO = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
@@ -100,7 +100,7 @@ STOP. Compare measured vs threshold.
 
 If user picks (1), enter the characterization sub-loop:
 1. Identify uncovered branches via coverage report.
-2. Invoke `ck:implementer` with `TASK_TYPE = characterization-test` per uncovered area.
+2. Invoke `sd-implementer` with `TASK_TYPE = characterization-test` per uncovered area.
 3. Each new test must FAIL FAST if current behavior changes - characterization tests pin the CURRENT behavior, correct or not.
 4. Re-measure coverage.
 
@@ -117,14 +117,26 @@ If user picks (2) explicit exception, document the threshold reduction in `05-re
 
 ## Phase 4 - Plan parallel-safe tasks
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = plan`
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
    - `IMPACT = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
    - `MODE = refactor`
-2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task uses standard format PLUS:
-   - `Parallel batch`: tasks that touch disjoint file sets can be batched (max 3 parallel).
-   - `Conflicts with`: explicit list of other task IDs that touch overlapping files.
+2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task uses the canonical format PLUS refactor-specific fields:
+
+```
+### T<NN> - <title>
+- Files: <list of files to touch>
+- Layer: <Domain | Application | Infrastructure | Presentation>
+- Step type: <foundation | behavior | wiring | polish | test>
+- Test: <test file/method to create or update>
+- Acceptance: <one-line criterion>
+- Depends on: <T## or "none">
+- Conflicts with: <T## or "none">
+- Complexity: <S | M | L>
+- Reversibility: <trivial | moderate | hard>
+- Parallel batch: <batch number or "solo">
+```
 
 ### ⛔ Gate 4 - Plan approval
 
@@ -142,7 +154,7 @@ For each batch (up to 3 tasks in parallel):
 
 1. **Pre-batch**: run full test suite. Must be green. If red, abort batch and surface failure - the baseline must be clean.
 2. For each task in the batch:
-   - Invoke `ck:implementer` with:
+   - Invoke `sd-implementer` with:
      - `TASK_DETAILS = <task block>`
      - `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
      - `WORKFLOW_TYPE = refactor`
@@ -163,7 +175,7 @@ STOP after every batch. Display test results.
 
 After all batches complete:
 
-1. Invoke `ck:reviewer` with:
+1. Invoke `sd-reviewer` with:
    - `TASK_TYPE = holistic`
    - `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
    - `INVARIANTS = <invariants list>`

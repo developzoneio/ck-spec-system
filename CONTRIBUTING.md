@@ -1,4 +1,4 @@
-# Contributing to ck-spec-system
+# Contributing to specwright
 
 Thanks for considering a contribution. This document covers the PR process,
 per-file-type guidelines, and how to test changes locally.
@@ -39,7 +39,7 @@ per-file-type guidelines, and how to test changes locally.
 ## Repo layout
 
 ```
-ck-spec-system/
+specwright/
   commands/         # 9 slash commands (markdown with frontmatter)
   agents/           # 5 subagent definitions (markdown with frontmatter)
   hooks/
@@ -84,7 +84,7 @@ ck-spec-system/
 
 ### Commands (`commands/*.md`)
 
-A command is a markdown file with YAML frontmatter that Claude Code reads when the user types `/ck:<name>`.
+A command is a markdown file with YAML frontmatter that Claude Code reads when the user types `/sd:<name>`.
 
 **Required structure:**
 ```markdown
@@ -93,7 +93,7 @@ description: One-line summary shown in /help
 argument-hint: <ID or slug>
 ---
 
-# /ck:<name>
+# /sd:<name>
 
 ## Phase 0 - Bootstrap
 - Read CLAUDE.md
@@ -112,7 +112,7 @@ argument-hint: <ID or slug>
 - Phase 0 always bootstraps; do not skip.
 - Hard gates use the explicit marker `Gate N` and prose "STOP. Wait for explicit user approval."
 - State machine documented at top of file (what happens on re-invocation).
-- Subagent invocation uses the `ck:` prefix, never bare names.
+- Subagent invocation uses the `sd-` prefix, never bare names.
 - No stack-specific commands inside (no `dotnet test`, `npm test`, etc.). Reference the `commands.test` field from `project-config.json`.
 
 ### Agents (`agents/*.md`)
@@ -122,7 +122,7 @@ A subagent is a markdown file with YAML frontmatter consumed by the `Task` tool.
 **Required frontmatter:**
 ```yaml
 ---
-name: ck:<role>
+name: sd-<role>
 description: One-line summary used by routing.
 model: sonnet   # MUST be an alias: sonnet | haiku | opus | inherit
 tools: Read, Grep, Glob, ...   # MINIMAL allowlist
@@ -170,7 +170,7 @@ grep -nP "[^\x00-\x7F]" hooks/powershell/*.ps1 install/install.ps1
 
 ### Templates (`templates/**`)
 
-Templates are filled by `/ck:setup` and by agents.
+Templates are filled by `/sd:setup` and by agents.
 
 - Use `<<placeholder>>` syntax for fields the user fills manually.
 - Keep templates short and scannable. A `CLAUDE.md` template that ends up being 600 lines defeats the purpose.
@@ -188,16 +188,16 @@ Before opening any PR that touches install, hooks, commands, or agents:
 .\install\install.ps1 -DryRun
 
 # 2. Real install to a sandbox base path
-.\install\install.ps1 -BasePath C:\temp\ck-test
+.\install\install.ps1 -BasePath C:\temp\sd-test
 
 # 3. Verify
-Get-ChildItem C:\temp\ck-test\commands\ck\
-Get-ChildItem C:\temp\ck-test\agents\ck\
-Get-ChildItem C:\temp\ck-test\hooks\ck\
-Get-ChildItem C:\temp\ck-test\templates\ck\
+Get-ChildItem C:\temp\sd-test\commands\sd\
+Get-ChildItem C:\temp\sd-test\agents\sd\
+Get-ChildItem C:\temp\sd-test\hooks\sd\
+Get-ChildItem C:\temp\sd-test\templates\sd\
 
 # 4. Cleanup
-Remove-Item -Recurse -Force C:\temp\ck-test
+Remove-Item -Recurse -Force C:\temp\sd-test
 ```
 
 **Unix/macOS (bash):**
@@ -206,19 +206,19 @@ Remove-Item -Recurse -Force C:\temp\ck-test
 ./install/install.sh --dry-run
 
 # 2. Real install to a sandbox base path
-./install/install.sh --base-path /tmp/ck-test
+./install/install.sh --base-path /tmp/sd-test
 
 # 3. Verify
-ls /tmp/ck-test/commands/ck/
-ls /tmp/ck-test/agents/ck/
-ls /tmp/ck-test/hooks/ck/
-ls /tmp/ck-test/templates/ck/
+ls /tmp/sd-test/commands/sd/
+ls /tmp/sd-test/agents/sd/
+ls /tmp/sd-test/hooks/sd/
+ls /tmp/sd-test/templates/sd/
 
 # Verify hook executable bits
-test -x /tmp/ck-test/hooks/ck/prompt-router.sh && echo "OK"
+test -x /tmp/sd-test/hooks/sd/prompt-router.sh && echo "OK"
 
 # 4. Cleanup
-rm -rf /tmp/ck-test
+rm -rf /tmp/sd-test
 ```
 
 ---

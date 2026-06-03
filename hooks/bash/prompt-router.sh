@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ck-spec-system: UserPromptSubmit hook - prompt-router (bash).
+# specwright: UserPromptSubmit hook - prompt-router (bash).
 #
 # Reads Claude Code hook JSON from stdin. Emits a <context-router> block on
 # stdout when workflow keywords, ticket IDs, or in-progress specs are detected.
@@ -150,13 +150,13 @@ fi
 
 {
     echo '<context-router>'
-    echo 'Routing hints from ck-spec-system (UserPromptSubmit hook):'
+    echo 'Routing hints from specwright (UserPromptSubmit hook):'
 
     if [[ ${#matched[@]} -gt 0 ]]; then
         echo ''
         echo 'Workflow keyword matches:'
         for k in "${!matched[@]}"; do
-            echo "  - /ck:${k}  (matched: ${matched_terms[${k}]})"
+            echo "  - /sd:${k}  (matched: ${matched_terms[${k}]})"
         done
     fi
 
@@ -171,7 +171,7 @@ fi
             echo 'Matching spec folders under .specs/:'
             for s in "${ticket_specs[@]}"; do echo "  - ${s}"; done
         else
-            echo 'No matching spec folder found. Consider /ck:feature or /ck:bug to create one.'
+            echo 'No matching spec folder found. Consider /sd:feature or /sd:bug to create one.'
         fi
     fi
 
