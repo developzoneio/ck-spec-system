@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ck-spec-system: SubagentStop hook - subagent-retro (bash).
+# specwright: SubagentStop hook - subagent-retro (bash).
 #
 # After a subagent finishes:
 #   1. Load .claude/project-config.json (or defaults).

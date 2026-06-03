@@ -1,14 +1,14 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    ck-spec-system: UserPromptSubmit hook - prompt-router.
+    specwright: UserPromptSubmit hook - prompt-router.
 
 .DESCRIPTION
     Reads Claude Code hook JSON from stdin. Extracts the user prompt and the
     project cwd. Loads .claude/project-config.json (or sane defaults if absent)
     and:
       1. Matches the prompt against workflow keywords (bug / feature / refactor
-         / perf / rca) and suggests the relevant /ck:* command.
+         / perf / rca) and suggests the relevant /sd:* command.
       2. Detects ticket IDs in the prompt using ticket.pattern and looks up
          matching folders under .specs/.
       3. Reads .specs/index.md and surfaces any spec currently in-progress.
@@ -201,14 +201,14 @@ if ($workflowMatches.Count -eq 0 -and $ticketIds.Count -eq 0 -and $inProgress.Co
 # Build output block
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('<context-router>') | Out-Null
-$lines.Add('Routing hints from ck-spec-system (UserPromptSubmit hook):') | Out-Null
+$lines.Add('Routing hints from specwright (UserPromptSubmit hook):') | Out-Null
 
 if ($workflowMatches.Count -gt 0) {
     $lines.Add('') | Out-Null
     $lines.Add('Workflow keyword matches:') | Out-Null
     foreach ($key in $workflowMatches.Keys) {
         $kws = ($workflowMatches[$key] | Select-Object -Unique) -join ', '
-        $lines.Add("  - /ck:$key  (matched: $kws)") | Out-Null
+        $lines.Add("  - /sd:$key  (matched: $kws)") | Out-Null
     }
 }
 
@@ -219,7 +219,7 @@ if ($ticketIds.Count -gt 0) {
         $lines.Add('Matching spec folders under .specs/:') | Out-Null
         foreach ($s in $ticketSpecs) { $lines.Add("  - $s") | Out-Null }
     } else {
-        $lines.Add('No matching spec folder found. Consider /ck:feature or /ck:bug to create one.') | Out-Null
+        $lines.Add('No matching spec folder found. Consider /sd:feature or /sd:bug to create one.') | Out-Null
     }
 }
 

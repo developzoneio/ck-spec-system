@@ -3,11 +3,11 @@ description: Spec registry management. Pure file ops on .specs/ - no subagent in
 argument-hint: <subcommand> [args...]
 ---
 
-# /ck:spec
+# /sd:spec
 
 Dispatcher for spec registry operations. **No code is changed. No subagent is invoked.** All operations are file-system reads on `.specs/` with controlled writes to `.specs/index.md` and the target spec's frontmatter / `05-retro.md`.
 
-**Usage**: `/ck:spec <subcommand> [args...]`
+**Usage**: `/sd:spec <subcommand> [args...]`
 
 If `<subcommand>` is omitted or not recognized, run the `help` subcommand.
 
@@ -33,7 +33,7 @@ If `<subcommand>` is omitted or not recognized, run the `help` subcommand.
 ## Phase 0 - Bootstrap (always)
 
 1. Read `.claude/project-config.json` for `spec.dir`, `spec.indexFile`, `spec.prefixes`, `spec.lifecycle`.
-2. Verify `.specs/index.md` exists. If not, prompt: "No spec index found. Run `/ck:setup` first."
+2. Verify `.specs/index.md` exists. If not, prompt: "No spec index found. Run `/sd:setup` first."
 3. Dispatch to the requested subcommand.
 
 ---
@@ -51,9 +51,9 @@ Behavior:
 
 Example:
 ```
-/ck:spec list bug in-progress
-/ck:spec list feature
-/ck:spec list -- in-progress    (status only, double-dash signals positional skip)
+/sd:spec list bug in-progress
+/sd:spec list feature
+/sd:spec list -- in-progress    (status only, double-dash signals positional skip)
 ```
 
 ---

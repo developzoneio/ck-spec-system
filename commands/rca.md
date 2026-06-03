@@ -3,7 +3,7 @@ description: Incident root-cause analysis. Output IS the spec - NO code change i
 argument-hint: <incident-slug>
 ---
 
-# /ck:rca
+# /sd:rca
 
 Drives an incident analysis from raw signals to a documented root cause, recorded under `.specs/RCA-<slug>-<YYYYMMDD>/`. **No code is changed in this workflow.** Fixes spawn separate `BUG-*` / `REF-*` / `PERF-*` specs (reserved IDs are recorded under the RCA's "Spawned specs" section).
 
@@ -21,7 +21,7 @@ Drives an incident analysis from raw signals to a documented root cause, recorde
 | Hypothesis tree exists, no CONFIRMED entry | Resume Phase 3 |
 | Root cause documented, no Mitigation entry | Resume Phase 4 |
 | Mitigation documented, no Follow-up actions | Resume Phase 5 |
-| status `done` | Refuse; suggest viewing with `/ck:spec show RCA-...` |
+| status `done` | Refuse; suggest viewing with `/sd:spec show RCA-...` |
 
 ---
 
@@ -37,7 +37,7 @@ Drives an incident analysis from raw signals to a documented root cause, recorde
 
 This phase is conversational. The user has the raw evidence; the workflow turns it into structured timeline + symptoms.
 
-1. Invoke `ck:spec-architect` with:
+1. Invoke `sd-spec-architect` with:
    - `TASK = create`
    - `TEMPLATE = rca.template.md`
    - `SPEC_ID = RCA-<slug>-<YYYYMMDD>`
@@ -62,7 +62,7 @@ STOP. Display the populated Timeline, Symptoms, Affected scope, Recent changes. 
 
 ## Phase 2 - Hypothesis enumeration
 
-1. Invoke `ck:debugger` with:
+1. Invoke `sd-debugger` with:
    - `TASK = enumerate`
    - `SPEC_REF = .specs/RCA-<slug>-<YYYYMMDD>/00-spec.md`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
@@ -87,7 +87,7 @@ STOP. Display the ranked hypotheses. Ask:
 
 For each hypothesis in rank order:
 
-1. Invoke `ck:debugger` with:
+1. Invoke `sd-debugger` with:
    - `TASK = verify`
    - `HYPOTHESIS = <H#>`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
@@ -132,7 +132,7 @@ No gate here - documentation-only phase.
    - **Long-term (next quarter)** - process changes, coverage gates, training.
    - **Knowledge capture** - constitution amendments, glossary entries, runbook updates.
 2. Reserve spec IDs for each spawned spec. List them in **Spawned specs** table with title + owner.
-3. Note: this command does NOT create the spawned specs. The user runs `/ck:bug <ID>`, `/ck:refactor <slug>`, etc. separately. The RCA captures intent + reserved IDs.
+3. Note: this command does NOT create the spawned specs. The user runs `/sd:bug <ID>`, `/sd:refactor <slug>`, etc. separately. The RCA captures intent + reserved IDs.
 4. Fill **Lessons learned** (3-5 takeaways, honest):
    - What we did well.
    - What we did poorly.
@@ -148,7 +148,7 @@ No gate here - documentation-only phase.
 
 ## Rules (hard constraints)
 
-- **No code is changed in /ck:rca.** Period. If the user asks "while we're here, can you fix it?" -> redirect to `/ck:bug <ID>` after this workflow completes.
+- **No code is changed in /sd:rca.** Period. If the user asks "while we're here, can you fix it?" -> redirect to `/sd:bug <ID>` after this workflow completes.
 - Reproduction is rarely possible for incidents (the incident is over). Verification relies on logs, traces, queries, and code reads from the relevant time window.
 - All evidence lives under `04-artifacts/` with descriptive filenames. Never reference "the dashboard" - save a screenshot or query.
 - Rejected hypotheses are documented in full. They are as valuable as the confirmed one for future incidents.

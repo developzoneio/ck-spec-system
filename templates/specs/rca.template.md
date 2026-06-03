@@ -10,7 +10,7 @@ created: <<YYYY-MM-DD>>
 
 # RCA: <<short incident name, e.g. Payment outage on 2026-01-08>>
 
-> **This spec IS the deliverable.** No code is changed in `/ck:rca`. Fixes spawn separate BUG-* / REF-* / PERF-* specs (see "Spawned specs" below).
+> **This spec IS the deliverable.** No code is changed in `/sd:rca`. Fixes spawn separate BUG-* / REF-* / PERF-* specs (see "Spawned specs" below).
 
 ## Timeline (UTC)
 
@@ -59,7 +59,7 @@ Artifacts: see `04-artifacts/` for logs, screenshots, query results.
 
 ## Hypothesis tree
 
-<!-- TBD - filled by Phase 2 (ck:debugger enumerate mode). -->
+<!-- TBD - filled by Phase 2 (sd-debugger enumerate mode). -->
 <!-- 4-8 hypotheses ranked by (Likelihood × Impact) ÷ Cost-to-verify. -->
 
 **Status**: TBD - filled by Phase 2 enumeration.

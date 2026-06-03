@@ -22,7 +22,7 @@ Common issues and fixes. Skim the table of contents first; the fix you need is u
 [FAIL] commands
 [FAIL] agents
 ...
-Missing required source directories. Are you running this from a clean ck-spec-system checkout?
+Missing required source directories. Are you running this from a clean specwright checkout?
 ```
 
 **Cause**: you ran the installer from outside the repo root.
@@ -66,40 +66,40 @@ sudo apt install jq
 sudo dnf install jq
 ```
 
-### Hooks installed but `~/.claude/hooks/ck/*.sh` not executable
+### Hooks installed but `~/.claude/hooks/sd/*.sh` not executable
 
 **Cause**: rare - the installer ran with an unusual umask or as a different user than expected.
 
 **Fix**:
 ```bash
-chmod +x ~/.claude/hooks/ck/*.sh
+chmod +x ~/.claude/hooks/sd/*.sh
 ```
 
 ---
 
 ## Hooks not firing
 
-If `/ck:*` commands work but `<context-router>` blocks never appear, run through these checks in order.
+If `/sd:*` commands work but `<context-router>` blocks never appear, run through these checks in order.
 
 ### Check 1: `settings.json` wires hooks for THIS project
 
-`/ck:setup` writes `.claude/settings.json` per project. Without it, Claude Code does not invoke any hooks. Verify:
+`/sd:setup` writes `.claude/settings.json` per project. Without it, Claude Code does not invoke any hooks. Verify:
 
 ```bash
 cat .claude/settings.json
 ```
 
-The file should contain `hooks` entries for `UserPromptSubmit`, `PreToolUse`, and `SubagentStop`. If empty or missing, re-run `/ck:setup`.
+The file should contain `hooks` entries for `UserPromptSubmit`, `PreToolUse`, and `SubagentStop`. If empty or missing, re-run `/sd:setup`.
 
 ### Check 2: Hook scripts are executable (Unix)
 
 ```bash
-ls -l ~/.claude/hooks/ck/
+ls -l ~/.claude/hooks/sd/
 ```
 
 All three should have `-rwxr-xr-x`. If not:
 ```bash
-chmod +x ~/.claude/hooks/ck/*.sh
+chmod +x ~/.claude/hooks/sd/*.sh
 ```
 
 ### Check 3: Hooks are enabled in project-config
@@ -124,7 +124,7 @@ If any is `"enabled": false`, that hook is intentionally silent.
 Even when invoked via `powershell -NoProfile -ExecutionPolicy Bypass`, some systems are locked down further. Test manually:
 
 ```powershell
-'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -NoProfile -ExecutionPolicy Bypass -File $env:USERPROFILE\.claude\hooks\ck\prompt-router.ps1
+'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -NoProfile -ExecutionPolicy Bypass -File $env:USERPROFILE\.claude\hooks\sd\prompt-router.ps1
 ```
 
 If this errors with execution policy complaints, your system's group policy may be overriding the `-ExecutionPolicy Bypass`. Talk to your admin.
@@ -135,12 +135,12 @@ Pipe a JSON payload to the hook and check the output:
 
 **Unix:**
 ```bash
-echo '{"prompt":"fix bug INV-2501","cwd":"'"$PWD"'"}' | ~/.claude/hooks/ck/prompt-router.sh
+echo '{"prompt":"fix bug INV-2501","cwd":"'"$PWD"'"}' | ~/.claude/hooks/sd/prompt-router.sh
 ```
 
 **Windows:**
 ```powershell
-'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -File "$env:USERPROFILE\.claude\hooks\ck\prompt-router.ps1"
+'{"prompt":"fix bug INV-2501","cwd":"' + (Get-Location).Path + '"}' | powershell -File "$env:USERPROFILE\.claude\hooks\sd\prompt-router.ps1"
 ```
 
 Expect a `<context-router>` block on stdout. Empty output means no signal was detected (which is correct behavior for prompts without keywords or tickets).
@@ -153,13 +153,13 @@ Expect a `<context-router>` block on stdout. Empty output means no signal was de
 
 **Cause**: `.specs/constitution.md` does not exist in the project.
 
-**Fix**: run `/ck:setup`. If it ran before but the constitution was deleted, re-run `/ck:setup` - it will detect `partial` state and recreate the missing file.
+**Fix**: run `/sd:setup`. If it ran before but the constitution was deleted, re-run `/sd:setup` - it will detect `partial` state and recreate the missing file.
 
 ### Workflow refuses to proceed at a hard gate
 
 This is **by design**. Hard gates exist precisely to prevent skipping steps. The workflow tells you what is missing. Options:
 
-1. **Provide what's missing.** For `/ck:bug` Gate 2 (Reproduction), gather telemetry or reproduce locally. For `/ck:perf` Gate 2 (Baseline), run the benchmark and check in the artifact.
+1. **Provide what's missing.** For `/sd:bug` Gate 2 (Reproduction), gather telemetry or reproduce locally. For `/sd:perf` Gate 2 (Baseline), run the benchmark and check in the artifact.
 2. **Log a constitution exception.** If you have a defensible reason to skip, the workflow accepts that with explicit acknowledgement and logs to `05-retro.md`. The exception is visible at audit time.
 3. **Abort.** Spec stays at its current state; you can resume later by re-running the command.
 
@@ -197,26 +197,26 @@ If aliases also fail, verify your Claude Code account has access to the relevant
 
 **Fix**:
 ```
-/ck:spec validate --all
+/sd:spec validate --all
 ```
 
-This lists every inconsistency. Then fix manually (recommended) or remove the misaligned row from the index and re-add via `/ck:spec status`.
+This lists every inconsistency. Then fix manually (recommended) or remove the misaligned row from the index and re-add via `/sd:spec status`.
 
 ### "Illegal status transition: draft -> done"
 
 **Cause**: skipping intermediate states.
 
-**Fix**: lifecycle is `draft -> approved -> in-progress -> done`. Use `/ck:spec status <ID> approved` then `in-progress` then `done`. If you're closing a spec that genuinely had no execution (e.g. an RCA that documents itself), `/ck:rca` flows directly to `done` at workflow end - don't manually transition.
+**Fix**: lifecycle is `draft -> approved -> in-progress -> done`. Use `/sd:spec status <ID> approved` then `in-progress` then `done`. If you're closing a spec that genuinely had no execution (e.g. an RCA that documents itself), `/sd:rca` flows directly to `done` at workflow end - don't manually transition.
 
 ### A spec is stuck in `in-progress` for weeks
 
 **Cause**: workflow aborted mid-execution; nothing pulled it forward to `done`.
 
 **Fix**:
-- Re-run the original command: `/ck:feature <arg>`. The state machine resumes at the right phase.
-- If the work was abandoned, transition to `done` with a retro note explaining why: `/ck:spec status <ID> done` and edit `05-retro.md`.
+- Re-run the original command: `/sd:feature <arg>`. The state machine resumes at the right phase.
+- If the work was abandoned, transition to `done` with a retro note explaining why: `/sd:spec status <ID> done` and edit `05-retro.md`.
 
-### `/ck:spec stats` shows aging warnings
+### `/sd:spec stats` shows aging warnings
 
 The aging report flags specs in `in-progress` > 7 days and `draft` > 14 days (defaults). These are signals, not errors. Decide per case: resume, close, or archive.
 
@@ -241,9 +241,9 @@ If a path is there by mistake, remove it. If it should stay protected, update th
 
 **Fix**:
 ```
-/ck:spec validate --all
+/sd:spec validate --all
 ```
-If the index row is missing or has the wrong status, fix it via `/ck:spec status <ID> in-progress` or by editing `.specs/index.md` directly to add the row.
+If the index row is missing or has the wrong status, fix it via `/sd:spec status <ID> in-progress` or by editing `.specs/index.md` directly to add the row.
 
 ### I want to disable spec-gate temporarily
 
@@ -292,33 +292,33 @@ rm -rf .specs/FEAT-INV-2501
 # manually remove the row in .specs/index.md (or use editor)
 ```
 
-You can then re-run `/ck:feature INV-2501` from scratch.
+You can then re-run `/sd:feature INV-2501` from scratch.
 
 ### Reset the engine for one project
 
 Remove `CLAUDE.md`, `.specs/`, `.claude/`:
 ```bash
 rm -rf CLAUDE.md .specs .claude
-/ck:setup
+/sd:setup
 ```
 
-Backups created during the last `/ck:setup` run can be found at `CLAUDE.md.bak.<timestamp>` if you want to recover.
+Backups created during the last `/sd:setup` run can be found at `CLAUDE.md.bak.<timestamp>` if you want to recover.
 
 ### Reset the engine globally
 
 ```bash
 # Unix
-rm -rf ~/.claude/commands/ck \
-       ~/.claude/agents/ck \
-       ~/.claude/hooks/ck \
-       ~/.claude/templates/ck
+rm -rf ~/.claude/commands/sd \
+       ~/.claude/agents/sd \
+       ~/.claude/hooks/sd \
+       ~/.claude/templates/sd
 ./install/install.sh
 
 # Windows
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\ck
-Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\ck
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\sd
 .\install\install.ps1
 ```
 
@@ -330,7 +330,7 @@ This leaves your per-project specs untouched.
 # from a project
 rm -rf CLAUDE.md .specs .claude
 # globally
-rm -rf ~/.claude/commands/ck ~/.claude/agents/ck ~/.claude/hooks/ck ~/.claude/templates/ck
+rm -rf ~/.claude/commands/sd ~/.claude/agents/sd ~/.claude/hooks/sd ~/.claude/templates/sd
 ```
 
 You're back to plain Claude Code.
@@ -344,6 +344,6 @@ Open an issue at the project repository with:
 - Claude Code version (`claude --version`).
 - The exact command you ran.
 - The error message verbatim.
-- The output of `/ck:spec validate --all` (if relevant).
+- The output of `/sd:spec validate --all` (if relevant).
 
 Smaller reproductions are easier to fix.

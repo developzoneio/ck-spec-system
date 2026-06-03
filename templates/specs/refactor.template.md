@@ -21,12 +21,12 @@ created: <<YYYY-MM-DD>>
 
 ## Current state
 
-<!-- Describe what exists today. Use file:line citations. ck:code-explorer fills detail in 03-decisions.md. -->
+<!-- Describe what exists today. Use file:line citations. sd-code-explorer fills detail in 03-decisions.md. -->
 
 - **Primary file**: <<src/path/to/file.ext>> (<<N>> lines)
 - **Structure**: <<brief description of current shape, e.g. "single class with 7 public methods + 12 private helpers + 4 inline cache calls">>
 - **Test coverage**: <<currently N% - filled from coverage report>>
-- **Used by**: <<list callers - filled by ck:code-explorer in Phase 2>>
+- **Used by**: <<list callers - filled by sd-code-explorer in Phase 2>>
 
 ## Target state
 
@@ -56,7 +56,7 @@ created: <<YYYY-MM-DD>>
 
 ## Impact surface
 
-<!-- TBD - filled by ck:code-explorer in Phase 2 (impact-map task). -->
+<!-- TBD - filled by sd-code-explorer in Phase 2 (impact-map task). -->
 <!-- Should list: direct callers, transitive callers, test files, DI registrations, config references. -->
 
 **Status**: TBD - filled by Phase 2 impact mapping.

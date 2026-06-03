@@ -1,11 +1,11 @@
 ---
-description: Read-only code exploration via ck:code-explorer. Single subagent invocation. No spec created.
+description: Read-only code exploration via sd-code-explorer. Single subagent invocation. No spec created.
 argument-hint: <target or query>
 ---
 
-# /ck:explore
+# /sd:explore
 
-Fast, read-only code navigation. One `ck:code-explorer` invocation, no spec is created, no code is modified. Optional save to `.specs/_explorations/`.
+Fast, read-only code navigation. One `sd-code-explorer` invocation, no spec is created, no code is modified. Optional save to `.specs/_explorations/`.
 
 **Argument**: `$ARGUMENTS` -> free-form query.
 
@@ -33,11 +33,11 @@ Inspect `$ARGUMENTS` to detect intent. Detect by keyword first, fall back to `pa
 | "show structure", "overview", "layout of <module>" | Structural overview | `structure` |
 | anything else | Default | `pattern` |
 
-Print: "Detected intent: <INTENT>. Routing to ck:code-explorer."
+Print: "Detected intent: <INTENT>. Routing to sd-code-explorer."
 
 ---
 
-## Phase 2 - Invoke `ck:code-explorer`
+## Phase 2 - Invoke `sd-code-explorer`
 
 Invoke with:
 - `TASK = standalone`
@@ -94,5 +94,5 @@ The `.specs/_explorations/` folder is NOT tracked in `.specs/index.md` - it's a 
 - No spec lifecycle is started. No `00-spec.md` is created.
 - Every finding cites `file:line`. If a finding has no citation, the explorer is misbehaving and should be re-prompted.
 - If GitNexus is disabled or unavailable, fall back to grep / read. Tell the user "GitNexus disabled, using grep fallback - results may be less precise on transitive callers".
-- If the user follows up an exploration with "now fix X" or "now refactor X", REDIRECT to the appropriate workflow command (`/ck:bug`, `/ck:refactor`, etc.). Do not implement inline.
-- Save destination is always `.specs/_explorations/`. If `.specs/` does not exist, create the underscore folder ad-hoc; this does not require `/ck:setup`.
+- If the user follows up an exploration with "now fix X" or "now refactor X", REDIRECT to the appropriate workflow command (`/sd:bug`, `/sd:refactor`, etc.). Do not implement inline.
+- Save destination is always `.specs/_explorations/`. If `.specs/` does not exist, create the underscore folder ad-hoc; this does not require `/sd:setup`.
