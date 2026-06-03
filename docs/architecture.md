@@ -1,6 +1,6 @@
 # Architecture
 
-ck-spec-system is a thin layer on top of Claude Code that enforces spec-driven development workflows. This document explains the moving parts and why each one exists.
+specwright is a thin layer on top of Claude Code that enforces spec-driven development workflows. This document explains the moving parts and why each one exists.
 
 ---
 
@@ -10,10 +10,11 @@ ck-spec-system is a thin layer on top of Claude Code that enforces spec-driven d
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/ck/    9 workflow definitions                          |
-|    agents/ck/      5 subagent prompt files                         |
-|    hooks/ck/       3 cross-platform hook scripts                   |
-|    templates/ck/   4 setup + 5 spec templates                      |
+|    commands/sd/    9 workflow definitions                          |
+|    agents/sd/      5 subagent prompt files                         |
+|    hooks/sd/       3 cross-platform hook scripts                   |
+|    templates/sd/   4 setup + 5 spec templates                      |
+|    skills/sd/      5 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |
@@ -70,11 +71,11 @@ The 5 workflow commands have these gate counts:
 
 | Workflow | Gates | Why |
 |---|---|---|
-| `/ck:feature` | 3 | spec, plan, per-task review, integration |
-| `/ck:bug` | 5 | symptom, reproduction (HARD), root cause, failing test, regression |
-| `/ck:rca` | 3 | evidence, hypotheses, root cause |
-| `/ck:refactor` | 6 | spec, coverage, post-test, plan, per-batch tests, holistic review |
-| `/ck:perf` | 8 | target, baseline (HARD), hotspot, hypothesis, correctness, keep/revert, regression, final review |
+| `/sd:feature` | 3 | spec, plan, per-task review, integration |
+| `/sd:bug` | 5 | symptom, reproduction (HARD), root cause, failing test, regression |
+| `/sd:rca` | 3 | evidence, hypotheses, root cause |
+| `/sd:refactor` | 6 | spec, coverage, post-test, plan, per-batch tests, holistic review |
+| `/sd:perf` | 8 | target, baseline (HARD), hotspot, hypothesis, correctness, keep/revert, regression, final review |
 
 Gates marked HARD (e.g. bug reproduction, perf baseline) have no override path. The point is to force discipline at the moments when shortcuts are most tempting.
 
@@ -86,15 +87,49 @@ Each subagent has a focused role, a minimal tool allowlist, and a model assignme
 
 | Agent | Model | Tool surface | Role |
 |---|---|---|---|
-| `ck:spec-architect` | sonnet | Read/Write/Edit + Grep/Glob + Atlassian + Context7 | Authors specs, plans, tasks. Constitution-aware. |
-| `ck:code-explorer` | haiku | Read/Grep/Glob + GitNexus | Read-only navigation. Every finding cites `file:line`. |
-| `ck:debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + MSSQL (SELECT only) + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
-| `ck:implementer` | haiku | Read/Write/Edit/MultiEdit/Grep/Glob/Bash + Context7 | Executes ONE atomic task with scope discipline. |
-| `ck:reviewer` | sonnet | Read/Grep/Glob + sequential-thinking + GitNexus | Severity-tagged review (🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PASS). Cannot write. |
+| `sd-spec-architect` | sonnet | Read/Write/Edit + Grep/Glob + Atlassian + Context7 | Authors specs, plans, tasks. Constitution-aware. |
+| `sd-code-explorer` | haiku | Read/Grep/Glob + GitNexus | Read-only navigation. Every finding cites `file:line`. |
+| `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + MSSQL (SELECT only) + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
+| `sd-implementer` | haiku | Read/Write/Edit/MultiEdit/Grep/Glob/Bash + Context7 | Executes ONE atomic task with scope discipline. |
+| `sd-reviewer` | sonnet | Read/Grep/Glob + sequential-thinking + GitNexus | Severity-tagged review (🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PASS). Cannot write. |
 
 **Tool allowlists are minimal by design.** The reviewer cannot fix code because it has no write tools. The explorer cannot suggest fixes for the same reason. This is enforced by the engine, not by prose discipline alone.
 
 **Models use portable aliases** (`sonnet`, `haiku`) so they auto-update with the latest Anthropic model. Full model IDs would pin agents to a specific version and require code changes when the model is superseded.
+
+---
+
+## Agent skills
+
+Skills are markdown rule packs that agents reference from their frontmatter. They live in `~/.claude/skills/sd/<skill-name>/SKILL.md`. The rule body is loaded into the agent's context at runtime alongside the agent prompt itself.
+
+The split exists for three reasons:
+
+1. **De-duplication.** `sd-evidence-citation` is used by `sd-code-explorer`, `sd-debugger`, and `sd-reviewer`. Without skills, the same `file:line` citation rule would be copy-pasted into three agent files and drift over time. With skills, it lives in one place.
+2. **Smaller agent bodies.** The reviewer prompt no longer carries the full severity taxonomy inline; it points at `sd-severity-taxonomy`. Body size goes down; lookup discipline stays the same.
+3. **Auditability.** A reader can open one `SKILL.md` and see exactly what rules every agent follows for that concern — without grepping across 5 agent files.
+
+| Skill | Used by | Purpose |
+|---|---|---|
+| `sd-severity-taxonomy` | `sd-reviewer` | Severity levels + per-severity rules + mandatory output markdown. |
+| `sd-hypothesis-tree` | `sd-debugger` | Enumerate / verify protocol, the 5 mental models, score formula `(L × I) / C`, proximate-vs-root ladder. |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The 9-field task block + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
+| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
+| `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
+
+Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
+
+```yaml
+---
+name: sd-debugger
+model: sonnet
+skills:
+  - sd-hypothesis-tree
+  - sd-evidence-citation
+---
+```
+
+A skill is **not** an agent. It cannot be invoked directly, has no tools of its own, and produces no output on its own. It is a context block the agent inherits.
 
 ---
 
@@ -120,6 +155,23 @@ Runs before any code-editing tool. Decides:
 
 This catches the common failure mode where the user (or Claude) jumps straight to editing code without creating a spec first.
 
+**Block output schema (dual-format).** When `spec-gate` denies a tool call, it emits a single JSON object that carries **both** the new and the legacy schema fields so it works across Claude Code CLI versions:
+
+```json
+{
+  "decision": "block",
+  "reason": "spec-gate: editing code file 'src/foo.cs' but no in-progress spec is recorded ...",
+  "hookSpecificOutput": {
+    "permissionDecision": "deny",
+    "reason": "spec-gate: editing code file 'src/foo.cs' but no in-progress spec is recorded ..."
+  }
+}
+```
+
+- New schema (`hookSpecificOutput.permissionDecision = "deny"`) is read by recent CLI builds.
+- Legacy schema (`decision = "block"`) is read by older CLI builds.
+- Both are harmless to the other reader. No version probing required.
+
 ### `subagent-retro` (`SubagentStop`)
 
 Runs after every subagent invocation. If any in-progress spec has a `05-retro.md` older than `retroStaleMinutes`, emits a `<retro-reminder>` block. Debounced per session via `.claude/.hookstate/`.
@@ -137,7 +189,7 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 ├── 00-spec.md        Why / What / Success criteria / Constitution check
 ├── 01-plan.md        Phased implementation plan
 ├── 02-tasks.md       Atomic tasks with 9-field format
-├── 03-decisions.md   Impact analysis from ck:code-explorer + debugger output
+├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
 ├── 04-artifacts/     Evidence: logs, queries, traces, baselines, screenshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups
 ```
@@ -150,7 +202,7 @@ This is not documentation written after the fact. It is the **input contract** e
 
 ```
                         +--> revive (with reason)
-                        |       (only via /ck:spec revive)
+                        |       (only via /sd:spec revive)
                         v
 draft -> approved -> in-progress -> done -> archived
                                   ^   |
@@ -160,13 +212,13 @@ draft -> approved -> in-progress -> done -> archived
 
 | State | Meaning | Transition trigger |
 |---|---|---|
-| `draft` | Spec exists, not yet approved | `ck:spec-architect` creates it |
+| `draft` | Spec exists, not yet approved | `sd-spec-architect` creates it |
 | `approved` | Reviewed; ready to plan | User explicit approval at Gate 1 |
 | `in-progress` | Execution underway | Auto on plan approval (Gate 2) |
 | `done` | Closed; retro written; CI green | User explicit approval at close-out |
-| `archived` | No active work | Auto after N days, or `/ck:spec archive` |
+| `archived` | No active work | Auto after N days, or `/sd:spec archive` |
 
-All transitions are logged to `05-retro.md` with timestamp + reason. Illegal transitions are refused by `/ck:spec status`.
+All transitions are logged to `05-retro.md` with timestamp + reason. Illegal transitions are refused by `/sd:spec status`.
 
 ---
 
@@ -176,13 +228,13 @@ Heavy reasoning (architecture, investigation, holistic review) uses `sonnet`. Me
 
 | Workflow run | Typical cost | Sonnet calls | Haiku calls |
 |---|---|---|---|
-| `/ck:feature` (6 atomic tasks) | ~$2.00 - $3.00 | architect (spec + plan) + reviewer per task | explorer + implementer per task |
-| `/ck:bug` (with investigation) | ~$1.00 - $2.00 | architect + debugger + reviewer | implementer |
-| `/ck:rca` (no code) | ~$0.50 - $1.50 | architect + debugger (enum + verify) | (none) |
-| `/ck:refactor` (3 batches) | ~$1.50 - $3.50 | architect + reviewer holistic | explorer + implementer per task |
-| `/ck:perf` (3 hypotheses tried) | ~$2.00 - $4.00 | debugger (hotspot A + B per attempt) + reviewer | implementer |
-| `/ck:explore` (single call) | ~$0.05 - $0.20 | (none) | explorer |
-| `/ck:review` (standalone, 20 files) | ~$0.30 - $0.80 | reviewer | (none) |
+| `/sd:feature` (6 atomic tasks) | ~$2.00 - $3.00 | architect (spec + plan) + reviewer per task | explorer + implementer per task |
+| `/sd:bug` (with investigation) | ~$1.00 - $2.00 | architect + debugger + reviewer | implementer |
+| `/sd:rca` (no code) | ~$0.50 - $1.50 | architect + debugger (enum + verify) | (none) |
+| `/sd:refactor` (3 batches) | ~$1.50 - $3.50 | architect + reviewer holistic | explorer + implementer per task |
+| `/sd:perf` (3 hypotheses tried) | ~$2.00 - $4.00 | debugger (hotspot A + B per attempt) + reviewer | implementer |
+| `/sd:explore` (single call) | ~$0.05 - $0.20 | (none) | explorer |
+| `/sd:review` (standalone, 20 files) | ~$0.30 - $0.80 | reviewer | (none) |
 
 These are rough ballparks. Actual cost depends on file sizes, MCP usage, and conversation length. The point is that workflow design - not aggressive prompting alone - keeps cost predictable.
 
@@ -190,7 +242,7 @@ These are rough ballparks. Actual cost depends on file sizes, MCP usage, and con
 
 ## MCP integration
 
-ck-spec-system is built around a small set of MCP servers most useful for spec-driven work. None are required; agents fall back gracefully.
+specwright is built around a small set of MCP servers most useful for spec-driven work. None are required; agents fall back gracefully.
 
 ### Recommended user scope (`~/.claude.json`)
 
@@ -199,7 +251,7 @@ ck-spec-system is built around a small set of MCP servers most useful for spec-d
 | `context7` | Up-to-date library docs (avoids stale training-data examples) | spec-architect, implementer, debugger |
 | `sequential-thinking` | Structured multi-step reasoning | debugger, reviewer |
 | `tavily` | Web search for error signatures and library issues | debugger |
-| `playwright` (optional) | E2E reproduction for `/ck:bug` | main thread |
+| `playwright` (optional) | E2E reproduction for `/sd:bug` | main thread |
 
 ### Recommended project scope (per-project `.mcp.json` or `project-config.json` flags)
 
@@ -213,18 +265,18 @@ The split exists because user-scope servers are generic (any project benefits fr
 
 ---
 
-## Why the `ck:` prefix
+## Why the `sd:` prefix
 
-Every command, agent, and (conceptually) namespaced asset uses the `ck:` prefix:
+Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 
-- `/ck:feature` instead of `/feature`.
-- `ck:spec-architect` instead of `spec-architect`.
+- `/sd:feature` instead of `/feature`.
+- `sd-spec-architect` instead of `spec-architect`.
 
 The prefix exists for three reasons:
 
-1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `ck:` carves out a namespace.
-2. **Discoverability.** Typing `/ck:` in Claude Code lists all 9 commands. The namespace is its own table of contents.
-3. **Removability.** Uninstalling the engine removes everything under `ck/` subfolders, leaving the rest of `~/.claude/` intact.
+1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 9 commands. The namespace is its own table of contents.
+3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---
 
@@ -232,7 +284,7 @@ The prefix exists for three reasons:
 
 The engine assumes nothing about your stack. Agents read `CLAUDE.md` and `.specs/constitution.md` at runtime; the implementer uses `commands.test` from project-config rather than hardcoding `dotnet test` or `npm test`.
 
-Concrete example: the same `/ck:feature` workflow runs identically on...
+Concrete example: the same `/sd:feature` workflow runs identically on...
 
 **.NET project:**
 ```
@@ -256,7 +308,7 @@ When this discipline slips - e.g. an agent writing `dotnet test` because that's 
 
 ---
 
-## When NOT to use ck-spec-system
+## When NOT to use specwright
 
 The system is overhead. The overhead pays off when:
 
@@ -267,7 +319,7 @@ The system is overhead. The overhead pays off when:
 
 The overhead does NOT pay off when:
 
-- You're prototyping or doing throwaway work. Use `/ck:explore` if you want navigation, but skip the workflows.
+- You're prototyping or doing throwaway work. Use `/sd:explore` if you want navigation, but skip the workflows.
 - The project is tiny and read by only you. Plain Claude Code is faster.
 - You don't intend to enforce gates. The system is built around discipline; without that intent, the gates feel like friction with no benefit.
 
