@@ -1,7 +1,7 @@
-# ck-spec-system
+# specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Nine slash commands, five specialized subagents, three guard-rail hooks, nine templates - all under the `ck:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Nine slash commands, five specialized subagents, three guard-rail hooks, nine templates, five reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -11,7 +11,7 @@
 
 ## Why spec-driven?
 
-Most AI coding assistants are great at producing diff-shaped output. They are less great at remembering **why** a change was made, **what** invariants must hold, or **whether** the fix even addressed the right cause. `ck-spec-system` enforces a thin layer of discipline:
+Most AI coding assistants are great at producing diff-shaped output. They are less great at remembering **why** a change was made, **what** invariants must hold, or **whether** the fix even addressed the right cause. `specwright` enforces a thin layer of discipline:
 
 - Every non-trivial change starts with a written spec.
 - Workflows have **hard gates** - they refuse to proceed without explicit approval.
@@ -26,10 +26,11 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 | Capability | What you get |
 |---|---|
-| **9 slash commands** | `/ck:feature`, `/ck:bug`, `/ck:rca`, `/ck:refactor`, `/ck:perf`, `/ck:spec`, `/ck:explore`, `/ck:review`, `/ck:setup` |
-| **5 specialized subagents** | `ck:spec-architect`, `ck:code-explorer`, `ck:debugger`, `ck:implementer`, `ck:reviewer` |
+| **9 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup` |
+| **5 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
+| **5 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates` |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
 | **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
@@ -41,16 +42,16 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 **Windows (PowerShell 5.1+):**
 ```powershell
-git clone https://github.com/developzoneio/ck-spec-system.git
-cd ck-spec-system
+git clone https://github.com/developzoneio/specwright.git
+cd specwright
 .\install\install.ps1 -DryRun   # preview
 .\install\install.ps1           # install to $env:USERPROFILE\.claude
 ```
 
 **macOS / Linux (bash 4+):**
 ```bash
-git clone https://github.com/developzoneio/ck-spec-system.git
-cd ck-spec-system
+git clone https://github.com/developzoneio/specwright.git
+cd specwright
 ./install/install.sh --dry-run   # preview
 ./install/install.sh             # install to ~/.claude
 ```
@@ -59,10 +60,10 @@ Then in a real project:
 ```
 cd <your-project>
 claude
-> /ck:setup
+> /sd:setup
 ```
 
-That's it. `/ck:setup` will scaffold `CLAUDE.md`, `.specs/`, and `.claude/project-config.json` interactively.
+That's it. `/sd:setup` will scaffold `CLAUDE.md`, `.specs/`, and `.claude/project-config.json` interactively.
 
 See [`install/README.md`](install/README.md) for advanced options.
 
@@ -72,15 +73,15 @@ See [`install/README.md`](install/README.md) for advanced options.
 
 | Command | Type | Hard gates | Purpose |
 |---|---|---|---|
-| `/ck:feature <ID-or-slug>` | Workflow | 4 | Spec-driven feature: spec -> impact -> plan -> execute -> review -> close |
-| `/ck:bug <ID-or-slug>` | Workflow | 5 | Root-cause-first fix: capture -> reproduce -> investigate -> failing test -> minimal fix -> regression |
-| `/ck:rca <slug>` | Workflow | 3 | Incident analysis. **Output is the spec - no code change.** |
-| `/ck:refactor <slug>` | Workflow | 6 | Coverage-gated restructure: requires >=80% coverage before touching code |
-| `/ck:perf <slug>` | Workflow | 8 | Baseline-first optimization: measure -> hypothesize -> apply -> remeasure -> keep or revert |
-| `/ck:spec <subcommand>` | Utility | - | Spec registry: list, show, status, link, archive, revive, search, validate, stats |
-| `/ck:explore <target-or-query>` | Utility | - | Read-only code navigation, single subagent call, optional save |
-| `/ck:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |
-| `/ck:setup` | Utility | - | Idempotent project scaffold (interactive) |
+| `/sd:feature <ID-or-slug>` | Workflow | 4 | Spec-driven feature: spec -> impact -> plan -> execute -> review -> close |
+| `/sd:bug <ID-or-slug>` | Workflow | 5 | Root-cause-first fix: capture -> reproduce -> investigate -> failing test -> minimal fix -> regression |
+| `/sd:rca <slug>` | Workflow | 3 | Incident analysis. **Output is the spec - no code change.** |
+| `/sd:refactor <slug>` | Workflow | 6 | Coverage-gated restructure: requires >=80% coverage before touching code |
+| `/sd:perf <slug>` | Workflow | 8 | Baseline-first optimization: measure -> hypothesize -> apply -> remeasure -> keep or revert |
+| `/sd:spec <subcommand>` | Utility | - | Spec registry: list, show, status, link, archive, revive, search, validate, stats |
+| `/sd:explore <target-or-query>` | Utility | - | Read-only code navigation, single subagent call, optional save |
+| `/sd:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |
+| `/sd:setup` | Utility | - | Idempotent project scaffold (interactive) |
 
 ---
 
@@ -88,19 +89,44 @@ See [`install/README.md`](install/README.md) for advanced options.
 
 | Agent | Model | Tools (minimal allowlist) | Role |
 |---|---|---|---|
-| `ck:spec-architect` | sonnet | Read, Write, Edit, Grep, Glob, Atlassian MCP, Context7 MCP | Create / refine specs, plans, and tasks. Constitution-aware. |
-| `ck:code-explorer` | haiku | Read, Grep, Glob, GitNexus MCP | Read-only navigation. Every finding cites `file:line`. |
-| `ck:debugger` | sonnet | Read, Grep, Glob, Bash, sequential-thinking, GitNexus, MSSQL (SELECT only), Tavily, Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
-| `ck:implementer` | haiku | Read, Write, Edit, MultiEdit, Grep, Glob, Bash, Context7 | Executes ONE atomic task. Scope-disciplined, no opportunism. |
-| `ck:reviewer` | sonnet | Read, Grep, Glob, sequential-thinking, GitNexus | Severity-tagged review: BLOCK / WARN / SUGGEST / PASS. |
+| `sd-spec-architect` | sonnet | Read, Write, Edit, Grep, Glob, Atlassian MCP, Context7 MCP | Create / refine specs, plans, and tasks. Constitution-aware. |
+| `sd-code-explorer` | haiku | Read, Grep, Glob, GitNexus MCP | Read-only navigation. Every finding cites `file:line`. |
+| `sd-debugger` | sonnet | Read, Grep, Glob, Bash, sequential-thinking, GitNexus, MSSQL (SELECT only), Tavily, Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
+| `sd-implementer` | haiku | Read, Write, Edit, MultiEdit, Grep, Glob, Bash, Context7 | Executes ONE atomic task. Scope-disciplined, no opportunism. |
+| `sd-reviewer` | sonnet | Read, Grep, Glob, sequential-thinking, GitNexus | Severity-tagged review: BLOCK / WARN / SUGGEST / PASS. |
 
 All models use **portable aliases** (`sonnet`, `haiku`) so they auto-update.
 
 ---
 
+## Skills
+
+Skills are shared markdown rules that agents reference via frontmatter. They live in `~/.claude/skills/sd/` (one folder per skill, each with a `SKILL.md`). Pulling rules out of agent bodies and into skills keeps agent prompts smaller and lets multiple agents share the same canonical rule without copy-paste drift.
+
+| Skill | Used by | Purpose |
+|---|---|---|
+| `sd-severity-taxonomy` | `sd-reviewer` | BLOCK / WARN / SUGGEST / PASS severity rules and the mandatory review output format. |
+| `sd-hypothesis-tree` | `sd-debugger` | Enumerate-and-verify protocol with the 5 mental models, score formula, and proximate-vs-root "why" ladder. |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The 9-field atomic task block, canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
+| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
+| `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
+
+Agents declare the skills they apply via a `skills:` list in their frontmatter, e.g.:
+
+```yaml
+---
+name: sd-reviewer
+skills:
+  - sd-severity-taxonomy
+  - sd-evidence-citation
+---
+```
+
+---
+
 ## Spec-driven structure
 
-Every project that adopts `ck-spec-system` ends up with:
+Every project that adopts `specwright` ends up with:
 
 ```
 <your-repo>/
@@ -115,7 +141,7 @@ Every project that adopts `ck-spec-system` ends up with:
       00-spec.md                # Why / What / Success criteria / Constitution check
       01-plan.md                # Implementation plan
       02-tasks.md               # Atomic tasks with Files / Layer / Acceptance
-      03-decisions.md           # Impact analysis from ck:code-explorer
+      03-decisions.md           # Impact analysis from sd-code-explorer
       04-artifacts/             # Evidence: logs, queries, traces, screenshots
       05-retro.md               # Post-execution retro
     BUG-1247/
@@ -137,7 +163,8 @@ A spec is not "documentation you write afterwards". It is the **input contract**
 ```
 +--------------------------------------------------------------+
 |  User scope  (~/.claude/)            installed once          |
-|    commands/ck/   agents/ck/   hooks/ck/   templates/ck/     |
+|    commands/sd/   agents/sd/   hooks/sd/                     |
+|    templates/sd/  skills/sd/                                 |
 +--------------------------------------------------------------+
                             |
                             v
@@ -156,7 +183,7 @@ A spec is not "documentation you write afterwards". It is the **input contract**
 - **3 layers** - generic engine (user scope), per-project context (project scope), live conversation (runtime). The engine never changes per project; context comes from `CLAUDE.md` + `constitution.md` + `project-config.json`.
 - **Hard gates** - workflows refuse to proceed without explicit approval at named checkpoints (spec approval, reproduction confirmed, baseline measured, plan approval, review pass, etc.).
 - **Cost-aware models** - `sonnet` for reasoning agents (architect, debugger, reviewer); `haiku` for execution agents (implementer, explorer). Override per-task when needed.
-- **Stack-agnostic** - the same `/ck:feature` workflow runs on .NET, Node, Python, Go, or Rust. Agents read project context at runtime.
+- **Stack-agnostic** - the same `/sd:feature` workflow runs on .NET, Node, Python, Go, or Rust. Agents read project context at runtime.
 
 Full architecture: [`docs/architecture.md`](docs/architecture.md).
 
@@ -164,17 +191,17 @@ Full architecture: [`docs/architecture.md`](docs/architecture.md).
 
 ## MCP integrations
 
-`ck-spec-system` is designed around the MCP servers most useful for spec-driven work. None are required; agents fall back gracefully.
+`specwright` is designed around the MCP servers most useful for spec-driven work. None are required; agents fall back gracefully.
 
 | MCP server | Used by | Purpose |
 |---|---|---|
-| **Atlassian** | `ck:spec-architect`, commands | Fetch JIRA ticket context for `<ID>` arguments |
-| **Context7** | `ck:spec-architect`, `ck:implementer`, `ck:debugger` | Pull current library docs (no stale training-data examples) |
-| **sequential-thinking** | `ck:debugger`, `ck:reviewer` | Structured hypothesis enumeration and verification |
-| **GitNexus** | `ck:code-explorer`, `ck:debugger`, `ck:reviewer` | Fast symbol search, callers, call graph |
-| **MSSQL** | `ck:debugger` (SELECT/EXPLAIN only) | Inspect schema and query plans during investigation |
-| **Playwright** | optional | E2E reproduction for `/ck:bug` |
-| **Tavily** | `ck:debugger` | Web search for error signatures / library issues |
+| **Atlassian** | `sd-spec-architect`, commands | Fetch JIRA ticket context for `<ID>` arguments |
+| **Context7** | `sd-spec-architect`, `sd-implementer`, `sd-debugger` | Pull current library docs (no stale training-data examples) |
+| **sequential-thinking** | `sd-debugger`, `sd-reviewer` | Structured hypothesis enumeration and verification |
+| **GitNexus** | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Fast symbol search, callers, call graph |
+| **MSSQL** | `sd-debugger` (SELECT/EXPLAIN only) | Inspect schema and query plans during investigation |
+| **Playwright** | optional | E2E reproduction for `/sd:bug` |
+| **Tavily** | `sd-debugger` | Web search for error signatures / library issues |
 
 Configure per project in `.claude/project-config.json` under the `mcp` section.
 
@@ -190,8 +217,8 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 | Ubuntu 22.04+ | bash 5 | `stat -c %Y` syntax supported |
 | jq | 1.6+ | Optional. Bash hooks exit 0 if missing. |
 | .NET stack | ASP.NET Core 8 | Stack-agnostic - .NET is just one example |
-| Node stack | Node 20+ / TS 5+ | Same `/ck:feature` workflow |
-| Python stack | 3.11+ / FastAPI / Django | Same `/ck:feature` workflow |
+| Node stack | Node 20+ / TS 5+ | Same `/sd:feature` workflow |
+| Python stack | 3.11+ / FastAPI / Django | Same `/sd:feature` workflow |
 
 ---
 

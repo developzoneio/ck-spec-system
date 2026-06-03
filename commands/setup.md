@@ -3,9 +3,9 @@ description: Idempotent project scaffold. Detects state, asks 3 questions, gener
 argument-hint: (no args - interactive)
 ---
 
-# /ck:setup
+# /sd:setup
 
-Scaffolds a project to use `ck-spec-system`. Safe to re-run: detects existing state and only fills gaps.
+Scaffolds a project to use `specwright`. Safe to re-run: detects existing state and only fills gaps.
 
 **No arguments.** Fully interactive.
 
@@ -13,12 +13,14 @@ Scaffolds a project to use `ck-spec-system`. Safe to re-run: detects existing st
 
 ## Phase 0 - Prerequisites check
 
-1. Verify `~/.claude/templates/ck/` exists (i.e. the engine has been installed via the installer).
-   - If missing -> abort with: "ck-spec-system templates not found at `~/.claude/templates/ck/`. Run `install/install.ps1` (Windows) or `install/install.sh` (Unix) from the ck-spec-system repo first."
+1. Verify the following installed paths exist (i.e. the engine has been installed via the installer):
+   - `~/.claude/templates/sd/`
+   - `~/.claude/skills/sd/`
+   - If either is missing -> abort with: "specwright install incomplete — `<missing path>` not found. Run `install/install.ps1` (Windows) or `install/install.sh` (Unix) from the specwright repo first."
 2. Verify the current directory looks like a project root.
    - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`).
    - If nothing found -> warn and ask: "This directory does not appear to be a project root. Continue anyway? (yes / no)".
-3. Read `~/.claude/templates/ck/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
+3. Read `~/.claude/templates/sd/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
 
 ---
 
@@ -31,7 +33,7 @@ Classify the project into one of four states:
 | `fresh` | No `CLAUDE.md`, no `.specs/`, no `.claude/` | Full scaffold |
 | `post-init` | Has `CLAUDE.md` but no `.specs/` (e.g. ran `/init` only) | Backup `CLAUDE.md`, regenerate from template merging stack hints; scaffold `.specs/` and `.claude/` |
 | `partial` | Has `.specs/` OR `.claude/` but not both, OR missing key files | Fill the missing pieces only; never overwrite existing |
-| `complete` | Has `CLAUDE.md`, `.specs/constitution.md`, `.specs/index.md`, `.claude/project-config.json`, `.claude/settings.json` | Print "already set up - run `/ck:spec list` to view specs". Exit cleanly. |
+| `complete` | Has `CLAUDE.md`, `.specs/constitution.md`, `.specs/index.md`, `.claude/project-config.json`, `.claude/settings.json` | Print "already set up - run `/sd:spec list` to view specs". Exit cleanly. |
 
 Print the detected state and the planned changes BEFORE writing anything.
 
@@ -93,7 +95,7 @@ This determines which hook variant the generated `settings.json` references.
 1. If existing `CLAUDE.md` is present:
    - Backup to `CLAUDE.md.bak.<YYYYMMDD-HHmmss>`.
    - Merge: take stack hints from existing into the new template; preserve user-customized sections under "## Code conventions" and "## Forbidden patterns" verbatim if they exist.
-2. Generate new `CLAUDE.md` from `~/.claude/templates/ck/CLAUDE.template.md`:
+2. Generate new `CLAUDE.md` from `~/.claude/templates/sd/CLAUDE.template.md`:
    - Substitute `<<project-name>>` -> from current directory name or git remote.
    - Pre-fill stack fields from Phase 2 inference; leave others as `<<placeholder>>` for the user to fill.
 3. Display a diff summary (new vs old).
@@ -103,7 +105,7 @@ This determines which hook variant the generated `settings.json` references.
 ## Phase 5 - Scaffold .specs/
 
 1. Create `.specs/` directory if missing.
-2. Write `.specs/constitution.md` from `~/.claude/templates/ck/constitution.template.md`:
+2. Write `.specs/constitution.md` from `~/.claude/templates/sd/constitution.template.md`:
    - Substitute `<<project-name>>` and frontmatter fields.
    - Leave all rule placeholders as `<<placeholder>>` (the user must declare rules explicitly).
 3. Write `.specs/index.md`:
@@ -111,7 +113,7 @@ This determines which hook variant the generated `settings.json` references.
 ```
 # Spec index
 
-Active specs (auto-updated by /ck:spec status transitions):
+Active specs (auto-updated by /sd:spec status transitions):
 
 | ID | Type | Status | Created | Title |
 |---|---|---|---|---|
@@ -125,7 +127,7 @@ Active specs (auto-updated by /ck:spec status transitions):
 ## Phase 6 - Scaffold .claude/
 
 1. Create `.claude/` directory if missing.
-2. Write `.claude/project-config.json` from `~/.claude/templates/ck/project-config.template.json`:
+2. Write `.claude/project-config.json` from `~/.claude/templates/sd/project-config.template.json`:
    - Substitute project name, owner (from git config), repo URL (from git remote).
    - Set `ticket.system`, `ticket.pattern`, `ticket.baseUrl` from Phase 3 Q1/Q2.
    - Set `commands.{build,test,lint,coverage,run}` from inferred or asked-on-the-spot values.
@@ -155,11 +157,18 @@ Setup complete. Generated:
   - .claude/project-config.json (M MCP servers disabled)
   - .claude/settings.json (hooks: prompt-router, spec-gate, subagent-retro)
 
+Installed engine paths:
+  - ~/.claude/commands/sd/     (9 workflow commands)
+  - ~/.claude/agents/sd/       (5 specialist agents)
+  - ~/.claude/hooks/sd/        (3 hooks)
+  - ~/.claude/templates/sd/    (templates)
+  - ~/.claude/skills/sd/       (5 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates)
+
 Next steps:
   1. Fill placeholders in CLAUDE.md and .specs/constitution.md (open them in your editor).
   2. Enable MCP servers you use in .claude/project-config.json under the "mcp" section.
   3. Restart Claude Code so hooks are picked up.
-  4. Try: /ck:explore "where is the entrypoint" to verify the install works.
+  4. Try: /sd:explore "where is the entrypoint" to verify the install works.
 ```
 
 ---

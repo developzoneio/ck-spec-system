@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installer for ck-spec-system into a Claude Code base directory.
+# Installer for specwright into a Claude Code base directory.
 #
-# Copies the engine (commands, agents, bash hooks, templates) under <base>/ck/
-# for each engine folder:
-#   <base>/commands/ck/   <base>/agents/ck/
-#   <base>/hooks/ck/      <base>/templates/ck/
+# Copies the engine (commands, agents, bash hooks, templates) under <base>/<prefix>/
+# (default prefix "sd") for each engine folder:
+#   <base>/commands/sd/   <base>/agents/sd/
+#   <base>/hooks/sd/      <base>/templates/sd/
 #
 # Features:
 #   - --dry-run preview.
@@ -18,6 +18,7 @@ set -e
 # ---- defaults --------------------------------------------------------------
 
 BASE_PATH="${HOME}/.claude"
+PREFIX="sd"
 DRY_RUN=0
 FORCE=0
 APPLY_ALL=0
@@ -48,13 +49,14 @@ fail()    { echo "  ${C_RED}[FAIL]${C_RESET} $*"; }
 
 usage() {
     cat <<'EOF'
-ck-spec-system installer (Unix).
+specwright installer (Unix).
 
 Usage:
   ./install.sh [options]
 
 Options:
   --base-path <path>   Base directory (default: $HOME/.claude)
+  --prefix <name>      Namespace subfolder under each engine dir (default: sd)
   --dry-run            Preview without copying.
   --force              Overwrite without prompting (backups still made).
   --help               Show this message.
@@ -62,7 +64,7 @@ Options:
 Examples:
   ./install.sh --dry-run
   ./install.sh
-  ./install.sh --base-path /tmp/ck-test --force
+  ./install.sh --base-path /tmp/sd-test --force
 EOF
 }
 
@@ -70,6 +72,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --base-path)
             BASE_PATH="$2"; shift 2 ;;
+        --prefix)
+            PREFIX="$2"; shift 2 ;;
         --dry-run)
             DRY_RUN=1; shift ;;
         --force)
@@ -109,10 +113,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-section "ck-spec-system installer"
+section "specwright installer"
 info "Script:    $SCRIPT_PATH"
 info "Repo root: $REPO_ROOT"
 info "Base path: $BASE_PATH"
+info "Prefix:    $PREFIX"
 if [[ $DRY_RUN -eq 1 ]]; then
     info "Mode:      DRY RUN (no changes)"
 elif [[ $FORCE -eq 1 ]]; then
@@ -125,7 +130,7 @@ fi
 
 section "Verifying source layout"
 
-REQUIRED_DIRS=("commands" "agents" "hooks/bash" "templates")
+REQUIRED_DIRS=("commands" "agents" "hooks/bash" "templates" "skills")
 MISSING=0
 for d in "${REQUIRED_DIRS[@]}"; do
     if [[ -d "$REPO_ROOT/$d" ]]; then
@@ -138,7 +143,7 @@ done
 
 if [[ $MISSING -gt 0 ]]; then
     echo
-    fail "Missing required source directories. Are you running this from a clean ck-spec-system checkout?"
+    fail "Missing required source directories. Are you running this from a clean specwright checkout?"
     exit 1
 fi
 
@@ -151,10 +156,11 @@ fi
 # Format: "source_rel:target_rel:executable_flag"
 
 PLAN=(
-    "commands:commands/ck:0"
-    "agents:agents/ck:0"
-    "hooks/bash:hooks/ck:1"
-    "templates:templates/ck:0"
+    "commands:commands/${PREFIX}:0"
+    "agents:agents/${PREFIX}:0"
+    "hooks/bash:hooks/${PREFIX}:1"
+    "templates:templates/${PREFIX}:0"
+    "skills:skills/${PREFIX}:0"
 )
 
 section "Install plan"
@@ -266,14 +272,26 @@ fi
 
 section "Next steps"
 info "1. Verify install:"
-info "     ls $BASE_PATH/commands/ck/"
-info "     ls $BASE_PATH/agents/ck/"
-info "     ls $BASE_PATH/hooks/ck/"
+info "     ls $BASE_PATH/commands/${PREFIX}/"
+info "     ls $BASE_PATH/agents/${PREFIX}/"
+info "     ls $BASE_PATH/hooks/${PREFIX}/"
+info "     ls $BASE_PATH/skills/${PREFIX}/"
 info ""
 info "2. In a project directory:"
 info "     claude"
-info "     /ck:setup"
+info "     /sd:setup"
 info ""
 info "3. Restart Claude Code so hooks are picked up."
+info ""
+info "4. Hook wiring (Bash - add to your project .claude/settings.json):"
+info "     \"hooks\": {"
+info "       \"UserPromptSubmit\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\","
+info "         \"command\":\"bash \${HOME}/.claude/hooks/${PREFIX}/prompt-router.sh\",\"timeout\":5}]}],"
+info "       \"PreToolUse\": [{\"matcher\":\"Edit|Write|MultiEdit\",\"hooks\":[{\"type\":\"command\","
+info "         \"command\":\"bash \${HOME}/.claude/hooks/${PREFIX}/spec-gate.sh\",\"timeout\":5}]}],"
+info "       \"SubagentStop\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\","
+info "         \"command\":\"bash \${HOME}/.claude/hooks/${PREFIX}/subagent-retro.sh\",\"timeout\":3}]}]"
+info "     }"
+info "   (Or run /sd:setup in your project - it generates settings.json automatically.)"
 
 exit 0

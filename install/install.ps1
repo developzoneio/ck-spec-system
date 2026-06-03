@@ -1,17 +1,17 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Installer for ck-spec-system into a Claude Code base directory.
+    Installer for specwright into a Claude Code base directory.
 
 .DESCRIPTION
-    Copies the ck-spec-system engine (commands, agents, PowerShell hooks,
+    Copies the specwright engine (commands, agents, PowerShell hooks,
     templates) under a base path (default $env:USERPROFILE\.claude) into the
-    "ck/" subdirectory of each engine folder:
+    "<Prefix>/" subdirectory (default "sd/") of each engine folder:
 
-        <BasePath>\commands\ck\
-        <BasePath>\agents\ck\
-        <BasePath>\hooks\ck\
-        <BasePath>\templates\ck\
+        <BasePath>\commands\sd\
+        <BasePath>\agents\sd\
+        <BasePath>\hooks\sd\
+        <BasePath>\templates\sd\
 
     Features:
       - Dry-run preview (-DryRun).
@@ -26,6 +26,9 @@
 .PARAMETER BasePath
     Claude Code base directory. Default: $env:USERPROFILE\.claude.
 
+.PARAMETER Prefix
+    Namespace subfolder under each engine directory. Default: sd.
+
 .PARAMETER DryRun
     Show the install plan without copying anything.
 
@@ -35,11 +38,12 @@
 .EXAMPLE
     .\install.ps1 -DryRun
     .\install.ps1
-    .\install.ps1 -BasePath C:\temp\ck-test -Force
+    .\install.ps1 -BasePath C:\temp\sd-test -Force
 #>
 
 param(
     [string]  $BasePath = (Join-Path $env:USERPROFILE '.claude'),
+    [string]  $Prefix   = 'sd',
     [switch]  $DryRun,
     [switch]  $Force
 )
@@ -76,10 +80,11 @@ function Get-FileHashSafe {
 $scriptDir = $PSScriptRoot
 $repoRoot  = Split-Path -Path $scriptDir -Parent
 
-Write-Section 'ck-spec-system installer'
+Write-Section 'specwright installer'
 Write-Info  "Script:    $PSCommandPath"
 Write-Info  "Repo root: $repoRoot"
 Write-Info  "Base path: $BasePath"
+Write-Info  "Prefix:    $Prefix"
 Write-Info  ("Mode:      " + ($(if ($DryRun) { 'DRY RUN (no changes)' } else { 'INSTALL' })) + ($(if ($Force) { ' [Force]' } else { '' })))
 
 # ---- verify source layout --------------------------------------------------
@@ -90,7 +95,8 @@ $requiredDirs = @(
     @{ Path = 'commands';          Required = $true  },
     @{ Path = 'agents';            Required = $true  },
     @{ Path = 'hooks\powershell';  Required = $true  },
-    @{ Path = 'templates';         Required = $true  }
+    @{ Path = 'templates';         Required = $true  },
+    @{ Path = 'skills';            Required = $true  }
 )
 
 $missing = @()
@@ -106,7 +112,7 @@ foreach ($d in $requiredDirs) {
 
 if ($missing.Count -gt 0) {
     Write-Host ''
-    Write-Fail "Missing required source directories. Are you running this from a clean ck-spec-system checkout?"
+    Write-Fail "Missing required source directories. Are you running this from a clean specwright checkout?"
     exit 1
 }
 
@@ -114,10 +120,11 @@ if ($missing.Count -gt 0) {
 
 # Each entry: source rel path, target rel path under BasePath, recursive copy
 $plan = @(
-    [pscustomobject]@{ Source = 'commands';         Target = 'commands\ck';   Recursive = $true  ; Executable = $false }
-    [pscustomobject]@{ Source = 'agents';           Target = 'agents\ck';     Recursive = $true  ; Executable = $false }
-    [pscustomobject]@{ Source = 'hooks\powershell'; Target = 'hooks\ck';      Recursive = $true  ; Executable = $false }
-    [pscustomobject]@{ Source = 'templates';        Target = 'templates\ck';  Recursive = $true  ; Executable = $false }
+    [pscustomobject]@{ Source = 'commands';         Target = "commands\$Prefix";   Recursive = $true  ; Executable = $false }
+    [pscustomobject]@{ Source = 'agents';           Target = "agents\$Prefix";     Recursive = $true  ; Executable = $false }
+    [pscustomobject]@{ Source = 'hooks\powershell'; Target = "hooks\$Prefix";      Recursive = $true  ; Executable = $false }
+    [pscustomobject]@{ Source = 'templates';        Target = "templates\$Prefix";  Recursive = $true  ; Executable = $false }
+    [pscustomobject]@{ Source = 'skills';           Target = "skills\$Prefix";     Recursive = $true  ; Executable = $false }
 )
 
 Write-Section 'Install plan'
@@ -238,14 +245,26 @@ if ($DryRun) {
 
 Write-Section 'Next steps'
 Write-Info '1. Verify install:'
-Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath 'commands\ck') + "'")
-Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath 'agents\ck') + "'")
-Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath 'hooks\ck') + "'")
+Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath "commands\$Prefix") + "'")
+Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath "agents\$Prefix") + "'")
+Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath "hooks\$Prefix") + "'")
+Write-Info ("     Get-ChildItem '" + (Join-Path $BasePath "skills\$Prefix") + "'")
 Write-Info ''
 Write-Info '2. In a project directory:'
 Write-Info '     claude'
-Write-Info '     /ck:setup'
+Write-Info '     /sd:setup'
 Write-Info ''
 Write-Info '3. Restart Claude Code so hooks are picked up.'
+Write-Info ''
+Write-Info '4. Hook wiring (PowerShell - add to your project .claude/settings.json):'
+Write-Info '     "hooks": {'
+Write-Info '       "UserPromptSubmit": [{"matcher":"*","hooks":[{"type":"command",'
+Write-Info ("         " + '"command":"powershell -NoProfile -ExecutionPolicy Bypass -File ' + '${HOME}/.claude/hooks/' + "$Prefix/prompt-router.ps1" + '","timeout":5}]}],')
+Write-Info '       "PreToolUse": [{"matcher":"Edit|Write|MultiEdit","hooks":[{"type":"command",'
+Write-Info ("         " + '"command":"powershell -NoProfile -ExecutionPolicy Bypass -File ' + '${HOME}/.claude/hooks/' + "$Prefix/spec-gate.ps1" + '","timeout":5}]}],')
+Write-Info '       "SubagentStop": [{"matcher":"*","hooks":[{"type":"command",'
+Write-Info ("         " + '"command":"powershell -NoProfile -ExecutionPolicy Bypass -File ' + '${HOME}/.claude/hooks/' + "$Prefix/subagent-retro.ps1" + '","timeout":3}]}]')
+Write-Info '     }'
+Write-Info '   (Or run /sd:setup in your project - it generates settings.json automatically.)'
 
 exit 0
