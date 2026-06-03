@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# ck-spec-system: PreToolUse hook - spec-gate (bash).
+# specwright: PreToolUse hook - spec-gate (bash).
 #
 # Decides whether an Edit / Write / MultiEdit is allowed:
 #   - Protected paths   -> always block.
 #   - Allow-listed dirs / extensions -> always allow.
 #   - Code files        -> require an in-progress spec in .specs/index.md.
-#       mode=block -> emit decision=block JSON.
+#       mode=block -> emit block JSON (see emit_block below).
 #       mode=warn  -> warn to stderr; allow.
 #       mode=off   -> always allow.
 # Exits 0 silently on any missing tool or parse error.
+#
+# Output schema (dual-format for forward + backward compatibility):
+#   New:    hookSpecificOutput.permissionDecision = "deny"   (CLI >= schema v2)
+#   Legacy: decision = "block"                               (CLI < schema v2)
+# Both are emitted in the same JSON object so either CLI generation can act.
 #
 # Note: hooks must never fail noisily. `set -u` is intentionally omitted.
 
@@ -85,10 +90,13 @@ if [[ -z "${rel}" ]]; then
 fi
 
 # --- emit-block helper --------------------------------------------------------
+# Emits dual-format JSON: new hookSpecificOutput schema + legacy decision field.
+# The CLI reads whichever field it understands; both are harmless to the other.
 
 emit_block() {
     local reason="$1"
-    jq -nc --arg r "${reason}" '{decision:"block", reason:$r}'
+    jq -nc --arg r "${reason}" \
+        '{decision:"block",reason:$r,hookSpecificOutput:{permissionDecision:"deny",reason:$r}}'
 }
 
 # --- Rule 1: protected paths -> block ----------------------------------------
@@ -104,7 +112,7 @@ while IFS= read -r p; do
 done < <(printf '%s' "${config_json}" | jq -r '.paths.protected // [] | .[]' 2>/dev/null)
 
 if [[ ${is_protected} -eq 1 ]]; then
-    emit_block "spec-gate: '${rel}' is listed under paths.protected in .claude/project-config.json. Update via /ck:refactor or an ADR; never edit directly."
+    emit_block "spec-gate: '${rel}' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
     exit 0
 fi
 
@@ -168,7 +176,7 @@ if [[ -f "${index_path}" ]]; then
 fi
 
 if [[ ${has_in_progress} -eq 0 ]]; then
-    msg="spec-gate: editing code file '${rel}' but no in-progress spec is recorded in .specs/index.md. Run /ck:feature, /ck:bug, /ck:refactor, or /ck:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
+    msg="spec-gate: editing code file '${rel}' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
     if [[ "${mode}" == "block" ]]; then
         emit_block "${msg}"
         exit 0

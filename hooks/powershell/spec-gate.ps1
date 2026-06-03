@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    ck-spec-system: PreToolUse hook - spec-gate.
+    specwright: PreToolUse hook - spec-gate.
 
 .DESCRIPTION
     Reads Claude Code hook JSON from stdin. If the tool is Edit / Write /
@@ -12,9 +12,14 @@
       - Edits to code files (cs, ts, py, rs, go, java, kt, rb, php, swift,
         cpp, c, h, hpp, scala, js, jsx, tsx, vue, sql) -> require an
         in-progress spec recorded in .specs/index.md.
-          mode=block -> output decision=block JSON to stdout.
+          mode=block -> output block JSON to stdout (see Write-BlockDecision).
           mode=warn  -> write a warning to stderr; allow the edit.
           mode=off   -> always allow.
+
+    Output schema (dual-format for forward + backward compatibility):
+      New:    hookSpecificOutput.permissionDecision = "deny"   (CLI >= schema v2)
+      Legacy: decision = "block"                               (CLI < schema v2)
+    Both are emitted in the same JSON object so either CLI generation can act.
 
 .NOTES
     PURE ASCII ONLY. See prompt-router.ps1 for the rationale.
@@ -146,9 +151,15 @@ function Get-InProgressSpecs {
 
 function Write-BlockDecision {
     param([string]$Reason)
+    # Dual-format: new hookSpecificOutput schema + legacy decision field.
+    # The CLI reads whichever field it understands; both are harmless to the other.
     $obj = [pscustomobject]@{
-        decision = 'block'
-        reason   = $Reason
+        decision           = 'block'
+        reason             = $Reason
+        hookSpecificOutput = [pscustomobject]@{
+            permissionDecision = 'deny'
+            reason             = $Reason
+        }
     }
     [Console]::Out.WriteLine(($obj | ConvertTo-Json -Compress))
 }
@@ -187,7 +198,7 @@ if ([string]::IsNullOrWhiteSpace($rel)) { exit 0 }
 $protected = @()
 try { if ($config.paths.protected) { $protected = @($config.paths.protected) } } catch { }
 if (Test-IsProtected -RelPath $rel -Protected $protected) {
-    Write-BlockDecision "spec-gate: '$rel' is listed under paths.protected in .claude/project-config.json. Update via /ck:refactor or an ADR; never edit directly."
+    Write-BlockDecision "spec-gate: '$rel' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
     exit 0
 }
 
@@ -199,7 +210,7 @@ if (Test-IsCodeFile -RelPath $rel) {
     $indexFile = if ($config.spec.indexFile) { Join-Path $cwd $config.spec.indexFile } else { Join-Path $cwd '.specs/index.md' }
     $inProgress = Get-InProgressSpecs -IndexPath $indexFile
     if ($inProgress.Count -eq 0) {
-        $msg = "spec-gate: editing code file '$rel' but no in-progress spec is recorded in .specs/index.md. Run /ck:feature, /ck:bug, /ck:refactor, or /ck:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
+        $msg = "spec-gate: editing code file '$rel' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
         if ($mode -eq 'block') {
             Write-BlockDecision $msg
             exit 0
