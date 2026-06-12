@@ -37,6 +37,7 @@ Inputs: `SPEC` (path to `00-spec.md`), `OUTPUT_APPEND_TO` (typically `03-decisio
 Behavior:
 1. Read the spec. Identify the target: feature scope, bug-affected components, refactor primary file(s), or perf hotspot endpoint.
 2. Produce structured analysis (sections below). APPEND to `OUTPUT_APPEND_TO`. Do not overwrite.
+3. For "Precedents & conventions": derive conventions by sampling, never by stack assumption - `Glob` the target directory, then `Read` the top ~30 lines (or `mcp__gitnexus__list_symbols`) of at most 3 sibling files, and state the observed pattern with evidence.
 
 Structure of appended content:
 
@@ -73,6 +74,17 @@ Structure of appended content:
 - High risk: <files with many callers and no tests>
 - Medium risk: <files with callers OR no tests>
 - Low risk: <isolated, well-tested files>
+
+### Precedents & conventions
+
+- Nearest similar implementations (1-3):
+  - `file:line` - <symbol/role> - <why this is the closest precedent for what the spec adds>
+- Conventions observed in target directories (max 3 sibling files sampled per directory):
+  - File naming: <observed pattern> (evidence: `file`, `file`)
+  - Symbol naming: <observed pattern> (evidence: `file:line`)
+  - Test placement: <observed pattern> (evidence: `file` -> `test file`)
+- Existing utilities relevant to spec scope:
+  - `file:line` - <description>, or "none found (searched: <patterns>)"
 ```
 
 ### `TASK = callers`

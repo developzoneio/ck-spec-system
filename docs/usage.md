@@ -59,11 +59,13 @@ Spec-driven feature workflow.
 
 **Spec ID**: `FEAT-<arg>`. State machine on re-invocation: detected state -> resume at next phase.
 
+Phase 2 records the codebase's precedents and conventions (nearest similar implementations, naming patterns, existing utilities) alongside the impact map. Phase 3 tasks then carry `Pattern refs` - `file:line` citations of precedent code the implementer must read before writing, so new code mirrors the existing structure.
+
 Example:
 ```
 /sd:feature INV-2501
 ```
-With JIRA enabled and ticket pattern matching `INV-2501`, the architect fetches the ticket and includes it in the spec context.
+With JIRA enabled and ticket pattern matching `INV-2501`, the architect fetches the ticket and includes it in the spec context. It also snapshots the ticket content, its related tickets (1 hop), and linked Confluence pages to `.specs/FEAT-INV-2501/04-artifacts/ticket/` as durable evidence - caps configurable via `ticket.snapshot` in project-config.
 
 ### `/sd:bug <ID-or-slug>`
 

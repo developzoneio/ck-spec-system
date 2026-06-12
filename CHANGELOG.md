@@ -9,7 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] - 2026-06-12
+
+Pattern conformance release. Introduces `sd-pattern-discipline` (the 6th skill), wires it into spec-architect/implementer/reviewer, adds the `Pattern refs` task field, and closes the gap where impact analysis never reached implementation.
+
+### Added
+- `sd-pattern-discipline` skill (6th skill) - pattern discovery and adherence rules: precedent
+  sampling, `Pattern refs` authoring (spec-architect), following (implementer), and conformance
+  review (reviewer). Fixes implementations that ignored the target codebase's structure.
+- `Pattern refs` task field in `sd-atomic-task-format` - 1-3 `file:line` precedent citations the
+  implementer reads before writing. Required for tasks creating a new file or public symbol;
+  absent field is treated as `none` (backward compatible with existing `.specs/` folders).
+- `sd-code-explorer` impact-map output gains a "Precedents & conventions" section: nearest
+  similar implementations, observed naming/layout conventions, and reusable existing utilities.
+- Ticket snapshot protocol in `sd-spec-architect`: fetched JIRA tickets are now persisted to
+  `.specs/<ID>/04-artifacts/ticket/` together with related tickets (1 hop, capped) and linked
+  Confluence pages (capped). Configurable via `ticket.snapshot` in project-config (enabled by
+  default, absent means enabled); fetch failures never block spec creation.
+- `CLAUDE.md` added to the specwright repo itself (was previously missing).
+
+### Changed
+- `/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf` now pass `IMPACT_REF` (`03-decisions.md`)
+  to `sd-implementer`, closing the gap where impact analysis never reached implementation.
+- `sd-spec-architect`, `sd-implementer`, `sd-reviewer` wired to the `sd-pattern-discipline`
+  skill; implementer's convention discipline expanded to cover new files, new-symbol naming, and
+  reuse-before-write for helpers.
+- `sd-spec-architect` Atlassian tool allowlist: added `getJiraIssueRemoteIssueLinks` and
+  `getConfluencePage` (snapshot collection).
+
+### Fixed
+- `sd-spec-architect` tool allowlist referenced `mcp__atlassian__searchJiraIssues`, which is not
+  a real Atlassian MCP tool name - corrected to `mcp__atlassian__searchJiraIssuesUsingJql`.
+  Slug-based ticket search could never have resolved before.
+
 ### Planned
+- `/sd:setup` codebase scan: pre-fill constitution §1.1/§2.4 and CLAUDE.md conventions from
+  sampled source files instead of leaving `<<placeholder>>`s; optional `paths.layers` map in
+  project-config.
 - Optional `/sd:release` workflow for release-note generation from closed specs.
 - Optional `sd-docs-writer` agent for ADR generation.
 - Telemetry-free usage analytics (opt-in, local only).

@@ -141,6 +141,7 @@ STOP. Display hypotheses. Ask:
 1. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <hypothesis details + target files>`
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
+   - `IMPACT_REF = .specs/PERF-<slug>-<YYYYMMDD>/03-decisions.md` (hotspot analysis)
    - `WORKFLOW_TYPE = perf`
    - `CONSTRAINTS = <Constraints section: correctness must hold>`
 2. Implementer applies the change. ONE hypothesis at a time - no bundling.

@@ -12,7 +12,13 @@
   "ticket": {
     "system": "<<jira|github|linear|none>>",
     "pattern": "<<e.g. ^[A-Z]+-[0-9]+$ for JIRA, ^#[0-9]+$ for GitHub>>",
-    "baseUrl": "<<e.g. https://yourorg.atlassian.net/browse>>"
+    "baseUrl": "<<e.g. https://yourorg.atlassian.net/browse>>",
+    "snapshot": {
+      "enabled": true,
+      "maxRelated": 5,
+      "maxConfluencePages": 3,
+      "_use": "Persist fetched ticket + related tickets + linked Confluence pages to .specs/<ID>/04-artifacts/ticket/"
+    }
   },
 
   "spec": {
@@ -77,7 +83,7 @@
   "mcp": {
     "atlassian": {
       "enabled": false,
-      "_use": "Fetch JIRA tickets in /sd:feature and /sd:bug"
+      "_use": "Fetch JIRA tickets (+ related tickets and linked Confluence pages) in /sd:feature and /sd:bug"
     },
     "context7": {
       "enabled": false,

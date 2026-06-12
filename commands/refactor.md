@@ -135,6 +135,7 @@ If user picks (2) explicit exception, document the threshold reduction in `05-re
 - Conflicts with: <T## or "none">
 - Complexity: <S | M | L>
 - Reversibility: <trivial | moderate | hard>
+- Pattern refs: <1-3 file:line precedent citations + what to mirror, or "none">
 - Parallel batch: <batch number or "solo">
 ```
 
@@ -157,6 +158,7 @@ For each batch (up to 3 tasks in parallel):
    - Invoke `sd-implementer` with:
      - `TASK_DETAILS = <task block>`
      - `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
+     - `IMPACT_REF = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
      - `WORKFLOW_TYPE = refactor`
      - `INVARIANTS = <invariants list from spec>`
    - Implementer's constraint set is tightest in refactor mode: NO new public API, NO new feature, ONLY restructure.

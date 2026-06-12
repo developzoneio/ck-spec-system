@@ -162,7 +162,7 @@ Installed engine paths:
   - ~/.claude/agents/sd/       (5 specialist agents)
   - ~/.claude/hooks/sd/        (3 hooks)
   - ~/.claude/templates/sd/    (templates)
-  - ~/.claude/skills/sd/       (5 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates)
+  - ~/.claude/skills/sd/       (6 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline)
 
 Next steps:
   1. Fill placeholders in CLAUDE.md and .specs/constitution.md (open them in your editor).

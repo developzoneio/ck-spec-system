@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Nine slash commands, five specialized subagents, three guard-rail hooks, nine templates, five reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Nine slash commands, five specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -30,7 +30,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 | **5 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
-| **5 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates` |
+| **6 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline` |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
 | **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
@@ -107,9 +107,10 @@ Skills are shared markdown rules that agents reference via frontmatter. They liv
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | BLOCK / WARN / SUGGEST / PASS severity rules and the mandatory review output format. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate-and-verify protocol with the 5 mental models, score formula, and proximate-vs-root "why" ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The 9-field atomic task block, canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The atomic task block (9 required fields + `Pattern refs`), canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
+| `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |
 
 Agents declare the skills they apply via a `skills:` list in their frontmatter, e.g.:
 
@@ -142,7 +143,7 @@ Every project that adopts `specwright` ends up with:
       01-plan.md                # Implementation plan
       02-tasks.md               # Atomic tasks with Files / Layer / Acceptance
       03-decisions.md           # Impact analysis from sd-code-explorer
-      04-artifacts/             # Evidence: logs, queries, traces, screenshots
+      04-artifacts/             # Evidence: logs, queries, traces, screenshots, ticket snapshots
       05-retro.md               # Post-execution retro
     BUG-1247/
       ...
@@ -195,7 +196,7 @@ Full architecture: [`docs/architecture.md`](docs/architecture.md).
 
 | MCP server | Used by | Purpose |
 |---|---|---|
-| **Atlassian** | `sd-spec-architect`, commands | Fetch JIRA ticket context for `<ID>` arguments |
+| **Atlassian** | `sd-spec-architect`, commands | Fetch JIRA ticket context for `<ID>` arguments; snapshot ticket + related tickets + linked Confluence pages to `04-artifacts/ticket/` |
 | **Context7** | `sd-spec-architect`, `sd-implementer`, `sd-debugger` | Pull current library docs (no stale training-data examples) |
 | **sequential-thinking** | `sd-debugger`, `sd-reviewer` | Structured hypothesis enumeration and verification |
 | **GitNexus** | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Fast symbol search, callers, call graph |

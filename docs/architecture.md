@@ -14,7 +14,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 |    agents/sd/      5 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
-|    skills/sd/      5 reusable rule packs (referenced by agents)    |
+|    skills/sd/      6 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |
@@ -113,9 +113,10 @@ The split exists for three reasons:
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | Severity levels + per-severity rules + mandatory output markdown. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate / verify protocol, the 5 mental models, score formula `(L × I) / C`, proximate-vs-root ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The 9-field task block + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (9 required fields + `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
+| `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
 
 Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
 
@@ -188,9 +189,9 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 .specs/FEAT-INV-2501/
 ├── 00-spec.md        Why / What / Success criteria / Constitution check
 ├── 01-plan.md        Phased implementation plan
-├── 02-tasks.md       Atomic tasks with 9-field format
+├── 02-tasks.md       Atomic tasks (9 required fields + Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
-├── 04-artifacts/     Evidence: logs, queries, traces, baselines, screenshots
+├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups
 ```
 
@@ -257,7 +258,7 @@ specwright is built around a small set of MCP servers most useful for spec-drive
 
 | Server | Purpose | Used by |
 |---|---|---|
-| `atlassian` | Fetch JIRA tickets for `<ID>` arguments | spec-architect, commands |
+| `atlassian` | Fetch JIRA tickets for `<ID>` arguments + snapshot ticket / related tickets / linked Confluence pages | spec-architect, commands |
 | `gitnexus` | Fast symbol search, callers, call graph | code-explorer, debugger, reviewer |
 | `mssql` (SELECT/EXPLAIN only) | Inspect schema and query plans | debugger |
 

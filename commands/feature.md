@@ -46,7 +46,8 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
    - `TICKET_DATA = <fetched or pasted>`
    - `SPEC_ID = FEAT-<arg>`
 3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check, Linked specs.
-4. Register in `.specs/index.md` with status=`draft`.
+4. If a ticket was fetched, spec-architect also snapshots it (ticket content + related tickets + linked Confluence pages, per its Ticket snapshot protocol) to `.specs/FEAT-<arg>/04-artifacts/ticket/`.
+5. Register in `.specs/index.md` with status=`draft`.
 
 ### ⛔ Gate 1 - Spec approval
 
@@ -94,6 +95,7 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
 - Conflicts with: <T## or "none">
 - Complexity: <S | M | L>
 - Reversibility: <trivial | moderate | hard>
+- Pattern refs: <1-3 file:line precedent citations + what to mirror, or "none">
 ```
 
 3. Set status=`in-progress` in `00-spec.md` and `index.md`.
@@ -120,6 +122,7 @@ For each unchecked task:
 2. **Invoke `sd-implementer`** with:
    - `TASK_DETAILS = <full task block>`
    - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
+   - `IMPACT_REF = .specs/FEAT-<arg>/03-decisions.md`
    - `WORKFLOW_TYPE = feature`
 3. Implementer edits only files in `Files`. Writes a test if `Test` references a non-existent test file.
 4. **Run the task's test** in isolation via `commands.test` from project-config (scoped to the new test if possible).
@@ -154,7 +157,7 @@ Invoke `sd-reviewer` with:
 
 Reviewer checks ALL changes in one pass:
 - Constitution compliance across the full changeset.
-- Cross-task consistency (naming, patterns, DI wiring).
+- Cross-task consistency (naming, patterns, DI wiring) and conformance to each task's `Pattern refs`.
 - Scope creep detection (files not in any task's `Files` list).
 - Test coverage adequacy.
 - Public API surface changes.

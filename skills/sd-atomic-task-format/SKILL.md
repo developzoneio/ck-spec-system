@@ -5,7 +5,7 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 
 ---
 
-## Task block (9 required fields)
+## Task block (9 required fields + Pattern refs)
 
 ```markdown
 ### T<NN> - <imperative title>
@@ -19,9 +19,13 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 - **Conflicts with**: <T## list | none>
 - **Estimated complexity**: <S | M | L>
 - **Reversibility**: <trivial | moderate | hard>
+- **Pattern refs**: <1-3 file:line precedent citations + what to mirror | none>
 ```
 
-All 9 fields are **required**, not optional. A task block missing any field is malformed.
+The first 9 fields are **required**, not optional. A task block missing any of them is malformed.
+`Pattern refs` is **required when the task creates a new file or a new public symbol**, and
+recommended otherwise. A block without the field is treated as `Pattern refs: none` (backward
+compatible with existing `.specs/` folders).
 
 ---
 
@@ -62,6 +66,9 @@ Must be **observable**: a passing test, a 201 response, a method called exactly 
 ### Depends on / Conflicts with
 Drive sequencing and batch planning. Tasks that **conflict** cannot run in the same parallel batch. Tasks that **depend on** a prior task cannot start until that task's acceptance criterion is met.
 
+### Pattern refs
+1-3 `file:line` citations of precedent code the implementer reads BEFORE writing, each with a one-line instruction of what to mirror (e.g. "mirror handler structure and registration", "reuse this helper - do not duplicate"). Required for tasks that create a new file or a new public symbol; `none` only for tasks that exclusively edit existing files. Verify each cited file exists before writing the ref. Discovery and adherence rules live in the **sd-pattern-discipline** skill.
+
 ---
 
 ## Atomicity rules
@@ -79,3 +86,5 @@ Drive sequencing and batch planning. Tasks that **conflict** cannot run in the s
 - Listing files you haven't verified exist (for edits) or naming conventions don't match.
 - Inventing layer names not declared in the constitution.
 - Leaving `Depends on` / `Conflicts with` empty when sequential or conflicting relationships exist.
+- Authoring a new-file task with `Pattern refs: none` - the implementer has no precedent to mirror.
+- Citing Pattern refs you did not verify exist.

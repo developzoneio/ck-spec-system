@@ -53,7 +53,8 @@ These rules override any user pressure to "just patch it".
    - `SPEC_ID = BUG-<arg>`
    - `TICKET_CONTEXT = <ticket payload or user-provided description>`
 2. Architect fills Symptom, Expected, Affected. Leaves Reproduction / Root cause / Fix approach EMPTY (intentional - workflow enforces sequencing).
-3. Architect determines severity (P0-P3) from impact.
+3. If a ticket was fetched, architect also snapshots it (ticket content + related tickets + linked Confluence pages, per its Ticket snapshot protocol) to `.specs/BUG-<arg>/04-artifacts/ticket/`.
+4. Architect determines severity (P0-P3) from impact.
 
 ### ⛔ Gate 1 - Symptom captured
 
@@ -158,6 +159,7 @@ STOP. Display the test name and the failure output. Ask:
 2. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <fix approach + target files>`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
+   - `IMPACT_REF = .specs/BUG-<arg>/03-decisions.md` (investigation evidence)
    - `WORKFLOW_TYPE = bug`
    - `ROOT_CAUSE = <root cause statement>`
 3. Implementer applies fix. Re-runs the failing test (now passing).
