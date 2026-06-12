@@ -7,7 +7,8 @@ The installer copies the engine (commands, agents, hooks, templates) into a Clau
 ├── commands/sd/        9 slash commands
 ├── agents/sd/          5 subagent definitions
 ├── hooks/sd/           3 hook scripts (.ps1 on Windows, .sh on Unix)
-└── templates/sd/       9 templates (4 setup + 5 spec)
+├── templates/sd/       9 templates (4 setup + 5 spec)
+└── skills/sd/          6 skills (one folder per skill with SKILL.md)
 ```
 
 Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
@@ -37,6 +38,7 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 | `-DryRun` / `--dry-run` | off | Show the install plan; no files written. |
 | `-Force` / `--force` | off | Overwrite differing files without prompting. Backups are still created. |
 | `-BasePath <path>` / `--base-path <path>` | `~/.claude` | Install to a custom base directory (useful for sandboxed testing). |
+| `-Prefix <name>` / `--prefix <name>` | `sd` | Namespace subfolder under each engine directory. |
 
 ---
 
@@ -49,8 +51,9 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 | `hooks/powershell/` (Windows installer) | `hooks/sd/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
 | `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
 | `templates/` | `templates/sd/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
+| `skills/` | `skills/sd/` | 6 | One folder per skill, each with a `SKILL.md` |
 
-**Total**: 21 files per OS.
+**Total**: 32 files per OS.
 
 ---
 
@@ -107,7 +110,26 @@ If `/sd:explore` returns findings with `file:line` citations, the install is wor
 
 ## Uninstall
 
-The installer does not ship an uninstall script (the install is just files in known directories). To remove:
+Use the uninstall script. It removes exactly the five `sd/` directories the installer created
+(including installer-made `.bak.*` backups inside them) and touches nothing else:
+
+**Windows:**
+```powershell
+.\install\uninstall.ps1 -DryRun     # preview first (recommended)
+.\install\uninstall.ps1             # apply (asks for confirmation)
+```
+
+**Unix / macOS:**
+```bash
+./install/uninstall.sh --dry-run    # preview first (recommended)
+./install/uninstall.sh              # apply (asks for confirmation)
+```
+
+The uninstaller accepts the same `-BasePath`/`--base-path`, `-Prefix`/`--prefix`, and
+`-Force`/`--force` options as the installer. It is idempotent: running it with nothing
+installed exits cleanly.
+
+**Manual fallback** (equivalent to what the script does):
 
 **Windows:**
 ```powershell
@@ -115,6 +137,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.claude\commands\sd
 Remove-Item -Recurse -Force $env:USERPROFILE\.claude\agents\sd
 Remove-Item -Recurse -Force $env:USERPROFILE\.claude\hooks\sd
 Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\sd
+Remove-Item -Recurse -Force $env:USERPROFILE\.claude\skills\sd
 ```
 
 **Unix:**
@@ -122,10 +145,14 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.claude\templates\sd
 rm -rf ~/.claude/commands/sd \
        ~/.claude/agents/sd \
        ~/.claude/hooks/sd \
-       ~/.claude/templates/sd
+       ~/.claude/templates/sd \
+       ~/.claude/skills/sd
 ```
 
-Per-project artifacts (`.specs/`, `.claude/project-config.json`, `.claude/settings.json`, `CLAUDE.md`) remain in your projects until you remove them manually.
+Per-project artifacts remain in your projects until you remove them manually: `.specs/`,
+`.claude/project-config.json`, `.claude/.hookstate/` (subagent-retro debounce state),
+`CLAUDE.md`, and the hook wiring in `.claude/settings.json` (which now points at deleted
+scripts - remove the `"hooks"` block or re-run `/sd:setup` after reinstalling).
 
 ---
 
