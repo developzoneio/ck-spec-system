@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `install/uninstall.ps1` + `install/uninstall.sh` - removes the five `<base>/<area>/sd/`
+  directories with dry-run preview, confirmation prompt (`-Force`/`--force` to skip), and
+  per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).
+
+### Fixed
+- `install/README.md`: total file count corrected (21 -> 32), `skills/sd/` added to the layout
+  tree, install table, and manual uninstall commands (skills were missed since 1.1.0), and the
+  `-Prefix`/`--prefix` option documented.
+
 ---
 
 ## [1.2.0] - 2026-06-12

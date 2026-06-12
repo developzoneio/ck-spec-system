@@ -19,10 +19,12 @@ Note: `templates/CLAUDE.template.md` is the template `/sd:setup` scaffolds into 
 # Sandbox install test (run before any PR touching install/hooks/commands/agents)
 .\install\install.ps1 -BasePath C:\temp\sd-test
 Get-ChildItem C:\temp\sd-test\commands\sd\          # expect 9 .md files
+.\install\uninstall.ps1 -BasePath C:\temp\sd-test -Force   # round-trip: removes the 5 sd\ dirs
 Remove-Item -Recurse -Force C:\temp\sd-test         # cleanup
 ```
 
-Unix equivalents: `./install/install.sh --dry-run`, `--base-path /tmp/sd-test`, `--force`.
+Unix equivalents: `./install/install.sh --dry-run`, `--base-path /tmp/sd-test`, `--force`;
+`./install/uninstall.sh` takes the same flags.
 
 ```bash
 # Hook smoke test — hooks read JSON from stdin; every hook must exit 0
@@ -33,7 +35,7 @@ echo '{"tool_name":"Edit","tool_input":{"file_path":"src/foo.cs"},"cwd":"/path/t
 bash -n hooks/bash/spec-gate.sh
 
 # ASCII check for PowerShell files — any output means REJECT
-grep -nP "[^\x00-\x7F]" hooks/powershell/*.ps1 install/install.ps1
+grep -nP "[^\x00-\x7F]" hooks/powershell/*.ps1 install/*.ps1
 ```
 
 Every PR adds a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog / SemVer).

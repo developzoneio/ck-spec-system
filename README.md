@@ -67,6 +67,21 @@ That's it. `/sd:setup` will scaffold `CLAUDE.md`, `.specs/`, and `.claude/projec
 
 See [`install/README.md`](install/README.md) for advanced options.
 
+### Uninstall
+
+```powershell
+.\install\uninstall.ps1 -DryRun   # preview
+.\install\uninstall.ps1           # remove the five sd/ engine directories
+```
+
+```bash
+./install/uninstall.sh --dry-run   # preview
+./install/uninstall.sh             # remove the five sd/ engine directories
+```
+
+Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouched; see
+[`install/README.md`](install/README.md#uninstall) for details.
+
 ---
 
 ## Commands
