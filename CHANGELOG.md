@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `scripts/validate.ps1` + `scripts/validate.sh` - one command that runs every documented engine
+  invariant: pure-ASCII scan of `*.ps1`, `bash -n` on `*.sh`, hook-pair parity, agent `model:`
+  alias-only check, install-target file counts (real install to a temp base), and a non-empty
+  `[Unreleased]` CHANGELOG gate. Exit 1 on any failure.
+- `.github/workflows/ci.yml` - runs `validate` on push/PR across a Windows + Ubuntu matrix, plus an
+  install -> uninstall round-trip per the `CLAUDE.md` sandbox recipe.
 - `install/uninstall.ps1` + `install/uninstall.sh` - removes the five `<base>/<area>/sd/`
   directories with dry-run preview, confirmation prompt (`-Force`/`--force` to skip), and
   per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).

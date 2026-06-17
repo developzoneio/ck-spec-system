@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  validate:
+    name: validate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Run the full invariant validator (platform-native) ---------------
+      - name: Validate (bash)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/validate.sh
+
+      - name: Validate (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/validate.ps1
+
+      # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
+      - name: Install -> uninstall round-trip (bash)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(mktemp -d)"
+          ./install/install.sh --base-path "$base" --force
+          for area in commands agents hooks templates skills; do
+            test -d "$base/$area/sd" || { echo "FAIL: $area/sd missing after install"; exit 1; }
+          done
+          ./install/uninstall.sh --base-path "$base" --force
+          for area in commands agents hooks templates skills; do
+            test ! -d "$base/$area/sd" || { echo "FAIL: $area/sd survived uninstall"; exit 1; }
+          done
+          rm -rf "$base"
+          echo "round-trip OK"
+
+      - name: Install -> uninstall round-trip (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $base = Join-Path $env:RUNNER_TEMP 'sd-roundtrip'
+          if (Test-Path $base) { Remove-Item -Recurse -Force $base }
+          # Run installers in child processes so their `exit` does not end this step.
+          pwsh -NoProfile -File ./install/install.ps1 -BasePath $base -Force
+          if ($LASTEXITCODE -ne 0) { Write-Error 'install failed'; exit 1 }
+          foreach ($area in 'commands','agents','hooks','templates','skills') {
+            if (-not (Test-Path "$base/$area/sd")) { Write-Error "FAIL: $area/sd missing after install"; exit 1 }
+          }
+          pwsh -NoProfile -File ./install/uninstall.ps1 -BasePath $base -Force
+          if ($LASTEXITCODE -ne 0) { Write-Error 'uninstall failed'; exit 1 }
+          foreach ($area in 'commands','agents','hooks','templates','skills') {
+            if (Test-Path "$base/$area/sd") { Write-Error "FAIL: $area/sd survived uninstall"; exit 1 }
+          }
+          Remove-Item -Recurse -Force $base
+          Write-Host 'round-trip OK'
