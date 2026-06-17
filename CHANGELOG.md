@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).
 
 ### Fixed
+- `install/install.sh` marked executable (mode `100755`, matching `uninstall.sh`); it was `100644`,
+  so the documented `./install/install.sh` invocation failed with "Permission denied" on a fresh
+  Linux checkout. Surfaced by the new CI round-trip.
 - `install/README.md`: total file count corrected (21 -> 32), `skills/sd/` added to the layout
   tree, install table, and manual uninstall commands (skills were missed since 1.1.0), and the
   `-Prefix`/`--prefix` option documented.
