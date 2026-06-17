@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `/sd:release` command (10th command) - generates release notes from completed specs: collects
+  every spec in `done` status (feature / bug / refactor / perf; RCA excluded), groups them into
+  Keep-a-Changelog sections (FEAT -> Added, BUG -> Fixed, REF/PERF -> Changed) under an inferred
+  SemVer heading (any feature -> minor bump, else patch; major never auto-inferred), then
+  transitions each `done -> archived`. One hard gate previews the notes and the archive plan
+  before any write; `--dry-run` stops before writing. Pure file ops, no subagent (mirrors
+  `/sd:spec`). Gives the `done` (merged, unshipped) vs `archived` (shipped) states a concrete
+  meaning.
 - `scripts/validate.ps1` + `scripts/validate.sh` - one command that runs every documented engine
   invariant: pure-ASCII scan of `*.ps1`, `bash -n` on `*.sh`, hook-pair parity, agent `model:`
   alias-only check, install-target file counts (real install to a temp base), and a non-empty
@@ -74,7 +82,6 @@ Pattern conformance release. Introduces `sd-pattern-discipline` (the 6th skill),
 - `/sd:setup` codebase scan: pre-fill constitution §1.1/§2.4 and CLAUDE.md conventions from
   sampled source files instead of leaving `<<placeholder>>`s; optional `paths.layers` map in
   project-config.
-- Optional `/sd:release` workflow for release-note generation from closed specs.
 - Optional `sd-docs-writer` agent for ADR generation.
 - Telemetry-free usage analytics (opt-in, local only).
 

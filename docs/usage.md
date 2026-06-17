@@ -231,6 +231,35 @@ Examples:
 
 Already covered above. Re-runnable. Detects state (fresh / post-init / partial / complete) and only fills gaps. Backs up any file before overwriting.
 
+### `/sd:release [version] [--dry-run]`
+
+Cut a release from completed specs. **No code is changed. No subagent is invoked.** Pure file ops, like `/sd:spec`.
+
+Collects every spec currently in `done` (types feature / bug / refactor / perf - RCA is never released), groups them into Keep-a-Changelog sections, writes a versioned section to the project `CHANGELOG.md`, then transitions each released spec `done -> archived`.
+
+| Phase | Actor | Gate |
+|---|---|---|
+| 0 - Bootstrap | main thread | - |
+| 1 - Collect `done` specs | main thread | - |
+| 2 - Group into sections | main thread | - |
+| 3 - Determine version | main thread | - |
+| 4 - Preview + confirm | main thread | ⛔ Gate 1 (HARD - preview before any write) |
+| 5 - Write CHANGELOG + archive | main thread | - |
+| 6 - Report | main thread | - |
+
+Type-to-section mapping: feature -> `Added`, bug -> `Fixed`, refactor + perf -> `Changed`.
+
+Version is inferred when omitted (any feature -> minor bump, else patch; major is never auto-inferred - pass it explicitly). `--dry-run` renders the notes and the archive plan, then stops without writing.
+
+The lifecycle distinction this relies on: `done` = merged but not yet shipped; `archived` = shipped in a release.
+
+Examples:
+```
+/sd:release                  # infer version, preview, confirm, write
+/sd:release 2.0.0            # explicit version (e.g. a major)
+/sd:release --dry-run        # preview only, write nothing
+```
+
 ---
 
 ## Common patterns
@@ -247,6 +276,7 @@ Already covered above. Re-runnable. Detects state (fresh / post-init / partial /
 | "I just want to navigate the code" | `/sd:explore` |
 | "Review this change for compliance" | `/sd:review` |
 | "Manage / browse the spec registry" | `/sd:spec` |
+| "Cut a release / generate release notes from completed work" | `/sd:release` |
 
 ### Resuming a workflow
 

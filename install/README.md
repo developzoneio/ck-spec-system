@@ -4,7 +4,7 @@ The installer copies the engine (commands, agents, hooks, templates) into a Clau
 
 ```
 <base>/
-├── commands/sd/        9 slash commands
+├── commands/sd/        10 slash commands
 ├── agents/sd/          5 subagent definitions
 ├── hooks/sd/           3 hook scripts (.ps1 on Windows, .sh on Unix)
 ├── templates/sd/       9 templates (4 setup + 5 spec)
@@ -46,14 +46,14 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 
 | Source (in repo) | Target (under `<base>/`) | Files | Notes |
 |---|---|---|---|
-| `commands/` | `commands/sd/` | 9 | `feature`, `bug`, `rca`, `refactor`, `perf`, `spec`, `explore`, `review`, `setup` |
+| `commands/` | `commands/sd/` | 10 | `feature`, `bug`, `rca`, `refactor`, `perf`, `spec`, `explore`, `review`, `setup`, `release` |
 | `agents/` | `agents/sd/` | 5 | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
 | `hooks/powershell/` (Windows installer) | `hooks/sd/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
 | `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
 | `templates/` | `templates/sd/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
 | `skills/` | `skills/sd/` | 6 | One folder per skill, each with a `SKILL.md` |
 
-**Total**: 32 files per OS.
+**Total**: 33 files per OS.
 
 ---
 
@@ -81,7 +81,7 @@ After install, check the target directories:
 
 **Windows:**
 ```powershell
-Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 9 .md files
+Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 10 .md files
 Get-ChildItem $env:USERPROFILE\.claude\agents\sd\       # expect 5 .md files
 Get-ChildItem $env:USERPROFILE\.claude\hooks\sd\        # expect 3 .ps1 files
 Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 4 files + specs\ folder
@@ -89,7 +89,7 @@ Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 4 files + specs
 
 **Unix:**
 ```bash
-ls ~/.claude/commands/sd/      # 9 .md files
+ls ~/.claude/commands/sd/      # 10 .md files
 ls ~/.claude/agents/sd/        # 5 .md files
 ls ~/.claude/hooks/sd/         # 3 .sh files (executable)
 ls -l ~/.claude/hooks/sd/      # confirm +x bits set

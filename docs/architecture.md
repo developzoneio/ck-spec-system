@@ -10,7 +10,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    9 workflow definitions                          |
+|    commands/sd/    10 workflow definitions                         |
 |    agents/sd/      5 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
@@ -216,8 +216,8 @@ draft -> approved -> in-progress -> done -> archived
 | `draft` | Spec exists, not yet approved | `sd-spec-architect` creates it |
 | `approved` | Reviewed; ready to plan | User explicit approval at Gate 1 |
 | `in-progress` | Execution underway | Auto on plan approval (Gate 2) |
-| `done` | Closed; retro written; CI green | User explicit approval at close-out |
-| `archived` | No active work | Auto after N days, or `/sd:spec archive` |
+| `done` | Closed; retro written; CI green; awaiting release | User explicit approval at close-out |
+| `archived` | Shipped in a release, or no active work | Auto after N days, `/sd:spec archive`, or `/sd:release` |
 
 All transitions are logged to `05-retro.md` with timestamp + reason. Illegal transitions are refused by `/sd:spec status`.
 
@@ -276,7 +276,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 9 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 10 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---
