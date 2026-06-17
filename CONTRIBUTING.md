@@ -69,7 +69,10 @@ specwright/
 
 3. **Keep PRs focused.** One workflow, one agent, one hook per PR. A 1500-line "improve everything" PR will be asked to split.
 
-4. **Run local install + a smoke test** (see [Local install test](#local-install-test)) before opening the PR.
+4. **Run the validator** before opening the PR: `scripts/validate.ps1` (Windows) or
+   `scripts/validate.sh` (Unix) runs every engine-invariant check at once (ASCII, hook-pair parity,
+   model aliases, install-target counts, changelog gate). CI runs the same on Windows + Ubuntu.
+   See also the [Local install test](#local-install-test) for a manual install smoke test.
 
 5. **Update the changelog.** Add a line under `## [Unreleased]` in `CHANGELOG.md`.
 
@@ -137,7 +140,7 @@ tools: Read, Grep, Glob, ...   # MINIMAL allowlist
 
 ### Hooks
 
-Hooks come in pairs. If you change `hooks/powershell/foo.ps1`, you also update `hooks/bash/foo.sh`. The repo CI (when configured) will refuse PRs where the pair drifts.
+Hooks come in pairs. If you change `hooks/powershell/foo.ps1`, you also update `hooks/bash/foo.sh`. The repo CI runs `scripts/validate.{ps1,sh}`, which refuses PRs where the pair drifts (along with the other engine-invariant checks).
 
 **PowerShell (`*.ps1`) - critical encoding rule:**
 
