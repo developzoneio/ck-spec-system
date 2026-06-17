@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directories with dry-run preview, confirmation prompt (`-Force`/`--force` to skip), and
   per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).
 
+### Changed
+- `/sd:setup` Q1 and the `sd-spec-architect` ticket protocol now state explicitly that automatic
+  ticket-context fetch is JIRA-only: GitHub Issues and Linear are still recorded as the project
+  tracker (for prompt-hook ID recognition), but their ticket content is not auto-fetched - paste it
+  into the prompt instead. The ticket snapshot protocol is documented as JIRA-specific. Closes the
+  silent degradation where non-JIRA projects got no ticket fetch and no explanation.
+
 ### Fixed
 - `install/install.sh` marked executable (mode `100755`, matching `uninstall.sh`); it was `100644`,
   so the documented `./install/install.sh` invocation failed with "Permission denied" on a fresh
