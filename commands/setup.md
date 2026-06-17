@@ -69,6 +69,12 @@ Ask **three** critical questions. Provide defaults from Phase 2 inference where 
 
 If JIRA: ask `ticket.baseUrl` (e.g. `https://yourorg.atlassian.net/browse`).
 
+> Heads up: automatic ticket-context fetch is **JIRA-only** today - the `sd-spec-architect` agent
+> ships with Atlassian MCP tools only. GitHub Issues and Linear are still recorded as the project
+> tracker (so the prompt hook recognizes their ID format), but their ticket content is **not**
+> auto-fetched. For those, paste the relevant ticket details into the prompt when you start a
+> workflow.
+
 ### Q2: Ticket pattern
 
 > What ticket ID pattern should the hook recognize?

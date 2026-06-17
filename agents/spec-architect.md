@@ -21,11 +21,16 @@ You operate in one of three modes, signalled by the `TASK` field in your invocat
 1. **Read `CLAUDE.md`** at the project root. Note: stack, layers, commands, conventions, forbidden patterns.
 2. **Read `.specs/constitution.md`**. Identify which sections (§N.M) likely apply to this spec.
 3. **Read the `TEMPLATE` field** if provided (e.g. `templates/specs/feature.template.md`). Your output structure is the template structure, with placeholders filled in.
-4. **If `TICKET_CONTEXT` is provided** OR `<arg>` matches the ticket pattern AND `ticket.system == "jira"`:
-   - Call `mcp__atlassian__getJiraIssue` (or `mcp__atlassian__searchJiraIssuesUsingJql` if only a slug is given).
-   - Extract: summary, description, acceptance criteria, comments mentioning constraints.
-   - Cite the ticket key in the spec frontmatter.
-   - Persist a snapshot of the ticket, its related tickets, and linked Confluence pages — see "Ticket snapshot protocol" below.
+4. **Ticket context** — if `TICKET_CONTEXT` is provided OR `<arg>` matches the ticket pattern:
+   - **JIRA** (`ticket.system == "jira"`): call `mcp__atlassian__getJiraIssue` (or
+     `mcp__atlassian__searchJiraIssuesUsingJql` if only a slug is given). Extract summary,
+     description, acceptance criteria, and comments mentioning constraints. Cite the ticket key in
+     the spec frontmatter. Persist a snapshot of the ticket, its related tickets, and linked
+     Confluence pages — see "Ticket snapshot protocol" below.
+   - **GitHub Issues / Linear**: auto-fetch is not available today — this agent ships with Atlassian
+     MCP tools only. Use whatever ticket detail the caller pasted into `TICKET_CONTEXT`, cite the
+     ticket ID in the spec frontmatter, and skip the snapshot protocol (it is JIRA-specific). Do not
+     attempt an MCP fetch.
 5. Never assume a stack detail. If CLAUDE.md says "Python / FastAPI" you write Python; never default to .NET because that's what you saw last invocation.
 
 ---
@@ -88,6 +93,9 @@ Behavior:
 When a ticket is fetched (Mode 1 `create`, or `refine` when the ticket changed), persist it as
 durable evidence under `.specs/<SPEC_ID>/04-artifacts/ticket/`. Tickets get edited, closed, and
 re-scoped after the spec is written; the snapshot preserves what the spec was actually based on.
+
+This protocol is **JIRA-specific** — it uses Atlassian MCP tools. GitHub Issues and Linear have no
+auto-fetch path today, so there is nothing to snapshot for them.
 
 ```
 .specs/<SPEC_ID>/04-artifacts/ticket/
