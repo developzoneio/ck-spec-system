@@ -19,7 +19,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 
 # One platform's hooks land per install (bash hooks here), so 3 not 6.
-EXPECTED_COMMANDS=9
+EXPECTED_COMMANDS=10
 EXPECTED_AGENTS=5
 EXPECTED_SKILLS=6
 EXPECTED_HOOKS=3

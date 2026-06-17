@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Nine slash commands, five specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Ten slash commands, five specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -26,7 +26,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 | Capability | What you get |
 |---|---|
-| **9 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup` |
+| **10 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release` |
 | **5 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
@@ -97,6 +97,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:explore <target-or-query>` | Utility | - | Read-only code navigation, single subagent call, optional save |
 | `/sd:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |
 | `/sd:setup` | Utility | - | Idempotent project scaffold (interactive) |
+| `/sd:release [version]` | Utility | 1 | Release notes from `done` specs -> Keep-a-Changelog sections, then archive them |
 
 ---
 
