@@ -171,15 +171,24 @@ trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/6: CHANGELOG [Unreleased] non-empty"
+section "Check 6/6: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
     /^##[[:space:]]+\[/             { f=0 }
     f                               { print }
 ' "$changelog")"
+# Header of the section immediately below [Unreleased].
+next_header="$(awk '
+    /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
+    f && /^##[[:space:]]+\[/        { print; exit }
+' "$changelog")"
 if printf '%s\n' "$block" | grep -qE '^[[:space:]]*-[[:space:]]+[^[:space:]]'; then
     ok "[Unreleased] has at least one entry"
+elif printf '%s\n' "$next_header" \
+    | grep -qE '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]'; then
+    # Empty [Unreleased] is allowed only directly above a freshly cut release.
+    ok "[Unreleased] empty but sits directly above a dated release (just cut)"
 else
     fail "[Unreleased] section is empty (add a changelog entry)"
     add_failure "changelog: [Unreleased] empty"

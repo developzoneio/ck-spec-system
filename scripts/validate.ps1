@@ -238,7 +238,7 @@ try {
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/6: CHANGELOG [Unreleased] non-empty'
+Write-Section 'Check 6/6: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -250,12 +250,19 @@ if ($start -lt 0) {
     Add-Failure 'changelog: no [Unreleased] header'
 } else {
     $hasEntry = $false
+    $nextHeader = $null
     for ($i = $start + 1; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match '^##\s+\[') { break }
+        if ($lines[$i] -match '^##\s+\[') { $nextHeader = $lines[$i]; break }
         if ($lines[$i] -match '^\s*-\s+\S') { $hasEntry = $true; break }
     }
+    # An empty [Unreleased] passes only immediately after a release: the next
+    # section must be a dated [x.y.z] - <date> heading (the freshly cut
+    # version). Otherwise every PR must add an entry under [Unreleased].
+    $justReleased = ($null -ne $nextHeader) -and ($nextHeader -match '^##\s+\[\d+\.\d+\.\d+\]\s+-\s+\S')
     if ($hasEntry) {
         Write-Ok '[Unreleased] has at least one entry'
+    } elseif ($justReleased) {
+        Write-Ok '[Unreleased] empty but sits directly above a dated release (just cut)'
     } else {
         Write-FailMsg '[Unreleased] section is empty (add a changelog entry)'
         Add-Failure 'changelog: [Unreleased] empty'
