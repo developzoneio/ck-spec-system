@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `revert`, but a within-noise result defaults to `revert` and allows `keep` only as an explicit logged
   constitution exception (decision `kept (exception)` + a reason recorded to `05-retro.md`). With no
   reason supplied, the change is reverted.
+- `docs/architecture.md` gains two reference sections: a "Command -> agent routing" tree showing the
+  subagent fan-out per command (and the three file-ops commands that invoke none), and an "Artifact
+  ownership" table mapping each `.specs/<ID>/` file to its producing phase/agent and downstream readers.
+  Consolidates routing/ownership that previously lived only in scattered command files.
 - `/sd:setup` Q1 and the `sd-spec-architect` ticket protocol now state explicitly that automatic
   ticket-context fetch is JIRA-only: GitHub Issues and Linear are still recorded as the project
   tracker (for prompt-hook ID recognition), but their ticket content is not auto-fetched - paste it
