@@ -99,6 +99,32 @@ Each subagent has a focused role, a minimal tool allowlist, and a model assignme
 
 ---
 
+## Command -> agent routing
+
+Commands do not do the work themselves - they orchestrate subagents through phased gates. This is the
+fan-out each command performs (left to right = invocation order; `(xN)` = once per atomic task / hotspot):
+
+```
+/sd:feature   -> spec-architect -> code-explorer -> spec-architect -> implementer (xN) -> reviewer
+/sd:bug       -> spec-architect -> debugger (enumerate / verify) -> implementer -> reviewer
+/sd:refactor  -> spec-architect -> code-explorer -> implementer (coverage) -> spec-architect -> implementer (xN) -> reviewer
+/sd:perf      -> spec-architect -> debugger (hotspot / verify) -> implementer (xN) -> reviewer
+/sd:rca       -> spec-architect -> debugger (enumerate / verify)        [no code change - output IS the spec]
+/sd:explore   -> code-explorer
+/sd:review    -> reviewer
+/sd:spec      -> (none - pure file ops on .specs/)
+/sd:setup     -> (none - scaffolds CLAUDE.md / .specs/ / .claude/)
+/sd:release   -> (none - pure file ops; mirrors /sd:spec)
+```
+
+Three commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`) - they are deterministic
+file operations the main thread performs directly. The rest share one backbone: the architect frames the
+spec, an investigator (explorer or debugger) gathers evidence, the implementer makes the change one atomic
+task at a time, and the reviewer gates the result. The reviewer has no write tools, so the loop cannot
+auto-fix - findings always route back through a fresh implementer call.
+
+---
+
 ## Agent skills
 
 Skills are markdown rule packs that agents reference from their frontmatter. They live in `~/.claude/skills/sd/<skill-name>/SKILL.md`. The rule body is loaded into the agent's context at runtime alongside the agent prompt itself.
@@ -196,6 +222,24 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 ```
 
 This is not documentation written after the fact. It is the **input contract** every subagent reads. The implementer reads `02-tasks.md` to know what to edit. The reviewer reads `00-spec.md` to know what acceptance criteria to verify. Future engineers (and future Claude sessions) read all of it to understand why the code is shaped this way.
+
+### Artifact ownership
+
+Each file has one producing phase / agent and a defined set of downstream readers. The folder is
+append-only memory, not scratch space:
+
+| Artifact | Produced by | When | Read by |
+|---|---|---|---|
+| `00-spec.md` | `sd-spec-architect` (create); later sections filled in place by the workflow | Phase 1, then incrementally | every later phase + reviewer |
+| `01-plan.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
+| `02-tasks.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
+| `03-decisions.md` | `sd-code-explorer` (impact) + `sd-debugger` (hypotheses / verdicts); append-only | impact + investigation phases | `sd-implementer`, `sd-reviewer` |
+| `04-artifacts/` | any agent (logs, baselines, repro evidence, ticket snapshots) | throughout | any agent + future sessions |
+| `05-retro.md` | main thread (status transitions); append-only | every gate transition | resume logic + future sessions |
+
+The cross-phase fields inside `00-spec.md` are intentionally left empty at creation
+(`<!-- Filled by Phase N -->`) so the workflow enforces sequencing - the architect does not pre-fill a
+root cause the debugger has not yet confirmed.
 
 ---
 
