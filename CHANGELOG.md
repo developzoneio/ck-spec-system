@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explanation": it prints the current state, the requested state, the valid next state(s) from the
   state machine, and the shortest legal path to the requested state when reachable (e.g. `draft -> done`
   is rejected with the hint `draft -> approved -> in-progress -> done`). No file is mutated on refusal.
+- `/sd:bug` Phase 3 no longer assumes a confirmed root cause always arrives. The investigation loop
+  previously said "Continue until one is CONFIRMED" with no exit, so a bug whose every hypothesis is
+  rejected/inconclusive had no defined stopping point. Added Gate 3a (hypothesis tree exhausted): the
+  loop now terminates on a CONFIRMED hypothesis OR an exhausted tree, and the exhausted case STOPs and
+  asks the user to re-enumerate (with new evidence), add observability, or abort as "root cause not
+  found" - never guessing a fix from an unconfirmed tree.
 - `install/install.sh` marked executable (mode `100755`, matching `uninstall.sh`); it was `100644`,
   so the documented `./install/install.sh` invocation failed with "Permission denied" on a fresh
   Linux checkout. Surfaced by the new CI round-trip.

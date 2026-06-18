@@ -108,7 +108,29 @@ If the user insists on proceeding without repro, log a constitution exception to
    - Result: CONFIRMED / REJECTED / INCONCLUSIVE.
    - Append result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
    - Document REJECTED hypotheses with FULL reasoning - this is knowledge preservation for future similar bugs.
-   - Continue until one is CONFIRMED.
+   - Terminate the loop when EITHER one hypothesis is CONFIRMED (proceed to Gate 3) OR every enumerated
+     hypothesis is exhausted - all REJECTED, or only INCONCLUSIVE ones remain with no new evidence to act
+     on (go to Gate 3a). Never guess a fix from an unconfirmed tree.
+
+### ⛔ Gate 3a - Hypothesis tree exhausted (no confirmed root cause)
+
+Reached ONLY when the loop ends with no CONFIRMED hypothesis. STOP. Do NOT proceed to a fix - a fix on an
+unconfirmed root cause risks treating a symptom.
+
+Append the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict and reasoning) to
+`.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next investigation.
+
+Ask:
+
+> All <N> hypotheses were rejected or inconclusive; no root cause confirmed. How do you want to proceed?
+> (re-enumerate / observe / abort)
+
+- `re-enumerate` -> return to Phase 3 step 1 with the new evidence/telemetry that justifies fresh
+  hypotheses. Do not re-run identical hypotheses.
+- `observe` -> add observability (logging, tracing, metrics), reproduce again to gather evidence, then
+  re-enumerate. Log the gap to `05-retro.md`.
+- `abort` -> set status and close the spec as "root cause not found"; record the exhausted tree as the
+  outcome in `05-retro.md`.
 
 ### ⛔ Gate 3 - Root cause confirmed
 
