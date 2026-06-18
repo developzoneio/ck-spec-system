@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).
 
 ### Changed
+- `/sd:perf` Gate 6 now structurally refuses a no-measurable-gain "keep" instead of merely warning about
+  it in prose. The gate branches on the noise check: a measurable improvement still offers `keep` /
+  `revert`, but a within-noise result defaults to `revert` and allows `keep` only as an explicit logged
+  constitution exception (decision `kept (exception)` + a reason recorded to `05-retro.md`). With no
+  reason supplied, the change is reverted.
 - `/sd:setup` Q1 and the `sd-spec-architect` ticket protocol now state explicitly that automatic
   ticket-context fetch is JIRA-only: GitHub Issues and Linear are still recorded as the project
   tracker (for prompt-hook ID recognition), but their ticket content is not auto-fetched - paste it

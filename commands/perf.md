@@ -171,16 +171,29 @@ STOP. Display test results.
 
 STOP. Compare new measurement to previous best in Results log. Display:
 - Previous p95 -> new p95 (delta).
-- Whether improvement exceeds measurement noise (rule of thumb: must be > 5% AND >= absolute noise floor of the methodology).
+- Whether the improvement exceeds measurement noise (rule of thumb: must be > 5% AND >= absolute noise
+  floor of the methodology).
 
-Ask:
+Branch on the noise check - the gate offers different choices depending on whether the gain is real:
+
+**Case A - improvement is measurable** (> 5% AND >= noise floor). Ask:
 
 > Keep change or revert? (keep / revert)
 
 - `keep` -> update row decision to `kept`. Commit. Loop back to Gate 4 with the next hypothesis OR finalize this hotspot if SLA now met.
 - `revert` -> update row decision to `reverted`. Revert the code. Loop back to Gate 4.
 
-**Discipline note**: A "keep" decision without measurable improvement (i.e. within noise) is a constitution violation. Either the improvement is real and measurable, or it does not exist.
+**Case B - within noise** (no measurable improvement). A plain "keep" here is a constitution violation:
+either the improvement is real and measurable, or it does not exist. Default to revert. Ask:
+
+> Within measurement noise - no real improvement. Default: revert.
+> To keep anyway, state a constitution-exception reason; it will be logged. (revert / keep-with-reason)
+
+- `revert` (default) -> update row decision to `reverted`. Revert the code. Loop back to Gate 4.
+- `keep-with-reason` -> allowed ONLY with an explicit written reason. Update the row decision to
+  `kept (exception)` with that reason, and log a constitution exception to `05-retro.md`
+  (`Constitution exception: kept within-noise change at <hotspot>. Reason: <reason>.`). Commit, then
+  loop back to Gate 4. With no reason supplied, this option is refused and the change is reverted.
 
 Continue the loop until:
 - SLA goal is met (jump to Phase 5), OR
