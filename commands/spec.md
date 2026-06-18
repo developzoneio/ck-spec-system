@@ -92,7 +92,23 @@ done -> archived
 archived -> in-progress (only via 'revive', with reason)
 ```
 
-3. Illegal transitions REFUSED with explanation. E.g. `draft -> done` is rejected.
+3. Illegal transitions are REFUSED. Do NOT mutate any file. Print a refusal that names the current
+   state, the requested state, the valid next state(s) for the current state (from the machine above),
+   and - when the requested state is reachable - the shortest legal path to it:
+
+```
+Refused: cannot move <ID> from '<current>' to '<requested>'.
+Valid next state(s) from '<current>': <list, or 'none (terminal)'>.
+To reach '<requested>', follow: <current> -> ... -> <requested>.   (omit this line if unreachable)
+```
+
+   Example - `status SPEC-123 done` while `SPEC-123` is `draft`:
+
+```
+Refused: cannot move SPEC-123 from 'draft' to 'done'.
+Valid next state(s) from 'draft': approved.
+To reach 'done', follow: draft -> approved -> in-progress -> done.
+```
 4. On valid transition:
    - Update frontmatter `status:` field in `00-spec.md`.
    - Update the row in `.specs/index.md`.

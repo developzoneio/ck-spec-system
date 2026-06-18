@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silent degradation where non-JIRA projects got no ticket fetch and no explanation.
 
 ### Fixed
+- `/sd:spec status` now spells out the illegal-transition refusal instead of the vague "REFUSED with
+  explanation": it prints the current state, the requested state, the valid next state(s) from the
+  state machine, and the shortest legal path to the requested state when reachable (e.g. `draft -> done`
+  is rejected with the hint `draft -> approved -> in-progress -> done`). No file is mutated on refusal.
 - `install/install.sh` marked executable (mode `100755`, matching `uninstall.sh`); it was `100644`,
   so the documented `./install/install.sh` invocation failed with "Permission denied" on a fresh
   Linux checkout. Surfaced by the new CI round-trip.
