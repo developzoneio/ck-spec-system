@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `scripts/validate.{ps1,sh}` Check 6 now treats an empty `[Unreleased]` section as passing when the
+  section immediately below it is a dated `[x.y.z] - <date>` release heading (the freshly cut version),
+  so a clean post-release CHANGELOG no longer fails CI. A non-release-state empty `[Unreleased]` still
+  fails, preserving the "every PR adds a changelog line" invariant.
+
+---
+
+## [1.3.0] - 2026-06-18
+
+Release-tooling and CI hardening. Adds the `/sd:release` command (10th), a single-command repo invariant
+validator with a Windows + Ubuntu CI matrix, an uninstaller, and a batch of command/agent refinements.
+
 ### Added
 - `/sd:release` command (10th command) - generates release notes from completed specs: collects
   every spec in `done` status (feature / bug / refactor / perf; RCA excluded), groups them into
@@ -229,6 +242,8 @@ Each hook ships in two flavours:
 - Operating systems: Windows 11 + PowerShell 5.1 / 7.x, macOS 13+, Ubuntu 22.04+.
 - Optional MCP servers: Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily.
 
-[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/developzoneio/specwright/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/developzoneio/specwright/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/developzoneio/specwright/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/developzoneio/specwright/releases/tag/v1.0.0
