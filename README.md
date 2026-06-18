@@ -248,6 +248,20 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 - [`install/README.md`](install/README.md) - Install guide and options
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - PR process and dev guidelines
 - [`CHANGELOG.md`](CHANGELOG.md) - Release notes
+- [`ROADMAP.md`](ROADMAP.md) - Planned and exploratory work
+
+---
+
+## Roadmap
+
+Forward-looking work lives in [`ROADMAP.md`](ROADMAP.md). Highlights:
+
+- **Near-term** - GitHub Issue auto-fetch (`gh issue view`) to match the existing JIRA snapshot path.
+- **Planned** - `/sd:setup` codebase scan (detected defaults instead of `<<placeholder>>`s) and an
+  optional `sd-docs-writer` agent for ADRs.
+- **Exploratory** - local-only, opt-in usage analytics.
+
+Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

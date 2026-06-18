@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- `scripts/validate.{ps1,sh}` Check 6 now treats an empty `[Unreleased]` section as passing when the
-  section immediately below it is a dated `[x.y.z] - <date>` release heading (the freshly cut version),
-  so a clean post-release CHANGELOG no longer fails CI. A non-release-state empty `[Unreleased]` still
-  fails, preserving the "every PR adds a changelog line" invariant.
+### Added
+- `ROADMAP.md` - published roadmap of near-term, planned, and exploratory work, linked from
+  `README.md` (new `## Roadmap` section + Documentation entry). Migrated the forward-looking items
+  out of the non-standard `### Planned` subsection that sat under the `1.2.0` changelog entry into
+  this dedicated file.
 
 ---
 
@@ -42,6 +42,10 @@ validator with a Windows + Ubuntu CI matrix, an uninstaller, and a batch of comm
   per-project cleanup reminders (`.claude/settings.json` hook wiring, `.claude/.hookstate/`).
 
 ### Changed
+- `scripts/validate.{ps1,sh}` Check 6 now treats an empty `[Unreleased]` section as passing when the
+  section immediately below it is a dated `[x.y.z] - <date>` release heading (the freshly cut version),
+  so a clean post-release CHANGELOG no longer fails CI. A non-release-state empty `[Unreleased]` still
+  fails, preserving the "every PR adds a changelog line" invariant.
 - `/sd:perf` Gate 6 now structurally refuses a no-measurable-gain "keep" instead of merely warning about
   it in prose. The gate branches on the noise check: a measurable improvement still offers `keep` /
   `revert`, but a within-noise result defaults to `revert` and allows `keep` only as an explicit logged
@@ -110,12 +114,7 @@ Pattern conformance release. Introduces `sd-pattern-discipline` (the 6th skill),
   a real Atlassian MCP tool name - corrected to `mcp__atlassian__searchJiraIssuesUsingJql`.
   Slug-based ticket search could never have resolved before.
 
-### Planned
-- `/sd:setup` codebase scan: pre-fill constitution §1.1/§2.4 and CLAUDE.md conventions from
-  sampled source files instead of leaving `<<placeholder>>`s; optional `paths.layers` map in
-  project-config.
-- Optional `sd-docs-writer` agent for ADR generation.
-- Telemetry-free usage analytics (opt-in, local only).
+> Forward-looking items that previously lived here moved to [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
