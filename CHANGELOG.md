@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inside-out `paths.layers` map) into `CLAUDE.md` and `project-config.json`, with a single batch
   confirmation gate. Facts only - constitution rules are never auto-filled. Adds `paths.layers` to
   `templates/project-config.template.json`.
+- `/sd:adr` command (11th) + `sd-docs-writer` agent (6th) - drafts a numbered, MADR-style Architecture
+  Decision Record under `.specs/_adr/` from a spec's `03-decisions.md` (or an ad-hoc decision), behind one
+  hard approval gate. The agent (model `sonnet`, tools Read/Write/Glob/Grep, skill `sd-evidence-citation`)
+  writes only the ADR file and never invents decisions; the command owns numbering and supersession links.
+  Bumps command count 10 -> 11 and agent count 5 -> 6 across docs and the validators.
 
 ---
 

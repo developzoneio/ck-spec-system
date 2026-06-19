@@ -26,8 +26,8 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 | Capability | What you get |
 |---|---|
-| **10 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release` |
-| **5 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer` |
+| **11 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr` |
+| **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
 | **6 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline` |

@@ -32,8 +32,8 @@ $repoRoot  = Split-Path -Parent $scriptDir
 
 # ---- expected install-target counts ----------------------------------------
 # One platform's hooks land per install (PowerShell hooks here), so 3 not 6.
-$ExpectedCommands  = 10
-$ExpectedAgents    = 5
+$ExpectedCommands  = 11
+$ExpectedAgents    = 6
 $ExpectedSkills    = 6
 $ExpectedHooks     = 3
 $ExpectedTemplates = 9
