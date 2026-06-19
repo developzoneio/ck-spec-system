@@ -48,6 +48,8 @@
     "src": "<<e.g. src>>",
     "tests": "<<e.g. tests>>",
     "docs": "<<e.g. docs>>",
+    "layers": [],
+    "_layers_use": "Ordered inside-out [{name, path}] (innermost first); path may be a glob. Backs constitution 1.1 dependency direction. Filled by /sd:setup scan; [] when undetectable.",
     "protected": [
       ".specs/constitution.md",
       ".specs/index.md",
