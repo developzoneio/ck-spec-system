@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `README.md` (new `## Roadmap` section + Documentation entry). Migrated the forward-looking items
   out of the non-standard `### Planned` subsection that sat under the `1.2.0` changelog entry into
   this dedicated file.
+- `/sd:setup` codebase scan (Phase 2.5) - samples the project tree to pre-fill detected facts
+  (stack, `paths.{src,tests,docs}`, `commands.*` from the project manifest, and a new ordered
+  inside-out `paths.layers` map) into `CLAUDE.md` and `project-config.json`, with a single batch
+  confirmation gate. Facts only - constitution rules are never auto-filled. Adds `paths.layers` to
+  `templates/project-config.template.json`.
 
 ---
 

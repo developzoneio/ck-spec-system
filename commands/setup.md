@@ -55,6 +55,50 @@ If `CLAUDE.md` does not exist, defaults come from filename heuristics (`*.csproj
 
 ---
 
+## Phase 2.5 - Scan codebase (facts only)
+
+Goal: detect project **facts** by sampling actual source, turning `<<placeholder>>`s into defaults.
+This is Claude-driven sampling - there is NO scanner script. Detect facts ONLY; never infer
+constitution rules.
+
+1. Build a bounded picture of the tree:
+   - Glob top-level directories and file-extension counts.
+   - Skip `node_modules`, `bin`, `obj`, `.git`, `dist`, `target`, `vendor`, `.venv` and similar
+     build/dependency directories.
+   - Cap the directory walk at depth 3 and read at most ~15-20 representative files total.
+2. Detect and record:
+   - **Stack** (language / framework / db): extend the Phase 2 filename heuristics with a content peek
+     at the dominant package manifest (`package.json`, `*.csproj`, `pyproject.toml`, `go.mod`,
+     `Cargo.toml`, `pom.xml`, `build.gradle`).
+   - **Paths**: `src`, `tests`, `docs` from the directory layout.
+   - **Commands** (`build` / `test` / `lint` / `run` / `coverage`): read ONLY what the dominant
+     manifest declares (e.g. `package.json` `scripts`, `Makefile` targets, csproj/pyproject targets).
+     Never invent a stack command the manifest does not contain; leave unknown commands as
+     `<<placeholder>>`.
+   - **`paths.layers`**: an ordered inside-out array of `{ name, path }` inferred from top-level
+     source folders that look like architectural layers (innermost first; `path` may be a glob).
+     Use `[]` when no layered structure is detectable.
+3. Log which files were sampled so the user can judge confidence.
+
+### Gate - confirm detected facts (one batch confirmation, not a question)
+
+Print a single table of detected facts and ask the user to confirm before writing:
+
+```
+Detected (edit any before I write, or say "go"):
+  Language / framework / db : <values or "not detected">
+  Paths   src / tests / docs : <values or "not detected">
+  Layers (inside-out)        : <name:path, ... or "none">
+  Commands build/test/lint/run/coverage : <values or "<<placeholder>>">
+```
+
+> Review these. Reply with corrections (e.g. "tests = test, drop the Infrastructure layer") or "go".
+
+This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
+Anything the user does not correct is used as-is; anything still unknown stays `<<placeholder>>`.
+
+---
+
 ## Phase 3 - Interactive questions
 
 Ask **three** critical questions. Provide defaults from Phase 2 inference where possible.
@@ -103,7 +147,9 @@ This determines which hook variant the generated `settings.json` references.
    - Merge: take stack hints from existing into the new template; preserve user-customized sections under "## Code conventions" and "## Forbidden patterns" verbatim if they exist.
 2. Generate new `CLAUDE.md` from `~/.claude/templates/sd/CLAUDE.template.md`:
    - Substitute `<<project-name>>` -> from current directory name or git remote.
-   - Pre-fill stack fields from Phase 2 inference; leave others as `<<placeholder>>` for the user to fill.
+   - Pre-fill the Stack, Commands, and Architecture sections from Phase 2.5 detected facts (including
+     the layer list from `paths.layers`, rendered inside-out). Leave any field not detected and not
+     confirmed in the Phase 2.5 gate as `<<placeholder>>` for the user to fill.
 3. Display a diff summary (new vs old).
 
 ---
@@ -136,8 +182,11 @@ Active specs (auto-updated by /sd:spec status transitions):
 2. Write `.claude/project-config.json` from `~/.claude/templates/sd/project-config.template.json`:
    - Substitute project name, owner (from git config), repo URL (from git remote).
    - Set `ticket.system`, `ticket.pattern`, `ticket.baseUrl` from Phase 3 Q1/Q2.
-   - Set `commands.{build,test,lint,coverage,run}` from inferred or asked-on-the-spot values.
-   - Set `paths.{src,tests,docs}` from inferred values.
+   - Set `commands.{build,test,lint,coverage,run}` from Phase 2.5 detected facts; any command not
+     declared by the project manifest stays `<<placeholder>>`.
+   - Set `paths.{src,tests,docs}` from Phase 2.5 detected facts.
+   - Set `paths.layers` from Phase 2.5 as an ordered inside-out array of `{name, path}` objects
+     (innermost first); write `[]` if no layered structure was detected.
    - Leave MCP servers `enabled: false` by default. Print: "MCP servers are disabled by default. Enable them by editing `.claude/project-config.json` after installing the corresponding MCP servers in `~/.claude.json`."
 3. Write `.claude/settings.json` from the appropriate variant per Phase 3 Q3:
    - PowerShell -> use `settings.template.json` as-is.
@@ -183,6 +232,9 @@ Next steps:
 
 - **Idempotent.** Safe to re-run. Never overwrites without a timestamped backup.
 - **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`.
+- **Scan detects facts, never rules.** Phase 2.5 may pre-fill stack, paths, commands, and
+  `paths.layers` only. It never writes `.specs/constitution.md` rules - those stay `<<placeholder>>`
+  for the user to author explicitly.
 - **Never asks more than 3 questions.** Other fields are inferred or left as placeholders for the user to fill in their editor. Excess prompting kills adoption.
 - **Never enables MCP servers automatically.** They're opt-in; user must edit project-config.json after installing the server in `~/.claude.json`.
 - **Never modifies the engine** (`~/.claude/`). The setup command writes ONLY into the current working directory.
