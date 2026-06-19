@@ -18,7 +18,7 @@ Note: `templates/CLAUDE.template.md` is the template `/sd:setup` scaffolds into 
 
 # Sandbox install test (run before any PR touching install/hooks/commands/agents)
 .\install\install.ps1 -BasePath C:\temp\sd-test
-Get-ChildItem C:\temp\sd-test\commands\sd\          # expect 10 .md files
+Get-ChildItem C:\temp\sd-test\commands\sd\          # expect 11 .md files
 .\install\uninstall.ps1 -BasePath C:\temp\sd-test -Force   # round-trip: removes the 5 sd\ dirs
 Remove-Item -Recurse -Force C:\temp\sd-test         # cleanup
 ```
@@ -44,8 +44,8 @@ Every PR adds a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog
 
 | Source | Installs to | Contents |
 |---|---|---|
-| `commands/` | `~/.claude/commands/sd/` | 10 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`) |
-| `agents/` | `~/.claude/agents/sd/` | 5 subagents (`sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`) |
+| `commands/` | `~/.claude/commands/sd/` | 11 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`) |
+| `agents/` | `~/.claude/agents/sd/` | 6 subagents (`sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer`) |
 | `hooks/powershell/` + `hooks/bash/` | `~/.claude/hooks/sd/` | 3 hooks × 2 platforms (`prompt-router`, `spec-gate`, `subagent-retro`) |
 | `templates/` | `~/.claude/templates/sd/` | 4 setup templates + 5 spec templates in `specs/` |
 | `skills/` | `~/.claude/skills/sd/` | 6 rule packs, one folder per skill with `SKILL.md` |

@@ -22,6 +22,7 @@
 | `/sd:explore <query>` | Read-only code navigation. |
 | `/sd:review <target>` | Standalone compliance review. |
 | `/sd:setup` | Idempotent project scaffold. |
+| `/sd:adr <spec-ID>` | Author an ADR from a spec's decisions. |
 
 ## Stack
 
