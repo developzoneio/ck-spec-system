@@ -40,8 +40,8 @@ per-file-type guidelines, and how to test changes locally.
 
 ```
 specwright/
-  commands/         # 10 slash commands (markdown with frontmatter)
-  agents/           # 5 subagent definitions (markdown with frontmatter)
+  commands/         # 11 slash commands (markdown with frontmatter)
+  agents/           # 6 subagent definitions (markdown with frontmatter)
   hooks/
     powershell/     # 3 PowerShell hooks
     bash/           # 3 bash hooks (parity with PowerShell)

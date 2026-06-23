@@ -10,8 +10,8 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    10 workflow definitions                         |
-|    agents/sd/      5 subagent prompt files                         |
+|    commands/sd/    11 workflow definitions                         |
+|    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
 |    skills/sd/      6 reusable rule packs (referenced by agents)    |
@@ -92,6 +92,7 @@ Each subagent has a focused role, a minimal tool allowlist, and a model assignme
 | `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + MSSQL (SELECT only) + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
 | `sd-implementer` | haiku | Read/Write/Edit/MultiEdit/Grep/Glob/Bash + Context7 | Executes ONE atomic task with scope discipline. |
 | `sd-reviewer` | sonnet | Read/Grep/Glob + sequential-thinking + GitNexus | Severity-tagged review (🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PASS). Cannot write. |
+| `sd-docs-writer` | sonnet | Read/Write/Glob/Grep + sd-evidence-citation | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
 
 **Tool allowlists are minimal by design.** The reviewer cannot fix code because it has no write tools. The explorer cannot suggest fixes for the same reason. This is enforced by the engine, not by prose discipline alone.
 
@@ -112,6 +113,7 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:rca       -> spec-architect -> debugger (enumerate / verify)        [no code change - output IS the spec]
 /sd:explore   -> code-explorer
 /sd:review    -> reviewer
+/sd:adr       -> docs-writer
 /sd:spec      -> (none - pure file ops on .specs/)
 /sd:setup     -> (none - scaffolds CLAUDE.md / .specs/ / .claude/)
 /sd:release   -> (none - pure file ops; mirrors /sd:spec)
@@ -131,16 +133,16 @@ Skills are markdown rule packs that agents reference from their frontmatter. The
 
 The split exists for three reasons:
 
-1. **De-duplication.** `sd-evidence-citation` is used by `sd-code-explorer`, `sd-debugger`, and `sd-reviewer`. Without skills, the same `file:line` citation rule would be copy-pasted into three agent files and drift over time. With skills, it lives in one place.
+1. **De-duplication.** `sd-evidence-citation` is used by `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, and `sd-docs-writer`. Without skills, the same `file:line` citation rule would be copy-pasted into four agent files and drift over time. With skills, it lives in one place.
 2. **Smaller agent bodies.** The reviewer prompt no longer carries the full severity taxonomy inline; it points at `sd-severity-taxonomy`. Body size goes down; lookup discipline stays the same.
-3. **Auditability.** A reader can open one `SKILL.md` and see exactly what rules every agent follows for that concern — without grepping across 5 agent files.
+3. **Auditability.** A reader can open one `SKILL.md` and see exactly what rules every agent follows for that concern — without grepping across 6 agent files.
 
 | Skill | Used by | Purpose |
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | Severity levels + per-severity rules + mandatory output markdown. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate / verify protocol, the 5 mental models, score formula `(L × I) / C`, proximate-vs-root ladder. |
 | `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (9 required fields + `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
-| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
+| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
 
@@ -320,7 +322,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 10 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 11 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---
