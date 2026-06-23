@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   confirmation gate. Facts only - constitution rules are never auto-filled. Adds `paths.layers` to
   `templates/project-config.template.json`.
 
+### Fixed
+- `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
+  new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or
+  `.claude/settings.json` exists (states `complete` and `partial`) and rule-based-compares them
+  against the loaded templates - catching renamed engine paths (`hooks/ck` -> `hooks/sd`), the
+  `$schema` URL, `/ck:*` // `ck:*` names in `_use` docs, newly-introduced fields
+  (`ticket.snapshot`, `paths.layers`), pinned model IDs (`claude-sonnet-4-6` -> `sonnet`), and
+  stale `settings.local.json` permission paths. Every change is previewed in one batch gate
+  (silence is not approval) and each file is backed up `.bak.<timestamp>` before a targeted,
+  value-preserving patch. Fixes scaffolded projects whose three hooks silently pointed at the
+  non-existent `~/.claude/hooks/ck/` directory after the `ck` -> `specwright` rename.
+- `/sd:setup` Phase 7 (and Phase 1.5) now verify every hook `command` path in
+  `.claude/settings.json` resolves to a file on disk, warning loudly when a hook is not firing.
+
 ---
 
 ## [1.3.0] - 2026-06-18

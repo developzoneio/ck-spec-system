@@ -33,9 +33,113 @@ Classify the project into one of four states:
 | `fresh` | No `CLAUDE.md`, no `.specs/`, no `.claude/` | Full scaffold |
 | `post-init` | Has `CLAUDE.md` but no `.specs/` (e.g. ran `/init` only) | Backup `CLAUDE.md`, regenerate from template merging stack hints; scaffold `.specs/` and `.claude/` |
 | `partial` | Has `.specs/` OR `.claude/` but not both, OR missing key files | Fill the missing pieces only; never overwrite existing |
-| `complete` | Has `CLAUDE.md`, `.specs/constitution.md`, `.specs/index.md`, `.claude/project-config.json`, `.claude/settings.json` | Print "already set up - run `/sd:spec list` to view specs". Exit cleanly. |
+| `complete` | Has `CLAUDE.md`, `.specs/constitution.md`, `.specs/index.md`, `.claude/project-config.json`, `.claude/settings.json` | Run Phase 1.5 (drift check). If no drift: print "already set up - run `/sd:spec list` to view specs" and exit cleanly. If drift: offer the gated migration, then exit. |
 
 Print the detected state and the planned changes BEFORE writing anything.
+
+If the project already has `.claude/project-config.json` or `.claude/settings.json` (states
+`complete` or `partial`), run **Phase 1.5** before proceeding - even when the state is `complete`.
+
+---
+
+## Phase 1.5 - Drift check & migrate
+
+Runs whenever `.claude/project-config.json` or `.claude/settings.json` already exists (states
+`complete` and `partial`). The `complete` early exit happens ONLY after this phase finds no drift.
+Presence of the five key files does NOT mean their *contents* are current - this is what migrates
+projects scaffolded under an older engine name or template version.
+
+Compare the existing `.claude/*` files against the templates loaded in Phase 0. Detection is
+**rule-based, never a line-diff**: templates contain `<<placeholder>>` tokens and every project has
+its own values, so a raw diff would flag legitimate content. Apply ONLY the checks below; preserve
+every project-specific value and every already-filled field. The list is seeded with the known
+`ck` -> `sd` rename; the *shape* of each check (renamed token / missing block / pinned-to-alias)
+is generic, so future renames and newly-introduced template fields are caught the same way.
+
+### Drift checks (read-only - detect, do not write yet)
+
+**A. `.claude/settings.json`**
+
+1. **Hook command paths (HIGH).** Each hook command's script path must use the namespace dir of
+   the loaded `settings.template.json` (currently `.../hooks/sd/`). Flag any `/.claude/hooks/<other>/`
+   segment (e.g. `.../hooks/ck/`) and record the old -> new rewrite per hook
+   (UserPromptSubmit/prompt-router, PreToolUse/spec-gate, SubagentStop/subagent-retro).
+2. **Missing top-level blocks.** Flag any template top-level key absent from the file - currently
+   `_bash_adaptation` and `_schema_notes`. These are `_`-prefixed documentation keys; adding them
+   verbatim from the template is non-destructive.
+3. **Stale `_comment_top`.** If it names a previous engine ("ck-spec-system" / any value differing
+   from the template's), flag replacement with the template's value.
+
+**B. `.claude/project-config.json`**
+
+4. **`$schema` URL (MEDIUM).** If it does not equal the template's `$schema`
+   (`.../Developzone/specwright/main/schema/...`), flag the rewrite. Catches the old
+   `.../NXTK/ck-spec-system/...` host/org/repo.
+5. **Command/agent names in `_use` doc strings.** Scan every `_use` / `_*_use` string under
+   `mcp.*`, `ticket.*`, `hooks.*`, `paths.*`. Flag old-namespace tokens: `/ck:*` -> `/sd:*` and
+   `ck:<role>` / `ck-<role>` -> `sd-<role>`. Rewrite only the token, preserving the rest of the
+   wording.
+6. **Missing newly-introduced fields.** Flag template keys the file lacks - currently
+   `ticket.snapshot` (whole object) and `paths.layers` + `paths._layers_use`. Add each from the
+   template's default; `paths.layers` defaults to `[]` (never invent a layer map here - that is
+   Phase 2.5's job on a real scaffold).
+7. **Pinned model IDs -> aliases.** Under `models.*`, flag any dated/versioned ID
+   (`claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, ...) and map to the family alias
+   (`claude-sonnet-*` -> `sonnet`, `claude-haiku-*` -> `haiku`, `claude-opus-*` -> `opus`). Leave
+   values that are already aliases, and leave unrecognized custom strings untouched (flag nothing
+   rather than guess).
+
+**C. `.claude/settings.local.json` (if present)**
+
+8. **Stale permission entries.** Scan `permissions.allow[]` / `deny[]` for paths referencing a
+   previous engine namespace under `.claude/{templates,hooks,commands}/<other>/` and flag the
+   rewrite to the current namespace (`...\templates\ck\` -> `...\templates\sd\`), matching the
+   path segment regardless of slash direction. Do NOT add, remove, or reorder any other permission.
+
+### Hook-resolution check (always, even with zero drift findings)
+
+For each hook `command` in `settings.json`, expand `${HOME}`/`~` and confirm the script file
+exists on disk. Warn LOUDLY for any miss - this is the symptom that made the bug invisible:
+
+```
+WARNING - hook script not found on disk:
+  <HookEvent> -> <resolved path>
+  This hook is NOT firing. Expected after install: ~/.claude/hooks/sd/<name>.<ext>
+  Fix: repaired by the namespace rewrite below, OR re-run install/install.ps1 (Windows) /
+       install/install.sh (Unix) if the sd hooks were never installed.
+```
+
+A miss explained by check A.1 is folded into that finding. A miss with no rename explanation means
+the engine itself is not installed - tell the user to run the installer; do NOT create the hook
+script (setup never writes into `~/.claude/`).
+
+### Gate - confirm the migration plan (one batch confirmation, not a question)
+
+If zero findings AND every hook path resolves: print "No drift detected - `.claude/*` is current."
+and continue (in `complete` -> clean early exit; in `partial` -> continue filling missing pieces).
+
+Otherwise print ONE table grouped by file (each line showing exact before -> after with a
+HIGH/MED/LOW tag), then STOP for explicit approval:
+
+> Reply "go" to apply (each file backed up first), "skip" to leave `.claude/*` untouched, or name
+> specific lines to exclude (e.g. "skip the models lines").
+
+This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
+
+### Apply (only after explicit "go")
+
+1. Back up each file to be changed: `<file>.bak.<YYYYMMDD-HHmmss>` (same scheme as Phase 4 and the
+   installer). Never overwrite without a backup.
+2. Apply ONLY the approved targeted patches: rewrite the specific drifted tokens/paths/URLs in
+   place; add missing keys/blocks from the template at their template position. Do NOT reformat
+   untouched content, reorder keys, drop `_`-prefixed comment keys, or change any project-specific
+   value (project name, ticket settings, detected commands/paths, filled layers, MCP `enabled`
+   flags, `specGate.mode`). Preserve unfilled `<<placeholder>>` tokens.
+3. Validate each patched file still parses as JSON (mirrors Phase 7) and re-run the
+   hook-resolution check; report backups written, change counts per file, and post-migration hook
+   resolution. Tell the user to restart Claude Code so corrected hooks are picked up.
+
+If state was `complete`, exit after this report. If `partial`, continue to the remaining phases.
 
 ---
 
@@ -202,7 +306,12 @@ Active specs (auto-updated by /sd:spec status transitions):
 2. Grep `.specs/constitution.md` for remaining `<<placeholder>>` tokens. List them.
 3. Validate `.claude/project-config.json` is parseable JSON.
 4. Validate `.claude/settings.json` is parseable JSON.
-5. Print report:
+5. **Verify hooks resolve.** For each hook `command` in `.claude/settings.json`, expand
+   `${HOME}`/`~` and confirm the script file exists on disk. Warn loudly for any miss (the hook is
+   not firing) and point the user at `install/install.ps1` / `install/install.sh`. Same check as
+   Phase 1.5; on a fresh scaffold it confirms the just-written settings point at really-installed
+   hooks.
+6. Print report:
 
 ```
 Setup complete. Generated:
@@ -231,6 +340,7 @@ Next steps:
 ## Rules (hard constraints)
 
 - **Idempotent.** Safe to re-run. Never overwrites without a timestamped backup.
+- **Migrates drift, never silently.** Phase 1.5 detects content drift in existing `.claude/*` (renamed engine paths/URLs/command names, newly-introduced template fields, pinned model IDs) via rule-based checks against the loaded templates - never a raw line-diff, so `<<placeholder>>` and project-specific values are preserved. Every change is previewed in one batch gate, each file is backed up first, and every hook `command` path is verified to resolve on disk.
 - **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`.
 - **Scan detects facts, never rules.** Phase 2.5 may pre-fill stack, paths, commands, and
   `paths.layers` only. It never writes `.specs/constitution.md` rules - those stay `<<placeholder>>`
@@ -239,4 +349,4 @@ Next steps:
 - **Never enables MCP servers automatically.** They're opt-in; user must edit project-config.json after installing the server in `~/.claude.json`.
 - **Never modifies the engine** (`~/.claude/`). The setup command writes ONLY into the current working directory.
 - **Generated files have no BOM.** UTF-8 only.
-- If state is `complete`, the command exits without writing. The user can manually edit any generated file at any time.
+- If state is `complete` **and Phase 1.5 finds no drift**, the command exits without writing. If Phase 1.5 finds drift, it offers a backed-up, gated migration first (silence is never approval), then exits. The user can manually edit any generated file at any time.
