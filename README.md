@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Ten slash commands, five specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Eleven slash commands, six specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -23,6 +23,8 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 ---
 
 ## Features
+
+<!-- Counts/gates are authoritative in docs/architecture.md. Update there first, then mirror here. -->
 
 | Capability | What you get |
 |---|---|
@@ -86,9 +88,11 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 
 ## Commands
 
-| Command | Type | Hard gates | Purpose |
+<!-- Counts/gates are authoritative in docs/architecture.md. Update there first, then mirror here. -->
+
+| Command | Type | Gates | Purpose |
 |---|---|---|---|
-| `/sd:feature <ID-or-slug>` | Workflow | 4 | Spec-driven feature: spec -> impact -> plan -> execute -> review -> close |
+| `/sd:feature <ID-or-slug>` | Workflow | 3 | Spec-driven feature: spec -> impact -> plan -> execute -> review -> close |
 | `/sd:bug <ID-or-slug>` | Workflow | 5 | Root-cause-first fix: capture -> reproduce -> investigate -> failing test -> minimal fix -> regression |
 | `/sd:rca <slug>` | Workflow | 3 | Incident analysis. **Output is the spec - no code change.** |
 | `/sd:refactor <slug>` | Workflow | 6 | Coverage-gated restructure: requires >=80% coverage before touching code |

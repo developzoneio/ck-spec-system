@@ -117,6 +117,9 @@ If the user insists on proceeding without repro, log a constitution exception to
 Reached ONLY when the loop ends with no CONFIRMED hypothesis. STOP. Do NOT proceed to a fix - a fix on an
 unconfirmed root cause risks treating a symptom.
 
+> Gate 3a is the alternative-path form of Gate 3; the workflow reaches one or the other, never both, so
+> the gate count is 5.
+
 Append the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict and reasoning) to
 `.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next investigation.
 
