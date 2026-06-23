@@ -6,6 +6,8 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 
 ## Three-layer architecture
 
+<!-- AUTHORITATIVE asset counts. Update here first; README derives from this. -->
+
 ```
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
@@ -68,6 +70,8 @@ Phase N - Close-out
 A **gate** is a checkpoint where the workflow refuses to proceed without explicit user approval. Silence is not approval. Skipping a gate requires logging a constitution exception to the spec's retro.
 
 The 5 workflow commands have these gate counts:
+
+<!-- AUTHORITATIVE gate counts. Update here first; README derives from this. -->
 
 | Workflow | Gates | Why |
 |---|---|---|

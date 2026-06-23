@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Bumps command count 10 -> 11 and agent count 5 -> 6 across docs and the validators.
 
 ### Fixed
+- Reconcile documentation counts to disk (SW-1): corrected the `README.md` `/sd:feature` gate count
+  (`4` -> `3`) and the stale command/subagent tagline (`Ten`/`five` -> `Eleven`/`six`); designated
+  `docs/architecture.md` as the authoritative inventory source (asset + gate counts) with pointer
+  comments from `README.md`, and clarified that `/sd:bug` Gate 3a is the alternative-path form of Gate 3.
 - `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
   new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or
   `.claude/settings.json` exists (states `complete` and `partial`) and rule-based-compares them
