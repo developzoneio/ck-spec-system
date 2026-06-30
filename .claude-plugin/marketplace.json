@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace-manifest.json",
+  "name": "specwright",
+  "owner": {
+    "name": "Trong Tran",
+    "email": "trongtran@developzone.dev"
+  },
+  "description": "Official specwright marketplace",
+  "plugins": [
+    {
+      "name": "specwright",
+      "source": "./",
+      "description": "Spec-driven development toolkit for Claude Code"
+    }
+  ]
+}

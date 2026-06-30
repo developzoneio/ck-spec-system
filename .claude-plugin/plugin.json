@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "specwright",
+  "displayName": "Specwright",
+  "version": "1.4.0",
+  "description": "Spec-driven development toolkit - 11 workflow commands, 6 agents, 6 skills, and 3 lifecycle hooks for Claude Code",
+  "author": {
+    "name": "Trong Tran",
+    "email": "trongtran@developzone.dev",
+    "url": "https://github.com/developzoneio/specwright"
+  },
+  "repository": "https://github.com/developzoneio/specwright",
+  "license": "MIT",
+  "keywords": ["spec-driven", "workflow", "agents", "tdd", "adr"]
+}

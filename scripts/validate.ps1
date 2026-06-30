@@ -13,6 +13,7 @@
       5. Install-target count: a real install to a temp base lands the expected
          file counts under each <area>/sd/ subfolder.
       6. CHANGELOG gate: the [Unreleased] section is non-empty.
+      7. Plugin manifest validation: claude plugin validate passes on the repo root.
 
     Exit code 0 = all checks passed; 1 = at least one check failed.
 
@@ -102,7 +103,7 @@ Write-Host "  Repo root: $repoRoot"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-Write-Section 'Check 1/6: Pure-ASCII scan (*.ps1)'
+Write-Section 'Check 1/7: Pure-ASCII scan (*.ps1)'
 $ps1Files = Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
     Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 $asciiBad = 0
@@ -119,7 +120,7 @@ if ($asciiBad -eq 0) { Write-Ok "$($ps1Files.Count) .ps1 file(s) are pure ASCII"
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-Write-Section 'Check 2/6: bash -n syntax (*.sh)'
+Write-Section 'Check 2/7: bash -n syntax (*.sh)'
 $shFiles = @()
 foreach ($sub in @('hooks\bash', 'install', 'scripts')) {
     $dir = Join-Path $repoRoot $sub
@@ -147,7 +148,7 @@ if ($null -eq $bashExe) {
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-Write-Section 'Check 3/6: Hook-pair parity'
+Write-Section 'Check 3/7: Hook-pair parity'
 $psHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File |
     ForEach-Object { $_.BaseName }
 $shHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\bash') -Filter *.sh -File |
@@ -171,7 +172,7 @@ if ($parityBad -eq 0) { Write-Ok "$($psHooks.Count) hook pair(s) present on both
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-Write-Section 'Check 4/6: Agent model aliases'
+Write-Section 'Check 4/7: Agent model aliases'
 $agentFiles = Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File
 $modelBad = 0
 foreach ($f in $agentFiles) {
@@ -194,7 +195,7 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-Write-Section 'Check 5/6: Install-target counts'
+Write-Section 'Check 5/7: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
 $psExe = (Get-Process -Id $PID).Path
@@ -238,7 +239,7 @@ try {
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/6: CHANGELOG [Unreleased] gate'
+Write-Section 'Check 6/7: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -266,6 +267,22 @@ if ($start -lt 0) {
     } else {
         Write-FailMsg '[Unreleased] section is empty (add a changelog entry)'
         Add-Failure 'changelog: [Unreleased] empty'
+    }
+}
+
+# ---- Check 7: plugin manifest validation -----------------------------------
+
+Write-Section 'Check 7/7: Plugin manifest validation'
+$claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
+if ($null -eq $claudeCmd) {
+    Write-WarnMsg 'claude CLI not found in PATH; skipping plugin validate (CI runs this step).'
+} else {
+    $pluginOut = & claude plugin validate $repoRoot 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok '.claude-plugin/plugin.json and marketplace.json pass claude plugin validate'
+    } else {
+        Write-FailMsg "claude plugin validate failed:`n$pluginOut"
+        Add-Failure "plugin-validate: claude plugin validate exited $LASTEXITCODE"
     }
 }
 

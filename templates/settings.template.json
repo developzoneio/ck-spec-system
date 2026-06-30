@@ -1,52 +1,5 @@
 {
-  "_comment_top": "Claude Code project settings - hook wiring for specwright. PowerShell version (Windows). For bash adaptation, see _bash_adaptation at bottom.",
-
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/sd/prompt-router.ps1",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/sd/spec-gate.ps1",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${HOME}/.claude/hooks/sd/subagent-retro.ps1",
-            "timeout": 3
-          }
-        ]
-      }
-    ]
-  },
-
-  "_bash_adaptation": {
-    "_comment": "On macOS/Linux replace PowerShell command lines with bash invocations. Make hooks executable (chmod +x) and adjust file extension.",
-    "UserPromptSubmit_command_example": "bash ${HOME}/.claude/hooks/sd/prompt-router.sh",
-    "PreToolUse_command_example": "bash ${HOME}/.claude/hooks/sd/spec-gate.sh",
-    "SubagentStop_command_example": "bash ${HOME}/.claude/hooks/sd/subagent-retro.sh",
-    "_note_powershell_on_unix": "PowerShell 7+ is available on Unix; if installed, the PowerShell command above works as-is. Otherwise switch to the bash variants."
-  },
+  "_comment_top": "Claude Code project settings for specwright. Hooks are registered automatically by the specwright plugin (no hooks block needed here). Add project-specific settings below.",
 
   "_schema_notes": {
     "_hook_output_format": "spec-gate emits dual-format JSON for forward and backward CLI compatibility.",
@@ -56,9 +9,7 @@
     "_example_block_output": "{\"decision\":\"block\",\"reason\":\"...\",\"hookSpecificOutput\":{\"permissionDecision\":\"deny\",\"reason\":\"...\"}}"
   },
 
-  "_timeout_notes": {
-    "userPromptSubmit": "5s - inject routing hints and spec context",
-    "preToolUse": "5s - check spec-gate before code edits",
-    "subagentStop": "3s - debounced retro reminder"
+  "_legacy_manual_install_note": {
+    "_comment": "If you installed specwright via the manual installer (not the plugin), hooks are NOT auto-registered. Add the hooks block from install/README.md to this file to wire them up, then restart Claude Code."
   }
 }

@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` — distributes specwright
+  as a Claude Code plugin; install with `/plugin marketplace add developzoneio/specwright`
+  then `/plugin install specwright@specwright`. Closes SW-2.
+- `hooks/hooks.json` — plugin-level hook wiring (prompt-router, spec-gate, subagent-retro);
+  hooks now auto-register at user scope when the plugin is installed, no per-project
+  `/sd:setup` hook configuration required.
+- `scripts/validate.ps1` / `scripts/validate.sh` Check 7 — runs `claude plugin validate .`
+  to catch manifest schema errors before distribution; counts bumped from 6 to 7.
+- `.github/workflows/ci.yml` plugin-validate step — runs `claude plugin validate .` on both
+  ubuntu and windows runners before the existing invariant-validator step.
+
+### Changed
+- `/sd:setup` Phase 0 now detects both install methods: reads templates from
+  `${CLAUDE_PLUGIN_ROOT}/templates/` (plugin install) or `~/.claude/templates/sd/` (manual
+  install fallback); all `<template-root>` refs updated throughout Phases 4-6.
+- `/sd:setup` Phase 6 no longer writes a hooks block to `.claude/settings.json`; the plugin
+  auto-registers hooks. Legacy manual-install users see a migration notice.
+- `/sd:setup` Phase 7 hook-path check replaced with plugin presence check
+  (`claude plugin list`); warns rather than blocking when plugin is absent.
+- `templates/settings.template.json` — hooks block removed; scaffolded `settings.json` no
+  longer double-registers hooks already handled by the plugin. Legacy install note added.
+- `install/README.md` — plugin install section promoted to top (recommended path);
+  manual installer moved under a "Manual install (legacy)" heading.
+
+### Deprecated
+- `install/` manual installer — kept for CI and airgapped environments; plugin distribution
+  via `/plugin marketplace add developzoneio/specwright` is now the recommended path.
+
+
 - `ROADMAP.md` - published roadmap of near-term, planned, and exploratory work, linked from
   `README.md` (new `## Roadmap` section + Documentation entry). Migrated the forward-looking items
   out of the non-standard `### Planned` subsection that sat under the `1.2.0` changelog entry into

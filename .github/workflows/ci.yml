@@ -17,6 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # --- Plugin manifest validation ----------------------------------------
+      - name: Plugin manifest validate (bash)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: claude plugin validate .
+
+      - name: Plugin manifest validate (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: claude plugin validate .
+
       # --- Run the full invariant validator (platform-native) ---------------
       - name: Validate (bash)
         if: runner.os == 'Linux'

@@ -13,14 +13,22 @@ Scaffolds a project to use `specwright`. Safe to re-run: detects existing state 
 
 ## Phase 0 - Prerequisites check
 
-1. Verify the following installed paths exist (i.e. the engine has been installed via the installer):
-   - `~/.claude/templates/sd/`
-   - `~/.claude/skills/sd/`
-   - If either is missing -> abort with: "specwright install incomplete — `<missing path>` not found. Run `install/install.ps1` (Windows) or `install/install.sh` (Unix) from the specwright repo first."
+1. Determine the **template root** based on how specwright is installed:
+   - **Plugin install** (recommended): `${CLAUDE_PLUGIN_ROOT}/templates/`
+     When this command is loaded through the plugin, `${CLAUDE_PLUGIN_ROOT}` is substituted
+     with the real plugin cache path. If it shows as a real filesystem path here (not the
+     literal string `${CLAUDE_PLUGIN_ROOT}`), use it.
+   - **Manual install** (fallback): `~/.claude/templates/sd/`
+     Used when running from the old installer. If `${CLAUDE_PLUGIN_ROOT}` is still the
+     literal string (unsubstituted), fall back to `~/.claude/templates/sd/`.
+   - If neither path contains `CLAUDE.template.md` -> abort with:
+     "specwright not found. Install via plugin: `/plugin marketplace add developzoneio/specwright`
+     then `/plugin install specwright@specwright`. Or use the legacy installer: `install/install.ps1`
+     (Windows) / `install/install.sh` (Unix)."
 2. Verify the current directory looks like a project root.
    - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`).
    - If nothing found -> warn and ask: "This directory does not appear to be a project root. Continue anyway? (yes / no)".
-3. Read `~/.claude/templates/sd/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
+3. Read `<template-root>/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory using the resolved template root from step 1. (Spec templates remain on disk for later.)
 
 ---
 
@@ -249,7 +257,7 @@ This determines which hook variant the generated `settings.json` references.
 1. If existing `CLAUDE.md` is present:
    - Backup to `CLAUDE.md.bak.<YYYYMMDD-HHmmss>`.
    - Merge: take stack hints from existing into the new template; preserve user-customized sections under "## Code conventions" and "## Forbidden patterns" verbatim if they exist.
-2. Generate new `CLAUDE.md` from `~/.claude/templates/sd/CLAUDE.template.md`:
+2. Generate new `CLAUDE.md` from `<template-root>/CLAUDE.template.md` (resolved in Phase 0):
    - Substitute `<<project-name>>` -> from current directory name or git remote.
    - Pre-fill the Stack, Commands, and Architecture sections from Phase 2.5 detected facts (including
      the layer list from `paths.layers`, rendered inside-out). Leave any field not detected and not
@@ -261,7 +269,7 @@ This determines which hook variant the generated `settings.json` references.
 ## Phase 5 - Scaffold .specs/
 
 1. Create `.specs/` directory if missing.
-2. Write `.specs/constitution.md` from `~/.claude/templates/sd/constitution.template.md`:
+2. Write `.specs/constitution.md` from `<template-root>/constitution.template.md` (resolved in Phase 0):
    - Substitute `<<project-name>>` and frontmatter fields.
    - Leave all rule placeholders as `<<placeholder>>` (the user must declare rules explicitly).
 3. Write `.specs/index.md`:
@@ -283,7 +291,7 @@ Active specs (auto-updated by /sd:spec status transitions):
 ## Phase 6 - Scaffold .claude/
 
 1. Create `.claude/` directory if missing.
-2. Write `.claude/project-config.json` from `~/.claude/templates/sd/project-config.template.json`:
+2. Write `.claude/project-config.json` from `<template-root>/project-config.template.json` (resolved in Phase 0):
    - Substitute project name, owner (from git config), repo URL (from git remote).
    - Set `ticket.system`, `ticket.pattern`, `ticket.baseUrl` from Phase 3 Q1/Q2.
    - Set `commands.{build,test,lint,coverage,run}` from Phase 2.5 detected facts; any command not
@@ -292,10 +300,13 @@ Active specs (auto-updated by /sd:spec status transitions):
    - Set `paths.layers` from Phase 2.5 as an ordered inside-out array of `{name, path}` objects
      (innermost first); write `[]` if no layered structure was detected.
    - Leave MCP servers `enabled: false` by default. Print: "MCP servers are disabled by default. Enable them by editing `.claude/project-config.json` after installing the corresponding MCP servers in `~/.claude.json`."
-3. Write `.claude/settings.json` from the appropriate variant per Phase 3 Q3:
-   - PowerShell -> use `settings.template.json` as-is.
-   - Bash -> swap `powershell -NoProfile ...` invocations for `bash <path>.sh`.
-   - Both -> write both, comment in the file noting which is active.
+3. Write `.claude/settings.json` from `<template-root>/settings.template.json` (resolved in Phase 0).
+   The template no longer includes a hooks block — hooks are auto-registered at user scope
+   by the specwright plugin. Back up any existing `.claude/settings.json` first.
+   If the user is on the legacy manual install (Phase 0 detected `~/.claude/templates/sd/`),
+   emit a note: "Hook wiring is not included in `.claude/settings.json` because the plugin
+   handles it automatically. If you are using the manual installer without the plugin,
+   add the hooks block from `install/README.md` manually, or migrate to the plugin install."
 4. Backup any existing `.claude/settings.json` first.
 
 ---
@@ -306,11 +317,14 @@ Active specs (auto-updated by /sd:spec status transitions):
 2. Grep `.specs/constitution.md` for remaining `<<placeholder>>` tokens. List them.
 3. Validate `.claude/project-config.json` is parseable JSON.
 4. Validate `.claude/settings.json` is parseable JSON.
-5. **Verify hooks resolve.** For each hook `command` in `.claude/settings.json`, expand
-   `${HOME}`/`~` and confirm the script file exists on disk. Warn loudly for any miss (the hook is
-   not firing) and point the user at `install/install.ps1` / `install/install.sh`. Same check as
-   Phase 1.5; on a fresh scaffold it confirms the just-written settings point at really-installed
-   hooks.
+5. **Verify plugin or hooks are active.** Hooks are registered automatically when specwright
+   is installed as a plugin. Check: does the output of `claude plugin list` include
+   `specwright@specwright`? If yes -> print "[OK] specwright plugin active - hooks auto-registered."
+   If no (legacy manual install path) -> warn: "specwright plugin not detected. Hooks will not
+   fire automatically. Run `/plugin marketplace add developzoneio/specwright` then
+   `/plugin install specwright@specwright` to switch to the plugin install and get automatic
+   hook registration. Alternatively, add the hooks block to `.claude/settings.json` manually
+   (see `install/README.md`)." Do NOT block setup completion on this warning.
 6. Print report:
 
 ```
@@ -319,20 +333,18 @@ Setup complete. Generated:
   - .specs/constitution.md (N placeholders to fill)
   - .specs/index.md (empty registry)
   - .claude/project-config.json (M MCP servers disabled)
-  - .claude/settings.json (hooks: prompt-router, spec-gate, subagent-retro)
+  - .claude/settings.json
 
-Installed engine paths:
-  - ~/.claude/commands/sd/     (11 workflow commands)
-  - ~/.claude/agents/sd/       (6 specialist agents)
-  - ~/.claude/hooks/sd/        (3 hooks)
-  - ~/.claude/templates/sd/    (templates)
-  - ~/.claude/skills/sd/       (6 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline)
+Engine source: <plugin cache path OR ~/.claude/.../ for manual install>
+  - 11 workflow commands  (feature, bug, rca, refactor, perf, spec, explore, review, setup, release, adr)
+  - 6 specialist agents   (spec-architect, code-explorer, debugger, implementer, reviewer, docs-writer)
+  - 6 skills              (severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline)
+  - 3 lifecycle hooks     (prompt-router, spec-gate, subagent-retro) [auto-registered via plugin]
 
 Next steps:
   1. Fill placeholders in CLAUDE.md and .specs/constitution.md (open them in your editor).
   2. Enable MCP servers you use in .claude/project-config.json under the "mcp" section.
-  3. Restart Claude Code so hooks are picked up.
-  4. Try: /sd:explore "where is the entrypoint" to verify the install works.
+  3. Try: /sd:explore "where is the entrypoint" to verify the install works.
 ```
 
 ---

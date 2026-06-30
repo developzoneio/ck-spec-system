@@ -1,5 +1,38 @@
 # Installing specwright
 
+> **Deprecated for most users.** specwright now distributes as a Claude Code plugin.
+> See **Plugin install (recommended)** below. The manual installer is kept for
+> CI environments and restricted setups that cannot use the marketplace.
+
+---
+
+## Plugin install (recommended)
+
+Two commands — no git clone, no file copying, automatic updates:
+
+```sh
+/plugin marketplace add developzoneio/specwright
+/plugin install specwright@specwright
+```
+
+Or via the CLI:
+
+```sh
+claude plugin marketplace add developzoneio/specwright
+claude plugin install specwright@specwright
+```
+
+Hooks (prompt-router, spec-gate, subagent-retro) are registered automatically at user scope.
+Per-project setup (CLAUDE.md, `.specs/`, `project-config.json`) is still done via `/sd:setup`.
+
+To update: `/plugin update specwright@specwright`
+
+To uninstall: `claude plugin uninstall specwright@specwright`
+
+---
+
+## Manual install (legacy)
+
 The installer copies the engine (commands, agents, hooks, templates) into a Claude Code base directory, under the `sd/` subfolder of each engine directory:
 
 ```

@@ -10,6 +10,7 @@
 #   5. Install-target count: a real install to a temp base lands the expected
 #      file counts under each <area>/sd/ subfolder.
 #   6. CHANGELOG gate: the [Unreleased] section is non-empty.
+#   7. Plugin manifest validation: claude plugin validate passes on the repo root.
 #
 # Exit 0 = all checks passed; 1 = at least one failed.
 
@@ -52,7 +53,7 @@ echo "  Repo root: $repo_root"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-section "Check 1/6: Pure-ASCII scan (*.ps1)"
+section "Check 1/7: Pure-ASCII scan (*.ps1)"
 ascii_bad=0
 ps1_count=0
 while IFS= read -r -d '' f; do
@@ -69,7 +70,7 @@ if [[ $ascii_bad -eq 0 ]]; then ok "$ps1_count .ps1 file(s) are pure ASCII"; fi
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-section "Check 2/6: bash -n syntax (*.sh)"
+section "Check 2/7: bash -n syntax (*.sh)"
 syn_bad=0
 sh_count=0
 while IFS= read -r -d '' f; do
@@ -86,7 +87,7 @@ if [[ $syn_bad -eq 0 ]]; then ok "$sh_count .sh file(s) pass bash -n"; fi
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-section "Check 3/6: Hook-pair parity"
+section "Check 3/7: Hook-pair parity"
 parity_bad=0
 ps_count=0
 for psf in "$repo_root"/hooks/powershell/*.ps1; do
@@ -112,7 +113,7 @@ if [[ $parity_bad -eq 0 ]]; then ok "$ps_count hook pair(s) present on both plat
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-section "Check 4/6: Agent model aliases"
+section "Check 4/7: Agent model aliases"
 model_bad=0
 agent_count=0
 for af in "$repo_root"/agents/*.md; do
@@ -140,7 +141,7 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-section "Check 5/6: Install-target counts"
+section "Check 5/7: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
 cleanup_tmp() { [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true; }
@@ -171,7 +172,7 @@ trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/6: CHANGELOG [Unreleased] gate"
+section "Check 6/7: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
@@ -192,6 +193,20 @@ elif printf '%s\n' "$next_header" \
 else
     fail "[Unreleased] section is empty (add a changelog entry)"
     add_failure "changelog: [Unreleased] empty"
+fi
+
+# ---- Check 7: plugin manifest validation -----------------------------------
+
+section "Check 7/7: Plugin manifest validation"
+if ! command -v claude >/dev/null 2>&1; then
+    warn "claude CLI not found in PATH; skipping plugin validate (CI runs this step)."
+else
+    if plugin_out="$(claude plugin validate "$repo_root" 2>&1)"; then
+        ok ".claude-plugin/plugin.json and marketplace.json pass claude plugin validate"
+    else
+        fail "claude plugin validate failed: $plugin_out"
+        add_failure "plugin-validate: claude plugin validate exited non-zero"
+    fi
 fi
 
 # ---- summary ---------------------------------------------------------------
