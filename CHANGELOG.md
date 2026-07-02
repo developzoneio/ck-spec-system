@@ -77,6 +77,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machine's UTC offset exactly like the bug fixed earlier in this file, just triggered a different
   way. Both are PowerShell-only; `hooks/bash/subagent-retro.sh` was unaffected (no bash twin
   change needed).
+- `install/install.sh` hardening: aligned to `set -euo pipefail` (was `set -e` only, so unset-
+  variable typos and mid-pipeline failures - e.g. a `sha256sum`/`shasum` error - passed silently;
+  those two pipelines now end `|| true` since a hash-tool failure is expected-recoverable, not a
+  reason to abort); added the same `--prefix` safety guard `uninstall.sh` already had (empty,
+  `/`, `\`, or `..` components rejected) to `install/install.ps1` too, so install and uninstall
+  accept the same set of prefixes on both platforms - previously only uninstall validated it, so
+  `--prefix ../evil` would have written outside the intended tree; quoted the unquoted
+  `rel="${f#$src_root/}"` strip pattern (glob-interpreted `$src_root` broke on a repo path
+  containing `[`, `*`, or `?`); and added an `ERR` trap that reports how many files already
+  landed and the exact `uninstall.sh` command to run if a copy fails mid-install (no full
+  transactional rollback - per-file `.bak.*` backups already protect overwritten files).
 - Post-1.3.0 docs drift: `README.md`'s tagline said "Ten slash commands, five specialized
   subagents" (now eleven / six); the Commands table was missing `/sd:adr` and listed
   `/sd:feature` at 4 hard gates (the merged review+integration gate makes it 3); the Agents table

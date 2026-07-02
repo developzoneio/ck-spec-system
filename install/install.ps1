@@ -75,6 +75,17 @@ function Get-FileHashSafe {
     }
 }
 
+# ---- prefix safety guard ---------------------------------------------------
+# Mirrors uninstall.ps1's guard exactly - install and uninstall must accept the
+# same set of prefixes, or a prefix legal for one and rejected by the other
+# leaves orphaned or unreachable files.
+
+if ([string]::IsNullOrWhiteSpace($Prefix) -or
+    $Prefix.Contains('/') -or $Prefix.Contains('\') -or $Prefix.Contains('..')) {
+    Write-Fail "Invalid prefix '$Prefix'. Must be a plain folder name (no separators, no '..')."
+    exit 1
+}
+
 # ---- repo root detection ---------------------------------------------------
 
 $scriptDir = $PSScriptRoot
