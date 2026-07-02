@@ -68,6 +68,15 @@ $configBlockJson = @'
 {
   "spec": {"dir": ".specs", "indexFile": ".specs/index.md"},
   "ticket": {"pattern": "^[A-Z]+-[0-9]+$"},
+  "workflow": {
+    "keywords": {
+      "bug": ["bug", "fix", "broken", "error", "crash", "regression", "defect"],
+      "feature": ["feature", "add", "implement", "new", "support"],
+      "refactor": ["refactor", "restructure", "clean up", "extract", "rename"],
+      "perf": ["perf", "performance", "slow", "optimize", "latency", "throughput"],
+      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"]
+    }
+  },
   "hooks": {
     "userPromptRouter": {"enabled": true},
     "specGate": {"enabled": true, "mode": "block"},

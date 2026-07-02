@@ -189,6 +189,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surface (`query`, `context`, `impact`, `list_repos`) and renamed `context7`/`tavily` tools to
   their current names (`query-docs`, `tavily_search`), keeping each agent's frontmatter allowlist
   and body usage in parity.
+- `hooks/bash/prompt-router.sh`'s per-workflow keyword lookup silently dropped every keyword but
+  the last in a workflow's list when `.claude/project-config.json` defined `workflow.keywords`:
+  some `jq` builds (observed with a Windows `jq.exe`) emit CRLF line endings for `join("\n")`
+  output even from an LF-only input, so `while IFS= read -r kw` left a trailing `\r` on every
+  keyword but the final one, and `[[ "$prompt_lower" == *"$kw_lower"* ]]` never matched a
+  CR-suffixed keyword. Found by piping real prompts through the hook against a live project's
+  config (not the smoke-test fixture, which omitted `workflow.keywords` and only ever exercised
+  the hardcoded default-list fallback). Fixed by stripping a trailing `\r` off each line read from
+  the list; also added a `workflow.keywords` block to both `scripts/smoke-hooks.sh` and
+  `scripts/smoke-hooks.ps1` fixtures so the `jq`/config-driven path is exercised going forward.
+  `hooks/powershell/prompt-router.ps1` was unaffected (native `ConvertFrom-Json`, no `jq`).
 
 ---
 

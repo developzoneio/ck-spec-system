@@ -71,6 +71,9 @@ match_keywords() {
     fi
     local kw
     while IFS= read -r kw; do
+        # Some jq builds (e.g. Windows jq.exe) emit CRLF for join("\n") output;
+        # strip a trailing CR so the comparison below isn't corrupted.
+        kw="${kw%$'\r'}"
         [[ -z "${kw}" ]] && continue
         local kw_lower
         kw_lower="$(printf '%s' "${kw}" | tr '[:upper:]' '[:lower:]')"
