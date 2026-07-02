@@ -61,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   go straight from spec to investigation/baseline artifacts, so the old "except RCA" exemption
   reported FAIL on every correctly executed bug/perf spec. Also corrected the same overgeneralized
   claim in `docs/usage.md`'s resume heuristic.
+- `hooks/powershell/subagent-retro.ps1`'s debounce check now parses `lastReminderUtc` as UTC via
+  `[datetimeoffset]::Parse(...).UtcDateTime` instead of `[datetime]::Parse(...)`, which returned a
+  local-`Kind` value silently converted from the UTC string, skewing `$age` by the machine's UTC
+  offset (negative for ~UTC offset hours on UTC+N machines, wrongly suppressing reminders; always
+  past-debounce on UTC-N machines, never suppressing). The bash twin was already correct
+  (epoch seconds throughout).
 
 ---
 

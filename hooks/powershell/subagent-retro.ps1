@@ -120,7 +120,7 @@ function Test-DebounceElapsed {
     if (-not (Test-Path -LiteralPath $StatePath)) { return $true }
     try {
         $st = Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 | ConvertFrom-Json
-        $last = [datetime]::Parse($st.lastReminderUtc)
+        $last = [datetimeoffset]::Parse($st.lastReminderUtc).UtcDateTime
         $age = (Get-Date).ToUniversalTime() - $last
         return ($age.TotalMinutes -ge $DebounceMinutes)
     } catch {
