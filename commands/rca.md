@@ -91,7 +91,8 @@ For each hypothesis in rank order:
    - `TASK = verify`
    - `HYPOTHESIS = <H#>`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
-2. Debugger gathers evidence (logs, queries, code reads). For MSSQL, **SELECT / EXPLAIN only** - never UPDATE / DELETE / INSERT.
+2. Debugger gathers evidence (logs, queries, code reads). Database access (via the project's MCP
+   tool or CLI) is **SELECT / EXPLAIN only** - never UPDATE / DELETE / INSERT.
 3. Result: `CONFIRMED` / `REJECTED` / `INCONCLUSIVE`. Append result with evidence pointers to "Verification results (Phase 3)".
 4. Document REJECTED with FULL reasoning. This is knowledge preservation.
 5. Continue until one hypothesis is `CONFIRMED`.
@@ -152,6 +153,6 @@ No gate here - documentation-only phase.
 - Reproduction is rarely possible for incidents (the incident is over). Verification relies on logs, traces, queries, and code reads from the relevant time window.
 - All evidence lives under `04-artifacts/` with descriptive filenames. Never reference "the dashboard" - save a screenshot or query.
 - Rejected hypotheses are documented in full. They are as valuable as the confirmed one for future incidents.
-- MSSQL access (via MCP) is SELECT / EXPLAIN only. Any UPDATE attempt is a constitution violation.
+- Database access (via the project's MCP tool or CLI) is SELECT / EXPLAIN only. Any UPDATE attempt is a constitution violation.
 - The Spawned specs section is a CONTRACT. Each reserved ID should be created within the agreed timeline; if not, log to retro.
 - RCAs do not get a `revive` action. New incident -> new RCA.

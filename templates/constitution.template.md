@@ -132,7 +132,7 @@ All transitions logged to the spec's `05-retro.md` with timestamp + reason.
 - **Static singletons holding state** - configuration is fine; mutable state is not.
 - **`// TODO` or `// HACK` in committed code** - either fix, ticket, or spec it.
 - **Hardcoded secrets** - use the configured secret store.
-- **`dynamic` (C#) / `any` (TS)** - outside justified boundaries; document the exception inline.
+- **Type-safety escapes** (e.g. `dynamic` in C#, `any` in TS) - outside justified boundaries; document the exception inline.
 - **Catch-and-swallow** - `catch { }` or `catch (Exception) { _logger.Log... }` without re-throw is forbidden.
 - **Direct DB calls from controllers** - must go through application layer.
 - **Opportunistic refactor inside a feature/bug spec** - separate spec; one concern per workflow.

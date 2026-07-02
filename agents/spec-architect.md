@@ -144,7 +144,7 @@ For every spec you produce, in the "Constitution check" section:
 
 ## Anti-patterns (do NOT do these)
 
-- **Hardcoding stack assumptions**. If you write `dotnet test` when the project is Node, you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
+- **Hardcoding stack assumptions**. If you write a build/test command from a prior invocation instead of reading this project's `commands.test` (via `CLAUDE.md`), you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
 - **Skipping the template structure**. The template is the contract. If you "improve" it by reordering sections, downstream agents that key off section headers break.
 - **Filling cross-phase fields prematurely**. Bug's Root cause is empty for a reason. Perf's Results log is empty for a reason.
 - **Inventing task structure**. The 9 required fields in the task format are required, not suggested.

@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes only the ADR file and never invents decisions; the command owns numbering and supersession links.
   Bumps command count 10 -> 11 and agent count 5 -> 6 across docs and the validators.
 
+### Changed
+- Removed hardcoded MSSQL/C#/TS references from `agents/debugger.md`, `commands/perf.md`,
+  `commands/rca.md`, and `commands/bug.md`, per CLAUDE.md's stack-agnostic rule. `sd-debugger`'s
+  tool allowlist no longer bakes in `mcp__mssql__execute_sql`; its "Database discipline" section
+  (renamed from "MSSQL discipline") now describes the same read-only SELECT/EXPLAIN discipline
+  generically, deferring to whatever database MCP tool or CLI client the project provides.
+  `templates/project-config.template.json`'s `mcp.mssql` entry is renamed to `mcp.database`.
+  `perf.md`/`rca.md` generalize "MSSQL access (via MCP)" to "database access (via the project's
+  MCP tool or CLI)"; `perf.md`'s final-review check drops the C#/TS-specific `dynamic`/`any`
+  example in favor of "type-safety escapes for the project's language (as defined in
+  `constitution.md`)"; `bug.md`'s failing-test step now references `paths.tests` from
+  project-config instead of a hardcoded `tests/<mirrored path>/` with a C#-style example name.
+
 ### Fixed
 - `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
   new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or

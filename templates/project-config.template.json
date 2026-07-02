@@ -99,9 +99,9 @@
       "enabled": false,
       "_use": "Fast symbol search, callers, call graph for sd-code-explorer"
     },
-    "mssql": {
+    "database": {
       "enabled": false,
-      "_use": "Read-only schema and query-plan inspection in sd-debugger (SELECT/EXPLAIN only)"
+      "_use": "Read-only schema and query-plan inspection in sd-debugger (SELECT/EXPLAIN only) - set to whichever database MCP tool this project provides (e.g. mssql, postgres)"
     },
     "playwright": {
       "enabled": false,

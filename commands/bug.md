@@ -154,9 +154,11 @@ Ask:
 
 Main thread does this, NOT a subagent. The test must:
 
-1. Live under `tests/<mirrored path>/` per project conventions.
+1. Live under `paths.tests` (from `.claude/project-config.json`), mirroring the source path per
+   project convention.
 2. Reproduce the symptom (must FAIL when run).
-3. Be named for the bug, not the fix (e.g. `Should_NotDoubleDecrement_When_RetryAfterTransientFailure`).
+3. Be named for the bug, not the fix (example, adapt to project/language naming convention:
+   "does not double-decrement when a transient failure is retried").
 4. Be added to `00-spec.md` Regression test checklist.
 
 Run the test once. Confirm it fails for the documented reason.

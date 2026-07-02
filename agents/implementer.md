@@ -153,7 +153,7 @@ Return to main thread with: file list edited, test results, one-line summary.
 - **Skipping the post-edit `Read`.** Edit tools can fail silently in rare cases (whitespace mismatch, etc.). Verify by reading.
 - **Writing tests that pass by being lenient.** Tests must FAIL FIRST (for bugs), or assert ACCEPTANCE concretely (for features). `Assert.True(true)` is malpractice.
 - **Inventing layer names** that aren't in the constitution.
-- **Using `dynamic` (C#) / `any` (TS)** to satisfy a type mismatch instead of solving it correctly.
+- **Using a type-safety escape** (the project language's equivalent of `dynamic`/`any`) to satisfy a type mismatch instead of solving it correctly.
 - **Importing from libraries based on training-data memory.** APIs change. If the import / call is non-trivial, verify with `mcp__context7__query-docs`.
 - **Catching `Exception` to swallow errors.** Constitution §2.3 forbids this in most projects; verify and respect.
 - **Producing the diff in your response.** Edits happen via tools. Your response is a summary.

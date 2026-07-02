@@ -227,7 +227,7 @@ STOP. Display final test results + final measurement. Ask:
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `CHANGED_FILES = <all files touched across kept attempts>`
    - `RESULTS_LOG = <Results log>`
-2. Reviewer checks: correctness preserved (no test edits to make them pass), no behavior change beyond what spec accepted under "Trade-offs", no new constitution exceptions, no static state introduced, no `dynamic` (C#) / `any` (TS) sneaked in.
+2. Reviewer checks: correctness preserved (no test edits to make them pass), no behavior change beyond what spec accepted under "Trade-offs", no new constitution exceptions, no static state introduced, no type-safety escapes for the project's language (as defined in `constitution.md`) sneaked in.
 
 ### ⛔ Gate 8 - Final review pass
 
@@ -259,5 +259,5 @@ STOP. Display reviewer verdict. Ask:
 - Revert on no measurable improvement. The Results log is the source of truth.
 - Reverted attempts are LOGGED, not deleted. They are knowledge.
 - Correctness tests must remain unchanged. If the optimization requires changing a test, it changes behavior - that needs a FEAT-* or BUG-* spec, not PERF-*.
-- MSSQL access (via MCP) for hotspot analysis is SELECT / EXPLAIN only.
+- Database access (via the project's MCP tool or CLI) for hotspot analysis is read-only: SELECT / EXPLAIN only.
 - If SLA cannot be met after exhausting hypotheses, close the PERF spec with the documented gap and lessons. Do not "ship anyway".
