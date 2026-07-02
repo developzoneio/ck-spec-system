@@ -166,11 +166,12 @@ if [[ ${is_code} -eq 0 ]]; then
     exit 0
 fi
 
-# Check for in-progress spec.
+# Check for in-progress spec. Both markers must appear on the SAME line
+# (mirrors prompt-router.sh and spec-gate.ps1's same-line semantics).
 has_in_progress=0
 if [[ -f "${index_path}" ]]; then
-    if grep -q 'in-progress' "${index_path}" 2>/dev/null && \
-       grep -q -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' "${index_path}" 2>/dev/null; then
+    if grep -E 'in-progress' "${index_path}" 2>/dev/null \
+         | grep -q -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+'; then
         has_in_progress=1
     fi
 fi

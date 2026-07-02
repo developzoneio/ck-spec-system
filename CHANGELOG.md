@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   threw a non-terminating `ParameterBindingException` on every real (piped/redirected) stdin
   invocation, leaving it unbound and causing every PowerShell hook to exit silently before reading
   any input. Renamed to `$hookInput` in all three files.
+- `hooks/bash/spec-gate.sh` in-progress detection now requires `in-progress` and a spec ID on the
+  SAME line, matching `spec-gate.ps1` and `prompt-router.sh`'s existing same-line semantics. The
+  previous two independent file-wide `grep`s let an `in-progress` legend/header line combine with a
+  spec ID on an unrelated `done` row, so bash allowed a code edit that PowerShell would warn/block
+  on the identical `.specs/index.md`.
 
 ---
 
