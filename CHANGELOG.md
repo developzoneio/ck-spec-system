@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   threw a non-terminating `ParameterBindingException` on every real (piped/redirected) stdin
   invocation, leaving it unbound and causing every PowerShell hook to exit silently before reading
   any input. Renamed to `$hookInput` in all three files.
+- `hooks/powershell/subagent-retro.ps1`: `Get-IndexSpecs` ran the spec-ID regex `-match` before the
+  `in-progress` literal `-match`, so the second match clobbered `$Matches` and every in-progress
+  spec was reported under the literal ID `"in-progress"` instead of its real ID (e.g. `FEAT-123`),
+  causing the retro-staleness check to look at the wrong path and never fire correctly. Swapped
+  the match order (`in-progress` first, ID regex last) to match the already-correct sister hooks
+  `prompt-router.ps1` and `spec-gate.ps1`.
 
 ---
 

@@ -72,7 +72,7 @@ function Get-IndexSpecs {
         return $result
     }
     foreach ($line in $lines) {
-        if ($line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+' -and $line -match 'in-progress') {
+        if ($line -match 'in-progress' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
             $id = $Matches[0]
             $type = ($id -split '-')[0]
             $obj = [pscustomobject]@{
