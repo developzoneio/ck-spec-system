@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field `refactor.md`'s inline copy had already drifted to include while `feature.md`'s copy
   lacked it). `commands/bug.md` and `commands/rca.md` no longer restate the 5-mental-models /
   `(Likelihood x Impact) / Cost-to-verify` method inline - both now point at `sd-hypothesis-tree`.
+- `scripts/validate.sh` and `scripts/validate.ps1` now derive their expected install-target
+  counts (commands / agents / skills / hooks / templates) from the source tree instead of
+  hardcoding them as literals in both files - a new command/agent/skill/template only needs to
+  land in its source dir, never a constant bumped in two scripts (this already bit PR #12, which
+  had to bump both). Each derived count is asserted `> 0` so an empty or misnamed source dir
+  fails loudly instead of vacuously passing Check 5.
 
 ### Fixed
 - Post-1.3.0 docs drift: `README.md`'s tagline said "Ten slash commands, five specialized

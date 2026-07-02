@@ -18,12 +18,24 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 
-# One platform's hooks land per install (bash hooks here), so 3 not 6.
-EXPECTED_COMMANDS=11
-EXPECTED_AGENTS=6
-EXPECTED_SKILLS=6
-EXPECTED_HOOKS=3
-EXPECTED_TEMPLATES=9
+# Counts are derived from the source tree, not hardcoded - a new command/agent/skill/template
+# only needs to land in its source dir, never a constant bumped in two scripts. Each count is
+# asserted > 0 below so an empty/misnamed source dir fails loudly instead of vacuously passing.
+# One platform's hooks land per install (bash hooks here), so this counts hooks/bash/*.sh only;
+# Check 3 (hook-pair parity) already asserts the powershell count matches.
+EXPECTED_COMMANDS="$(find "$repo_root/commands" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+EXPECTED_AGENTS="$(find "$repo_root/agents" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+EXPECTED_SKILLS="$(find "$repo_root/skills" -mindepth 2 -maxdepth 2 -type f -name 'SKILL.md' | wc -l | tr -d ' ')"
+EXPECTED_HOOKS="$(find "$repo_root/hooks/bash" -maxdepth 1 -type f -name '*.sh' | wc -l | tr -d ' ')"
+EXPECTED_TEMPLATES="$(find "$repo_root/templates" -type f | wc -l | tr -d ' ')"
+
+for pair in "commands:$EXPECTED_COMMANDS" "agents:$EXPECTED_AGENTS" "skills:$EXPECTED_SKILLS" \
+    "hooks:$EXPECTED_HOOKS" "templates:$EXPECTED_TEMPLATES"; do
+    if [[ "${pair#*:}" -eq 0 ]]; then
+        echo "FATAL: derived expected count for ${pair%%:*} is 0 - source dir empty or missing?" >&2
+        exit 1
+    fi
+done
 
 MODEL_ALIASES="sonnet haiku opus inherit"
 

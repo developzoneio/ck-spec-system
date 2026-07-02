@@ -31,12 +31,29 @@ $scriptDir = $PSScriptRoot
 $repoRoot  = Split-Path -Parent $scriptDir
 
 # ---- expected install-target counts ----------------------------------------
-# One platform's hooks land per install (PowerShell hooks here), so 3 not 6.
-$ExpectedCommands  = 11
-$ExpectedAgents    = 6
-$ExpectedSkills    = 6
-$ExpectedHooks     = 3
-$ExpectedTemplates = 9
+# Counts are derived from the source tree, not hardcoded - a new command/agent/skill/template
+# only needs to land in its source dir, never a constant bumped in two scripts. Each count is
+# asserted > 0 below so an empty/misnamed source dir fails loudly instead of vacuously passing.
+# One platform's hooks land per install (PowerShell hooks here), so this counts
+# hooks/powershell/*.ps1 only; Check 3 (hook-pair parity) already asserts the bash count matches.
+$ExpectedCommands  = (Get-ChildItem (Join-Path $repoRoot 'commands') -Filter *.md -File).Count
+$ExpectedAgents    = (Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File).Count
+$ExpectedSkills    = (Get-ChildItem (Join-Path $repoRoot 'skills') -Filter 'SKILL.md' -File -Recurse).Count
+$ExpectedHooks     = (Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File).Count
+$ExpectedTemplates = (Get-ChildItem (Join-Path $repoRoot 'templates') -File -Recurse).Count
+
+foreach ($pair in @(
+    @{ Name = 'commands';  Count = $ExpectedCommands },
+    @{ Name = 'agents';    Count = $ExpectedAgents },
+    @{ Name = 'skills';    Count = $ExpectedSkills },
+    @{ Name = 'hooks';     Count = $ExpectedHooks },
+    @{ Name = 'templates'; Count = $ExpectedTemplates }
+)) {
+    if ($pair.Count -eq 0) {
+        Write-Host "FATAL: derived expected count for $($pair.Name) is 0 - source dir empty or missing?" -ForegroundColor Red
+        exit 1
+    }
+}
 
 $ModelAliases = @('sonnet', 'haiku', 'opus', 'inherit')
 
