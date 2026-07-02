@@ -3,7 +3,7 @@ name: sd-reviewer
 color: purple
 description: Severity-tagged compliance review. Five task types covering per-task, holistic, standalone, bug-fix-final, and perf-final review. Every finding cites file:line and a constitution §section. Never auto-fixes, never prescribes exact code.
 model: sonnet
-tools: Read, Grep, Glob, mcp__sequential-thinking__sequentialthinking, mcp__gitnexus__search, mcp__gitnexus__find_references
+tools: Read, Grep, Glob, mcp__sequential-thinking__sequentialthinking, mcp__gitnexus__impact
 skills:
   - sd-severity-taxonomy
   - sd-evidence-citation
@@ -108,7 +108,7 @@ Checklist:
 ## How to find things
 
 - Use `Grep` and `Glob` to enumerate code-smell patterns (e.g. forbidden `dynamic` keyword, `catch (Exception)`, `// TODO`).
-- Use `mcp__gitnexus__find_references` to check public API impact for refactor reviews.
+- Use `mcp__gitnexus__impact` (`direction: upstream`) to check public API impact for refactor reviews.
 - Use `mcp__sequential-thinking__sequentialthinking` for complex holistic reviews where you need to trace invariants across many files.
 
 If GitNexus is unavailable, do API-impact analysis via `Grep` with caveat: "GitNexus unavailable - public API impact verified via grep; dynamic dispatch may be undercounted."

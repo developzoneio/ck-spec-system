@@ -46,9 +46,9 @@ Invoke with:
 - `GITNEXUS_AVAILABLE = <true|false from project-config.mcp.gitnexus.enabled>`
 
 Explorer routes internally based on `DETECTED_INTENT`:
-- `definition` -> GitNexus `list_symbols` + `get_file`, fallback to `Grep` for definition markers.
-- `callers` -> GitNexus `find_references`, fallback to `Grep` for invocation patterns.
-- `trace` -> GitNexus `get_call_graph` (1-2 hops).
+- `definition` -> GitNexus `context`, fallback to `Grep` for definition markers.
+- `callers` -> GitNexus `impact` (`direction: upstream`), fallback to `Grep` for invocation patterns.
+- `trace` -> GitNexus `impact` (`direction: downstream`, 1-2 hops).
 - `impact` -> direct callers (1-hop) + transitive (2-3 hop) + tests touching the target + DI / config refs.
 - `pattern` -> `Grep` with refined query, return file:line snippets.
 - `structure` -> directory listing + top-level symbols per file.

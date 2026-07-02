@@ -75,6 +75,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `workflow.keywords` (or one workflow's entry) lost keyword routing hints on Windows while bash
   kept emitting them from defaults on Linux/macOS. The five built-in keyword lists are unchanged,
   just reused instead of duplicated.
+- Agent frontmatter `tools:` allowlists and body instructions in `agents/code-explorer.md`,
+  `agents/debugger.md`, `agents/reviewer.md`, `agents/implementer.md`, `agents/spec-architect.md`,
+  `commands/explore.md`, and `skills/sd-evidence-citation/SKILL.md` referenced MCP tool names that
+  no longer exist on the live servers (`mcp__gitnexus__search`/`get_file`/`find_references`/
+  `get_call_graph`/`list_symbols`, `mcp__context7__get-library-docs`, `mcp__tavily__search`),
+  so every "verify via MCP" instruction pointed at a dead tool. Remapped to the current GitNexus
+  surface (`query`, `context`, `impact`, `list_repos`) and renamed `context7`/`tavily` tools to
+  their current names (`query-docs`, `tavily_search`), keeping each agent's frontmatter allowlist
+  and body usage in parity.
 
 ---
 

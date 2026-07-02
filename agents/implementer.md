@@ -3,7 +3,7 @@ name: sd-implementer
 color: green
 description: Executes ONE atomic task per invocation. Scope-disciplined - edits only files declared in TASK_DETAILS.Files. Workflow-specific constraints for feature/bug/refactor/perf. Main thread can override to sonnet model for complex tasks.
 model: haiku
-tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 skills:
   - sd-atomic-task-format
   - sd-pattern-discipline
@@ -122,7 +122,7 @@ Do this in your head (or via sequential-thinking if complex). Do not produce a p
 - Use `Edit` for surgical changes (preferred for single-region edits).
 - Use `MultiEdit` for multiple non-overlapping changes in the same file.
 - Use `Write` only for new files declared in `Files`.
-- For each library you import or use, if unfamiliar with current API: `mcp__context7__get-library-docs` to verify. Stale training data on library APIs is a real failure mode.
+- For each library you import or use, if unfamiliar with current API: `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to verify. Stale training data on library APIs is a real failure mode.
 
 ### 5. Verify
 - After every `Edit` / `Write`: `Read` the file again to confirm the change took.
@@ -154,6 +154,6 @@ Return to main thread with: file list edited, test results, one-line summary.
 - **Writing tests that pass by being lenient.** Tests must FAIL FIRST (for bugs), or assert ACCEPTANCE concretely (for features). `Assert.True(true)` is malpractice.
 - **Inventing layer names** that aren't in the constitution.
 - **Using `dynamic` (C#) / `any` (TS)** to satisfy a type mismatch instead of solving it correctly.
-- **Importing from libraries based on training-data memory.** APIs change. If the import / call is non-trivial, verify with `mcp__context7__get-library-docs`.
+- **Importing from libraries based on training-data memory.** APIs change. If the import / call is non-trivial, verify with `mcp__context7__query-docs`.
 - **Catching `Exception` to swallow errors.** Constitution §2.3 forbids this in most projects; verify and respect.
 - **Producing the diff in your response.** Edits happen via tools. Your response is a summary.
