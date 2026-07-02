@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `commands/refactor.md`'s characterization-test loop now invokes `sd-implementer` with
   `TASK_DETAILS`/`SPEC_REF`/`WORKFLOW_TYPE` instead of the unrecognized `TASK_TYPE`, matching every
   other implementer invocation in the repo.
+- `/sd:spec validate` no longer requires `01-plan.md`/`02-tasks.md` for in-progress bug and perf
+  specs. Only `/sd:feature` and `/sd:refactor` produce those artifacts; `/sd:bug` and `/sd:perf`
+  go straight from spec to investigation/baseline artifacts, so the old "except RCA" exemption
+  reported FAIL on every correctly executed bug/perf spec. Also corrected the same overgeneralized
+  claim in `docs/usage.md`'s resume heuristic.
 
 ---
 

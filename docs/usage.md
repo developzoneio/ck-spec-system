@@ -282,7 +282,7 @@ Examples:
 
 Workflow commands are **resumable**. Re-running `/sd:feature INV-2501` after closing your terminal mid-execution detects the current state of `.specs/FEAT-INV-2501/` and jumps to the next phase. The state machine is documented at the top of each command file.
 
-The main heuristic: workflow checks for the presence and contents of `00-spec.md`, `01-plan.md`, `02-tasks.md` (with task completion ratio), and `05-retro.md` to determine where you are.
+The main heuristic: workflow checks for the presence and contents of `00-spec.md`, `05-retro.md`, and (feature/refactor only) `01-plan.md` and `02-tasks.md` (with task completion ratio) to determine where you are.
 
 ### Linking specs
 
