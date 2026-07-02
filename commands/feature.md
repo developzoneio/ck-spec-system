@@ -29,10 +29,16 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
 
 ## Phase 0 - Bootstrap (always runs)
 
-1. Read `CLAUDE.md` at project root.
-2. Read `.specs/constitution.md`.
-3. Read `.claude/project-config.json` (for `commands.*`, `spec.*`, `ticket.*`, `workflow.*`).
-4. Read `.specs/index.md` for existing spec states.
+1. Read `CLAUDE.md` at project root. If missing, WARN and continue - print "No `CLAUDE.md` found;
+   stack conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`. If `.specs/` or this file is missing, STOP: "No `.specs/` found -
+   run `/sd:setup` first."
+3. Read `.claude/project-config.json` (for `commands.*`, `spec.*`, `ticket.*`, `workflow.*`). If
+   missing, STOP with the same message. If present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+4. Read `.specs/index.md` for existing spec states. If missing, STOP with the same
+   "run `/sd:setup` first" message.
 5. Determine state from table above.
 
 ---

@@ -38,9 +38,15 @@ Drives an optimization from a measured baseline to a measured improvement, with 
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. Compute UTC date for spec ID.
-3. Detect state. Print resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. Compute UTC date for spec ID.
+4. Detect state. Print resume plan.
 
 ---
 

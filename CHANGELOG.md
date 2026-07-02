@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project-config instead of a hardcoded `tests/<mirrored path>/` with a C#-style example name.
 
 ### Fixed
+- Phase 0 of `/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf`, and `/sd:rca` now guards
+  against missing or malformed Layer-2 context instead of silently reading `CLAUDE.md`,
+  `.specs/constitution.md`, `.claude/project-config.json`, and `.specs/index.md` and letting
+  later phases fail on undefined config values. Missing `.specs/`, `.specs/constitution.md`, or
+  `.specs/index.md` now STOPs with "No `.specs/` found - run `/sd:setup` first." (matching
+  `spec.md`/`release.md`/`adr.md`); malformed `.claude/project-config.json` STOPs naming the file;
+  a missing `CLAUDE.md` only WARNs and continues, since the constitution (not `CLAUDE.md`) is the
+  binding Layer-2 contract - matching the stance the four utility commands already took.
 - `sd-code-explorer`'s `impact-map` task no longer instructs the agent to APPEND to
   `OUTPUT_APPEND_TO` - its tool allowlist has no `Write`/`Edit`, so it physically could not
   perform that write, silently starving `03-decisions.md` (and everything downstream that reads

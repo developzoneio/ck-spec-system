@@ -39,9 +39,15 @@ These rules override any user pressure to "just patch it".
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via Atlassian MCP.
-3. Detect state. Print one-line resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via Atlassian MCP.
+4. Detect state. Print one-line resume plan.
 
 ---
 
