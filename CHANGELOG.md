@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offset (negative for ~UTC offset hours on UTC+N machines, wrongly suppressing reminders; always
   past-debounce on UTC-N machines, never suppressing). The bash twin was already correct
   (epoch seconds throughout).
+- `hooks/powershell/prompt-router.ps1` now applies the built-in default keyword list PER WORKFLOW
+  when the loaded `.claude/project-config.json` has no list (or an empty list) for that workflow,
+  matching `prompt-router.sh`'s per-workflow fallback. Previously PS only fell back to defaults
+  when the config file itself was absent/unparseable, then silently skipped any workflow whose
+  list was `$null` once a config file existed - so a valid config that simply omitted
+  `workflow.keywords` (or one workflow's entry) lost keyword routing hints on Windows while bash
+  kept emitting them from defaults on Linux/macOS. The five built-in keyword lists are unchanged,
+  just reused instead of duplicated.
 
 ---
 
