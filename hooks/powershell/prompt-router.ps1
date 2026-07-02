@@ -173,11 +173,11 @@ function Get-InProgressSpecs {
 
 # ---- main ----
 
-$input = Read-StdinJson
-if ($null -eq $input) { exit 0 }
+$hookInput = Read-StdinJson
+if ($null -eq $hookInput) { exit 0 }
 
-$prompt = $input.prompt
-$cwd    = $input.cwd
+$prompt = $hookInput.prompt
+$cwd    = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($prompt) -or [string]::IsNullOrWhiteSpace($cwd)) { exit 0 }
 if (-not (Test-Path -LiteralPath $cwd)) { exit 0 }
 

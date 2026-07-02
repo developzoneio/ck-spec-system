@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-existent `~/.claude/hooks/ck/` directory after the `ck` -> `specwright` rename.
 - `/sd:setup` Phase 7 (and Phase 1.5) now verify every hook `command` path in
   `.claude/settings.json` resolves to a file on disk, warning loudly when a hook is not firing.
+- `hooks/powershell/subagent-retro.ps1`, `prompt-router.ps1`, and `spec-gate.ps1` no longer assign
+  parsed hook JSON to `$input` - PowerShell's reserved automatic pipeline variable. Assigning to it
+  threw a non-terminating `ParameterBindingException` on every real (piped/redirected) stdin
+  invocation, leaving it unbound and causing every PowerShell hook to exit silently before reading
+  any input. Renamed to `$hookInput` in all three files.
 
 ---
 
