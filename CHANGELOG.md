@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hard approval gate. The agent (model `sonnet`, tools Read/Write/Glob/Grep, skill `sd-evidence-citation`)
   writes only the ADR file and never invents decisions; the command owns numbering and supersession links.
   Bumps command count 10 -> 11 and agent count 5 -> 6 across docs and the validators.
+- `scripts/smoke-hooks.sh` + `scripts/smoke-hooks.ps1` - pipe fixture Claude Code hook JSON into
+  `prompt-router`, `spec-gate`, and `subagent-retro` against a temp `.specs/` tree and assert exit
+  codes AND key output substrings, not just "did not crash": keyword-match routing (bash and
+  PowerShell must agree), spec-gate allow/warn/block across in-progress / header-only-marker /
+  docs-edit / malformed-stdin cases, and subagent-retro naming the real spec ID then debouncing a
+  second run. `.github/workflows/ci.yml` adds `macos-latest` to the OS matrix (exercising the
+  BSD-specific `stat -f %m` / `date -j -f` fallback branches that only run there) and a smoke-test
+  step on every OS.
 
 ### Changed
 - Removed hardcoded MSSQL/C#/TS references from `agents/debugger.md`, `commands/perf.md`,
@@ -56,6 +64,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails loudly instead of vacuously passing Check 5.
 
 ### Fixed
+- `hooks/powershell/subagent-retro.ps1`'s debounce silently stopped persisting/reading state on
+  PowerShell 7+, found by writing `scripts/smoke-hooks.ps1`: (1) `Save-State`'s
+  `Split-Path -LiteralPath $StatePath -Parent` throws "Parameter set cannot be resolved" on some
+  PS7 builds (`-LiteralPath` there has no `-Parent` parameter set) - the surrounding `try/catch`
+  swallowed it, so the state directory/file were never written; switched to `Split-Path -Path`
+  (safe here - `-Parent` does no filesystem globbing, only `-Resolve` would). (2) Even once the
+  state file wrote, `Test-DebounceElapsed` re-broke: PS7's `ConvertFrom-Json` auto-converts an
+  ISO-8601 `...Z` string to a `[datetime]` (PS 5.1 leaves it as a string), and re-`Parse`-ing an
+  already-converted `[datetime]` stringifies it with the local culture - dropping the UTC marker -
+  so `[datetimeoffset]::Parse` silently re-interpreted it as local time, skewing `$age` by the
+  machine's UTC offset exactly like the bug fixed earlier in this file, just triggered a different
+  way. Both are PowerShell-only; `hooks/bash/subagent-retro.sh` was unaffected (no bash twin
+  change needed).
 - Post-1.3.0 docs drift: `README.md`'s tagline said "Ten slash commands, five specialized
   subagents" (now eleven / six); the Commands table was missing `/sd:adr` and listed
   `/sd:feature` at 4 hard gates (the merged review+integration gate makes it 3); the Agents table
