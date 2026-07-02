@@ -100,7 +100,7 @@ STOP. Compare measured vs threshold.
 
 If user picks (1), enter the characterization sub-loop:
 1. Identify uncovered branches via coverage report.
-2. Invoke `sd-implementer` with `TASK_TYPE = characterization-test` per uncovered area.
+2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor` per uncovered area.
 3. Each new test must FAIL FAST if current behavior changes - characterization tests pin the CURRENT behavior, correct or not.
 4. Re-measure coverage.
 

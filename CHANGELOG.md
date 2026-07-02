@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previous two independent file-wide `grep`s let an `in-progress` legend/header line combine with a
   spec ID on an unrelated `done` row, so bash allowed a code edit that PowerShell would warn/block
   on the identical `.specs/index.md`.
+- `commands/feature.md` subagent invocations now use the field names `sd-spec-architect` and
+  `sd-code-explorer` actually read: `TICKET_CONTEXT` (was `TICKET_DATA`), `TASK`/`SPEC`/`IMPACT`
+  (was `TASK_TYPE`/`SPEC_REF`/`IMPACT_REF`), a full `feature.template.md` filename (was the bare
+  `feature`), and both `refine` invocations now carry the required `SPEC` path. `sd-reviewer`
+  invocations, which legitimately use `TASK_TYPE`/`SPEC_REF` as their own contract, are unchanged.
+  `commands/refactor.md`'s characterization-test loop now invokes `sd-implementer` with
+  `TASK_DETAILS`/`SPEC_REF`/`WORKFLOW_TYPE` instead of the unrecognized `TASK_TYPE`, matching every
+  other implementer invocation in the repo.
 
 ---
 

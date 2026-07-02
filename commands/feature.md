@@ -42,8 +42,8 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
 1. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via `mcp__atlassian__getJiraIssue`. If MCP unavailable, ask user for a paste or proceed with slug.
 2. Invoke `sd-spec-architect` with:
    - `TASK = create`
-   - `TEMPLATE = feature`
-   - `TICKET_DATA = <fetched or pasted>`
+   - `TEMPLATE = feature.template.md`
+   - `TICKET_CONTEXT = <fetched or pasted>`
    - `SPEC_ID = FEAT-<arg>`
 3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check, Linked specs.
 4. If a ticket was fetched, spec-architect also snapshots it (ticket content + related tickets + linked Confluence pages, per its Ticket snapshot protocol) to `.specs/FEAT-<arg>/04-artifacts/ticket/`.
@@ -56,7 +56,7 @@ STOP. Present the spec to the user. Ask:
 > Approve spec FEAT-<arg>? (yes / refine <feedback> / abort)
 
 - `yes` -> set status=`approved`, proceed.
-- `refine` -> invoke `sd-spec-architect` with `TASK = refine`, `FEEDBACK = <user feedback>`. Loop.
+- `refine` -> invoke `sd-spec-architect` with `TASK = refine`, `SPEC = .specs/FEAT-<arg>/00-spec.md`, `FEEDBACK = <user feedback>`. Loop.
 - `abort` -> set status=`archived`, exit.
 
 ---
@@ -64,8 +64,8 @@ STOP. Present the spec to the user. Ask:
 ## Phase 2 - Impact analysis
 
 1. Invoke `sd-code-explorer` with:
-   - `TASK_TYPE = impact-map`
-   - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
+   - `TASK = impact-map`
+   - `SPEC = .specs/FEAT-<arg>/00-spec.md`
    - `OUTPUT_APPEND_TO = .specs/FEAT-<arg>/03-decisions.md`
 2. Explorer produces: direct callers (1-hop), transitive (2-3 hop), test coverage scan, DI/config grep, public API surface, risk assessment.
 3. All findings cite `file:line`.
@@ -78,8 +78,8 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
 
 1. Invoke `sd-spec-architect` with:
    - `TASK = plan`
-   - `SPEC_REF = .specs/FEAT-<arg>/00-spec.md`
-   - `IMPACT_REF = .specs/FEAT-<arg>/03-decisions.md`
+   - `SPEC = .specs/FEAT-<arg>/00-spec.md`
+   - `IMPACT = .specs/FEAT-<arg>/03-decisions.md`
 2. Spec-architect produces:
    - `.specs/FEAT-<arg>/01-plan.md` (approach, alternatives considered, rationale).
    - `.specs/FEAT-<arg>/02-tasks.md` with atomic tasks, each having:
@@ -107,7 +107,7 @@ STOP. Present the plan and task list. Ask:
 > Approve plan for FEAT-<arg>? (<N> tasks, estimated <complexity>) (yes / refine <feedback> / abort)
 
 - `yes` -> proceed.
-- `refine` -> invoke `sd-spec-architect` with `TASK = refine`. Loop.
+- `refine` -> invoke `sd-spec-architect` with `TASK = refine`, `SPEC = .specs/FEAT-<arg>/00-spec.md`, `FEEDBACK = <user feedback>`. Loop.
 - `abort` -> set status=`archived`, exit.
 
 ---
