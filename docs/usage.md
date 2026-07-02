@@ -262,6 +262,33 @@ Examples:
 
 ---
 
+### `/sd:adr <spec-ID | "decision title">`
+
+Promotes a durable decision into a numbered, MADR-style ADR under `.specs/_adr/`. Drives the `sd-docs-writer` agent.
+
+Argument: a spec ID (e.g. `FEAT-012`) whose `03-decisions.md` holds the decision, or a free-text decision title for an ad-hoc ADR with no spec.
+
+| Phase | Actor | Gate |
+|---|---|---|
+| 0 - Bootstrap | main thread | - |
+| 1 - Resolve decision source | main thread | - |
+| 2 - Assign number and slug | main thread | - |
+| 3 - Draft ADR | `sd-docs-writer` | - |
+| Gate - approve before keeping | main thread | ⛔ Gate 1 (HARD - nothing is kept without approval) |
+| 4 - Report | main thread | - |
+
+Numbers are 4-digit, sequential (`0001-`, `0002-`, ...), derived by scanning `.specs/_adr/`. The
+agent never invents decisions - an empty or absent `03-decisions.md` aborts the command. ADRs are
+not specs: they have no `.specs/index.md` lifecycle entry.
+
+Examples:
+```
+/sd:adr FEAT-012                        # ADR from an existing spec's decisions
+/sd:adr "Adopt CQRS for the order service"  # ad-hoc ADR, no spec
+```
+
+---
+
 ## Common patterns
 
 ### Picking the right workflow

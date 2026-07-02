@@ -19,13 +19,8 @@ Small, well-scoped items targeted at the next minor release.
 
 Larger items that each warrant a full `/sd:feature` spec before building.
 
-- **`/sd:setup` codebase scan** - pre-fill `constitution.md` (architectural rules, conventions) and
-  `CLAUDE.md` from sampled source files instead of leaving `<<placeholder>>`s, with an optional
-  `paths.layers` map in `project-config.json`. Turns first-run setup from blank-template into
-  detected-defaults.
-- **`sd-docs-writer` agent** - an optional subagent that authors Architecture Decision Records (ADRs)
-  and architecture docs from spec artifacts, promoting durable `.specs/` decisions into human-facing
-  documentation.
+_Nothing queued right now - the last two Planned items (`/sd:setup` codebase scan, `sd-docs-writer`
+agent) shipped; see [`CHANGELOG.md`](CHANGELOG.md)._
 
 ## Exploratory
 

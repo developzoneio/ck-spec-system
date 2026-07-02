@@ -50,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `(Likelihood x Impact) / Cost-to-verify` method inline - both now point at `sd-hypothesis-tree`.
 
 ### Fixed
+- Post-1.3.0 docs drift: `README.md`'s tagline said "Ten slash commands, five specialized
+  subagents" (now eleven / six); the Commands table was missing `/sd:adr` and listed
+  `/sd:feature` at 4 hard gates (the merged review+integration gate makes it 3); the Agents table
+  was missing `sd-docs-writer` and listed a hardcoded `MSSQL` tool for `sd-debugger`; the `.specs/`
+  tree diagram omitted `_explorations/`, `_reviews/`, `_adr/`; the Roadmap highlights repeated two
+  items that already shipped. `ROADMAP.md`'s `## Planned` section still listed the `/sd:setup`
+  codebase scan and `sd-docs-writer` agent, both shipped in 1.3.0+ (CHANGELOG is the source of
+  truth for shipped work). `docs/usage.md`'s Utility commands section had no `/sd:adr` entry.
+  `templates/project-config.template.json`'s `workflow.gates.feature` still listed the pre-merge
+  4-gate sequence; collapsed to 3 and marked `_comment`-descriptive since no hook or command reads
+  the block. `CONTRIBUTING.md`'s agent frontmatter example omitted the mandated `color:` and
+  `skills:` fields. `examples/README.md` gated a promised-features list on "not in v1.0.0", three
+  minor versions after v1.0.0; reworded to point at `ROADMAP.md`.
 - Phase 0 of `/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf`, and `/sd:rca` now guards
   against missing or malformed Layer-2 context instead of silently reading `CLAUDE.md`,
   `.specs/constitution.md`, `.claude/project-config.json`, and `.specs/index.md` and letting

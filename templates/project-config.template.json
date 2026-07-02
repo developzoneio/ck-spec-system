@@ -66,7 +66,8 @@
       "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"]
     },
     "gates": {
-      "feature": ["spec-approved", "plan-approved", "review-pass", "integration-pass"],
+      "_comment": "Descriptive only - no hook or command reads this block today; it documents each workflow's hard-gate sequence for humans/tooling that may consume it later.",
+      "feature": ["spec-approved", "plan-approved", "integration-review-pass"],
       "bug": ["symptom-captured", "reproduction-confirmed", "root-cause-confirmed", "failing-test-written", "regression-pass"],
       "rca": ["evidence-gathered", "hypotheses-enumerated", "root-cause-confirmed"],
       "refactor": ["spec-approved", "coverage-threshold-met", "post-test-added", "plan-approved", "batch-tests-green", "holistic-review-pass"],
