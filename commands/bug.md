@@ -107,7 +107,7 @@ If the user insists on proceeding without repro, log a constitution exception to
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `REPRODUCTION = <reproduction section>`
    - `EVIDENCE_DIR = .specs/BUG-<arg>/04-artifacts/`
-2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate 4-8 hypotheses, ranked by `(Likelihood x Impact) / Cost-to-verify`.
+2. Debugger enumerates hypotheses per the **sd-hypothesis-tree** skill (5 mental models, `(Likelihood x Impact) / Cost-to-verify` ranking).
 3. Main thread appends the returned hypothesis tree to `.specs/BUG-<arg>/03-decisions.md` (debugger has no write tool).
 4. Loop:
    - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.

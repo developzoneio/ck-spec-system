@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example in favor of "type-safety escapes for the project's language (as defined in
   `constitution.md`)"; `bug.md`'s failing-test step now references `paths.tests` from
   project-config instead of a hardcoded `tests/<mirrored path>/` with a C#-style example name.
+- De-duplicated rules that were copy-pasted from skills into agent bodies and commands (CLAUDE.md:
+  "a rule used by multiple agents lives in one `SKILL.md`, never copy-pasted"), replacing each
+  copy with a reference to the owning skill: `agents/debugger.md`'s and `agents/reviewer.md`'s
+  Anti-patterns sections no longer restate `sd-hypothesis-tree`/`sd-severity-taxonomy`/
+  `sd-evidence-citation` (role-specific bullets are kept); `agents/code-explorer.md`'s
+  Anti-patterns section no longer restates `sd-evidence-citation`. `commands/feature.md` and
+  `commands/refactor.md` no longer inline the atomic task-block format - both now point at
+  `sd-atomic-task-format`, which gains a documented "Refactor mode" `Parallel batch` field (the
+  field `refactor.md`'s inline copy had already drifted to include while `feature.md`'s copy
+  lacked it). `commands/bug.md` and `commands/rca.md` no longer restate the 5-mental-models /
+  `(Likelihood x Impact) / Cost-to-verify` method inline - both now point at `sd-hypothesis-tree`.
 
 ### Fixed
 - Phase 0 of `/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf`, and `/sd:rca` now guards

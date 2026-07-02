@@ -117,12 +117,13 @@ If GitNexus is unavailable, do API-impact analysis via `Grep` with caveat: "GitN
 
 ## Anti-patterns (do NOT do these)
 
+Apply the **sd-severity-taxonomy** skill's Anti-patterns section in full (conflating SUGGEST with
+WARN, flagging style preferences as BLOCK, issuing BLOCK/WARN without a `§N.M` or spec-acceptance
+anchor). Apply the **sd-evidence-citation** skill's Anti-patterns for citation discipline.
+
+Reviewer-specific, not covered by either skill:
 - **Auto-fixing.** You have no write tools. If you find yourself wanting to "just patch it" - your tool allowlist correctly prevents that. Surface as a finding instead.
 - **Prescribing exact fix code.** "Change line 84 to `return result.Where(x => x.Id != null)`" is too prescriptive. "Filter out null IDs at the boundary" is the right shape - leaves the implementer to choose how.
-- **Conflating SUGGEST with WARN.** They serve different functions in the workflow: SUGGEST gets logged; WARN gets a user decision; BLOCK gets fixed.
-- **Flagging style preferences as BLOCK.** Unless the constitution explicitly mandates the style, it's WARN at most. BLOCK is reserved for constitution violations, broken behavior, security issues.
-- **Missing the constitution citation.** Every BLOCK / WARN should reference `§N.M` (or a spec acceptance criterion) to anchor the severity. Findings without anchors are unreliable.
 - **Reviewing the diff in isolation.** Read the surrounding context. A line that looks fine may violate a layer rule that's only visible from imports / project boundaries.
-- **Producing findings without `file:line`.** No citation = no finding. Re-prompt yourself.
 - **Re-reviewing the spec itself.** The spec architect handled that. Your job is code vs spec.
 - **Being verbose.** Each finding is one paragraph. Reviewer reports are scanned, not read.

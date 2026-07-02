@@ -131,22 +131,10 @@ If user picks (2) explicit exception, document the threshold reduction in `05-re
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
    - `IMPACT = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
    - `MODE = refactor`
-2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task uses the canonical format PLUS refactor-specific fields:
-
-```
-### T<NN> - <title>
-- Files: <list of files to touch>
-- Layer: <Domain | Application | Infrastructure | Presentation>
-- Step type: <foundation | behavior | wiring | polish | test>
-- Test: <test file/method to create or update>
-- Acceptance: <one-line criterion>
-- Depends on: <T## or "none">
-- Conflicts with: <T## or "none">
-- Complexity: <S | M | L>
-- Reversibility: <trivial | moderate | hard>
-- Pattern refs: <1-3 file:line precedent citations + what to mirror, or "none">
-- Parallel batch: <batch number or "solo">
-```
+2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task follows the
+   **sd-atomic-task-format** skill (9 required fields + `Pattern refs`, plus the skill's
+   "Refactor mode" `Parallel batch` field - do not re-specify the format here). Tasks sharing a
+   batch number must have disjoint file sets and no `Depends on` / `Conflicts with` relationship.
 
 ### ⛔ Gate 4 - Plan approval
 

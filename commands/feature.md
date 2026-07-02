@@ -90,22 +90,9 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
    - `IMPACT = .specs/FEAT-<arg>/03-decisions.md`
 2. Spec-architect produces:
    - `.specs/FEAT-<arg>/01-plan.md` (approach, alternatives considered, rationale).
-   - `.specs/FEAT-<arg>/02-tasks.md` with atomic tasks, each having:
-
-```
-### T<NN> - <title>
-- Files: <list of files to touch>
-- Layer: <Domain | Application | Infrastructure | Presentation>
-- Step type: <foundation | behavior | wiring | polish | test>
-- Test: <test file/method to create or update>
-- Acceptance: <one-line criterion>
-- Depends on: <T## or "none">
-- Conflicts with: <T## or "none">
-- Complexity: <S | M | L>
-- Reversibility: <trivial | moderate | hard>
-- Pattern refs: <1-3 file:line precedent citations + what to mirror, or "none">
-```
-
+   - `.specs/FEAT-<arg>/02-tasks.md` with atomic tasks, each formatted per the
+     **sd-atomic-task-format** skill (9 required fields + `Pattern refs`; the architect applies
+     this format, do not re-specify it here).
 3. Set status=`in-progress` in `00-spec.md` and `index.md`.
 
 ### ⛔ Gate 2 - Plan approval

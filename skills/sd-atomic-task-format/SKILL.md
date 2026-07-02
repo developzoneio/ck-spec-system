@@ -27,6 +27,18 @@ The first 9 fields are **required**, not optional. A task block missing any of t
 recommended otherwise. A block without the field is treated as `Pattern refs: none` (backward
 compatible with existing `.specs/` folders).
 
+### Refactor mode adds one field
+
+`/sd:refactor` tasks append a 10th field after `Pattern refs`:
+
+```markdown
+- **Parallel batch**: <batch number | "solo">
+```
+
+Tasks sharing a batch number have disjoint file sets and no `Depends on` / `Conflicts with`
+relationship between them - they are safe to execute in parallel. `solo` means the task cannot
+be batched with any other. Other workflow types (feature, bug, perf) do not use this field.
+
 ---
 
 ## Field rules

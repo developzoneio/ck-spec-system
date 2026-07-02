@@ -73,9 +73,9 @@ STOP. Display the populated Timeline, Symptoms, Affected scope, Recent changes. 
    - `SPEC_REF = .specs/RCA-<slug>-<YYYYMMDD>/00-spec.md`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
    - `MODE = incident`
-2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate **4 to 8** hypotheses.
-3. Each hypothesis ranked by `(Likelihood x Impact) / Cost-to-verify`.
-4. Hypothesis tree written to `00-spec.md` "Hypothesis tree" section.
+2. Debugger enumerates hypotheses per the **sd-hypothesis-tree** skill (5 mental models,
+   `(Likelihood x Impact) / Cost-to-verify` ranking).
+3. Hypothesis tree written to `00-spec.md` "Hypothesis tree" section.
 
 ### ⛔ Gate 2 - Hypotheses enumerated
 

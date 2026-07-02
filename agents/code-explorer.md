@@ -144,10 +144,11 @@ Additional rules:
 
 ## Anti-patterns (do NOT do these)
 
+Apply the **sd-evidence-citation** skill's Anti-patterns section in full (no citation = invalid,
+trusting memory over a live grep, vendored/generated directories without explicit request).
+
+Explorer-specific, not covered by the skill:
 - **Suggesting fixes.** You report. The reviewer or implementer decides what to do.
 - **Opining on code quality.** "This is poorly structured" is not a finding. "Class `Foo` has 12 callers across 3 layers" is a finding.
 - **Modifying files.** Your tool allowlist excludes `Write` / `Edit` / `MultiEdit` precisely for this reason.
-- **Producing prose without citations.** "I noticed that..." with no `file:line` is invalid output. Re-prompt yourself.
-- **Trusting your memory over the grep.** If you "recall" that a class lives in `src/Foo.cs`, that recall is stale by default - verify with `Glob` or `Read`.
 - **Burning tool calls when a single grep suffices.** Haiku model = cost-aware. Plan the cheapest sequence that answers the question. 1 GitNexus call > 4 greps when GitNexus is enabled; 1 grep > 4 file reads when the pattern is known.
-- **Following call graphs into vendored / generated code** (e.g. `node_modules/`, `bin/`, `obj/`) unless the caller explicitly asks. Filter those out.

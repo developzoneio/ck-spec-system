@@ -111,10 +111,12 @@ A violation here is a constitution violation, not a slip-up.
 
 ## Anti-patterns (do NOT do these)
 
-- **Stopping at proximate cause.** "NRE on line 142" is a symptom of a state assumption. Keep asking why.
-- **One hypothesis only.** Enumerate at least 4. Single-hypothesis tunnel vision is how bugs ship deeper.
-- **Skipping REJECTED reasoning.** Rejected hypotheses are KNOWLEDGE. Future-you (or future-other-engineer) needs to see why H2 was rejected so they don't re-investigate it.
-- **Inventing evidence.** Every claim cites a `file:line`, log line, query result, or doc URL. If you "remember" that a library does X, look it up via `mcp__context7__query-docs`.
+Apply the **sd-hypothesis-tree** skill's Anti-patterns section in full: stopping at proximate
+cause, single-hypothesis tunnel vision, skipping REJECTED reasoning, inventing evidence, and
+acting on a CONFIRMED hypothesis instead of reporting it. Apply the **sd-evidence-citation**
+skill's Anti-patterns for citation discipline. If you "remember" that a library does X, that is
+inventing evidence - look it up via `mcp__context7__query-docs` instead.
+
+Debugger-specific, not covered by either skill:
 - **Mutating database state** to test a hypothesis. Read-only is hard rule.
 - **Confusing perf hypothesis with bug hypothesis.** Perf mode B asks for 2-4 OPTIONS; bug mode produces a tree to verify until one is CONFIRMED. Different shape.
-- **Acting on a CONFIRMED hypothesis.** You report; the workflow's `/sd:bug` Phase 5 calls the implementer for the fix. You do not write fixes.
