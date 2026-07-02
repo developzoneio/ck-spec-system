@@ -108,18 +108,19 @@ Ask:
 
 > Confirm root cause: <one-line>. Proceed to mitigation documentation? (yes / dig deeper / abort)
 
-- `yes` -> proceed.
+- `yes` -> status=`approved`, proceed.
 - `dig deeper` -> back to Phase 3, additional hypotheses if needed.
 
 ---
 
 ## Phase 4 - Isolate + document
 
-1. Fill in `00-spec.md`:
+1. Set status=`in-progress`, update index.
+2. Fill in `00-spec.md`:
    - **Affected components** - file:line, service names, config keys.
    - **Why this is root cause** - the "why" chain (use 5-whys discipline; stop when answer is fixable).
-2. Fill **Mitigation applied** - what stopped the bleeding. Reference timestamps from Timeline.
-3. Note: mitigation IS NOT a fix. It is the immediate action that contained the impact. The actual fix lands in a spawned BUG-* spec.
+3. Fill **Mitigation applied** - what stopped the bleeding. Reference timestamps from Timeline.
+4. Note: mitigation IS NOT a fix. It is the immediate action that contained the impact. The actual fix lands in a spawned BUG-* spec.
 
 No gate here - documentation-only phase.
 

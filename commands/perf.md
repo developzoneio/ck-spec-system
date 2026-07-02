@@ -52,6 +52,7 @@ Drives an optimization from a measured baseline to a measured improvement, with 
    - `SPEC_ID = PERF-<slug>-<YYYYMMDD>`
 2. Architect fills Target (metric, goal SLA, environment, load profile, workload type), Measurement methodology, Constraints, Out of scope.
 3. Architect leaves **Current observed EMPTY** and **Results log EMPTY**. These are filled by measurement, not by assumption.
+4. Register in `.specs/index.md` with status=`draft`.
 
 ### ⛔ Gate 1 - Target defined
 
@@ -80,7 +81,8 @@ STOP. Two cases:
 
 **Case A: baseline already meets SLA goal.**
 > Baseline p95=<X> already meets SLA goal p95<<goal>. No optimization needed. Close PERF-<slug> as 'done' with no changes? (yes / proceed anyway / abort)
-- `yes` -> jump to Phase 6 close-out with summary "no work needed".
+- `yes` -> set status=`in-progress` (no hotspot work occurs, but the state machine has no
+  approved -> done shortcut), then jump to Phase 6 close-out with summary "no work needed".
 - `proceed anyway` -> requires explicit constitution exception ("optimizing past SLA"). Log to retro.
 
 **Case B: baseline below SLA goal.**
@@ -112,6 +114,8 @@ STOP. Display hotspot ranking. Ask:
 ---
 
 ## Phase 4 - Per-hotspot loop
+
+Set status=`in-progress`, update index (once, on first entry to this phase).
 
 For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple loop iterations.
 

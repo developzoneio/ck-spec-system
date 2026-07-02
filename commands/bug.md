@@ -86,7 +86,7 @@ STOP. This gate is HARD - no overrides. Ask:
 
 > Is reproduction confirmed? (yes - I can trigger it / partial - intermittent / no - cannot reproduce)
 
-- `yes` -> proceed.
+- `yes` -> status=`approved`, proceed.
 - `partial` -> ask user if they accept investigating with partial repro (logs / traces only). Log the decision and risks to retro.
 - `no` -> **REFUSE to proceed**. Tell the user: investigation without reproduction risks fixing the wrong thing. Options: gather more telemetry, add observability, or close as "cannot reproduce".
 
@@ -130,7 +130,8 @@ Ask:
   hypotheses. Do not re-run identical hypotheses.
 - `observe` -> add observability (logging, tracing, metrics), reproduce again to gather evidence, then
   re-enumerate. Log the gap to `05-retro.md`.
-- `abort` -> set status and close the spec as "root cause not found"; record the exhausted tree as the
+- `abort` -> set status=`in-progress` then `done` (the state machine has no approved -> done
+  shortcut) and close the spec as "root cause not found"; record the exhausted tree as the
   outcome in `05-retro.md`.
 
 ### ⛔ Gate 3 - Root cause confirmed
@@ -177,17 +178,18 @@ STOP. Display the test name and the failure output. Ask:
 
 ## Phase 5 - Implement minimal fix
 
-1. Fill `00-spec.md` Fix approach (MINIMAL). Confirm scope-discipline checklist:
+1. Set status=`in-progress`, update index.
+2. Fill `00-spec.md` Fix approach (MINIMAL). Confirm scope-discipline checklist:
    - [ ] Touches only files implicated by root cause.
    - [ ] No "while I'm here" cleanups.
    - [ ] No reformatting unrelated code.
-2. Invoke `sd-implementer` with:
+3. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <fix approach + target files>`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `IMPACT_REF = .specs/BUG-<arg>/03-decisions.md` (investigation evidence)
    - `WORKFLOW_TYPE = bug`
    - `ROOT_CAUSE = <root cause statement>`
-3. Implementer applies fix. Re-runs the failing test (now passing).
+4. Implementer applies fix. Re-runs the failing test (now passing).
 
 ---
 

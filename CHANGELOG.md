@@ -48,6 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invocation. `commands/perf.md`, `commands/bug.md`, and `commands/rca.md`'s equivalent
   "Append ... to `03-decisions.md`" steps after `sd-debugger` invocations (also write-tool-less)
   are now explicitly labeled as main-thread steps for the same reason.
+- `/sd:bug`, `/sd:rca`, and `/sd:perf` now walk every state in `/sd:spec`'s
+  `draft -> approved -> in-progress -> done -> archived` machine instead of jumping straight from
+  `draft`/`approved` to `done` - a history `/sd:spec status` itself would have refused as an
+  illegal transition. `bug.md` sets `approved` at Gate 2 (reproduction confirmed) and
+  `in-progress` at the start of Phase 5 (fix implementation); its Gate 3a "abort" (hypothesis tree
+  exhausted) now passes through `in-progress` on its way to `done` instead of jumping directly
+  from `approved`. `rca.md` sets `approved` at Gate 3 (root cause confirmed) and `in-progress` at
+  the start of Phase 4 (isolate + document) - RCAs produce no code, so "in-progress" now means
+  report-writing is underway. `perf.md` sets `draft` at spec creation (previously jumped straight
+  to `approved` at Gate 1) and `in-progress` at the start of Phase 4 (the per-hotspot loop),
+  including the Gate 2 Case A shortcut (baseline already meets SLA) which now passes through
+  `in-progress` before `done`. `docs/troubleshooting.md`'s "Illegal status transition" entry no
+  longer tells users that `/sd:rca` intentionally skips straight to `done`.
 - `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
   new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or
   `.claude/settings.json` exists (states `complete` and `partial`) and rule-based-compares them
