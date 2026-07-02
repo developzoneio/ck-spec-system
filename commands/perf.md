@@ -98,7 +98,7 @@ This gate is HARD - the workflow CANNOT enter Phase 3 without a checked-in basel
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `BASELINE_ARTIFACT = .specs/PERF-<slug>-<YYYYMMDD>/04-artifacts/baseline-<...>.json`
 2. Debugger's job: identify the 80/20 hotspots from profile data, query plans, or code reads. Output: ranked list of hotspots with file:line citations and contribution percentage to total latency / CPU / memory.
-3. Append hotspot ranking to `03-decisions.md`.
+3. Main thread appends the returned hotspot ranking to `03-decisions.md` (debugger has no write tool).
 
 ### ⛔ Gate 3 - Hotspot identified
 
@@ -125,7 +125,7 @@ For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple
    - Expected impact (e.g. "p95 -200ms based on current 350ms in this function").
    - Implementation cost (S / M / L).
    - Risk profile (correctness risk, scope of change, reversibility).
-3. Append hypotheses to `03-decisions.md`.
+3. Main thread appends the returned hypotheses to `03-decisions.md` (debugger has no write tool).
 
 ### ⛔ Gate 4 - Select hypothesis
 

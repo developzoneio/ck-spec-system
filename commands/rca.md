@@ -93,7 +93,7 @@ For each hypothesis in rank order:
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
 2. Debugger gathers evidence (logs, queries, code reads). Database access (via the project's MCP
    tool or CLI) is **SELECT / EXPLAIN only** - never UPDATE / DELETE / INSERT.
-3. Result: `CONFIRMED` / `REJECTED` / `INCONCLUSIVE`. Append result with evidence pointers to "Verification results (Phase 3)".
+3. Result: `CONFIRMED` / `REJECTED` / `INCONCLUSIVE`. Main thread appends the result with evidence pointers to "Verification results (Phase 3)" (debugger has no write tool).
 4. Document REJECTED with FULL reasoning. This is knowledge preservation.
 5. Continue until one hypothesis is `CONFIRMED`.
 

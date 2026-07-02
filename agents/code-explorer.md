@@ -32,14 +32,17 @@ Route internally based on `DETECTED_INTENT`. Use the matching sub-routine below.
 
 ### `TASK = impact-map`
 
-Inputs: `SPEC` (path to `00-spec.md`), `OUTPUT_APPEND_TO` (typically `03-decisions.md`).
+Inputs: `SPEC` (path to `00-spec.md`), `OUTPUT_TARGET` (informational - typically `03-decisions.md`;
+identifies which file the caller will append your output to).
 
 Behavior:
 1. Read the spec. Identify the target: feature scope, bug-affected components, refactor primary file(s), or perf hotspot endpoint.
-2. Produce structured analysis (sections below). APPEND to `OUTPUT_APPEND_TO`. Do not overwrite.
+2. Produce the structured analysis (sections below) as your final output. Do not attempt to write
+   files - your tool allowlist has no `Write`/`Edit` by design. The calling command appends your
+   returned analysis to `OUTPUT_TARGET`.
 3. For "Precedents & conventions": derive conventions by sampling, never by stack assumption - `Glob` the target directory, then `Read` the top ~30 lines (or `mcp__gitnexus__query` with a goal naming the directory) of at most 3 sibling files, and state the observed pattern with evidence.
 
-Structure of appended content:
+Structure of the returned analysis (the caller appends this verbatim):
 
 ```markdown
 ## Impact analysis (sd-code-explorer)

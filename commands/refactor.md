@@ -74,9 +74,12 @@ STOP. Display spec summary, especially Invariants and Out-of-scope. Ask:
 1. Invoke `sd-code-explorer` with:
    - `TASK = impact-map`
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
-   - `OUTPUT_APPEND_TO = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
+   - `OUTPUT_TARGET = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
 2. Explorer enumerates: direct callers, transitive callers (2-3 hop), test coverage scan of affected paths, DI / config grep, public API surface, risk assessment.
 3. Every finding cites file:line.
+4. Main thread appends the explorer's returned analysis to
+   `.specs/REF-<slug>-<YYYYMMDD>/03-decisions.md` (create the file if missing; never overwrite
+   existing content).
 
 No gate here - read-only.
 

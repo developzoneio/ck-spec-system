@@ -102,11 +102,11 @@ If the user insists on proceeding without repro, log a constitution exception to
    - `REPRODUCTION = <reproduction section>`
    - `EVIDENCE_DIR = .specs/BUG-<arg>/04-artifacts/`
 2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate 4-8 hypotheses, ranked by `(Likelihood x Impact) / Cost-to-verify`.
-3. Append hypothesis tree to `.specs/BUG-<arg>/03-decisions.md`.
+3. Main thread appends the returned hypothesis tree to `.specs/BUG-<arg>/03-decisions.md` (debugger has no write tool).
 4. Loop:
    - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.
    - Result: CONFIRMED / REJECTED / INCONCLUSIVE.
-   - Append result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
+   - Main thread appends the result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
    - Document REJECTED hypotheses with FULL reasoning - this is knowledge preservation for future similar bugs.
    - Terminate the loop when EITHER one hypothesis is CONFIRMED (proceed to Gate 3) OR every enumerated
      hypothesis is exhausted - all REJECTED, or only INCONCLUSIVE ones remain with no new evidence to act
@@ -117,8 +117,9 @@ If the user insists on proceeding without repro, log a constitution exception to
 Reached ONLY when the loop ends with no CONFIRMED hypothesis. STOP. Do NOT proceed to a fix - a fix on an
 unconfirmed root cause risks treating a symptom.
 
-Append the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict and reasoning) to
-`.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next investigation.
+Main thread appends the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict
+and reasoning) to `.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next
+investigation.
 
 Ask:
 

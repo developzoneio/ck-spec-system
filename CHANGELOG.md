@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project-config instead of a hardcoded `tests/<mirrored path>/` with a C#-style example name.
 
 ### Fixed
+- `sd-code-explorer`'s `impact-map` task no longer instructs the agent to APPEND to
+  `OUTPUT_APPEND_TO` - its tool allowlist has no `Write`/`Edit`, so it physically could not
+  perform that write, silently starving `03-decisions.md` (and everything downstream that reads
+  it as `IMPACT`). The task now returns the structured analysis as final output; the informational
+  `OUTPUT_TARGET` input names the file, and the calling command appends it. `commands/feature.md`
+  and `commands/refactor.md` each gained an explicit main-thread append step after the impact-map
+  invocation. `commands/perf.md`, `commands/bug.md`, and `commands/rca.md`'s equivalent
+  "Append ... to `03-decisions.md`" steps after `sd-debugger` invocations (also write-tool-less)
+  are now explicitly labeled as main-thread steps for the same reason.
 - `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
   new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or
   `.claude/settings.json` exists (states `complete` and `partial`) and rule-based-compares them

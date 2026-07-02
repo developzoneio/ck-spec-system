@@ -66,9 +66,11 @@ STOP. Present the spec to the user. Ask:
 1. Invoke `sd-code-explorer` with:
    - `TASK = impact-map`
    - `SPEC = .specs/FEAT-<arg>/00-spec.md`
-   - `OUTPUT_APPEND_TO = .specs/FEAT-<arg>/03-decisions.md`
+   - `OUTPUT_TARGET = .specs/FEAT-<arg>/03-decisions.md`
 2. Explorer produces: direct callers (1-hop), transitive (2-3 hop), test coverage scan, DI/config grep, public API surface, risk assessment.
 3. All findings cite `file:line`.
+4. Main thread appends the explorer's returned analysis to `.specs/FEAT-<arg>/03-decisions.md`
+   (create the file if missing; never overwrite existing content).
 
 No gate here - impact analysis is informational. User reviews it in Phase 3.
 
