@@ -156,14 +156,14 @@ function Remove-StaleStateFiles {
 
 # ---- main ----
 
-$input = Read-StdinJson
-if ($null -eq $input) { exit 0 }
+$hookInput = Read-StdinJson
+if ($null -eq $hookInput) { exit 0 }
 
-$cwd = $input.cwd
+$cwd = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = (Get-Location).Path }
 if (-not (Test-Path -LiteralPath $cwd)) { exit 0 }
 
-$sessionId = $input.session_id
+$sessionId = $hookInput.session_id
 if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = 'no-session' }
 
 $config = Get-ProjectConfig -Cwd $cwd
