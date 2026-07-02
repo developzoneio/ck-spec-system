@@ -7,7 +7,7 @@
 
 - `.specs/constitution.md` - architectural rules, conventions, quality bars (read for any non-trivial change).
 - `.specs/index.md` - active spec registry with lifecycle states (read at start of every workflow).
-- `.claude/project-config.json` - machine-readable paths, commands, models, MCP servers.
+- `.gemini/project-config.json` - machine-readable paths, commands, models, MCP servers.
 
 ## Workflows (spec-driven)
 

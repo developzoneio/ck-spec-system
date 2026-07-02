@@ -1,14 +1,14 @@
-# CLAUDE.md
+# GEMINI_CONSTITUTION.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Gemini Code (gemini.ai/code) when working with code in this repository.
 
 ## What this repo is
 
-specwright is a spec-driven development toolkit **for** Claude Code — there is no application code, build system, or test framework. The deliverables are markdown prompt files (commands, agents, skills, templates) plus PowerShell/bash hook scripts and a cross-platform installer. "Testing" means dry-run installs and piping JSON into hooks.
+specwright is a spec-driven development toolkit **for** Gemini Code — there is no application code, build system, or test framework. The deliverables are markdown prompt files (commands, agents, skills, templates) plus PowerShell/bash hook scripts and a cross-platform installer. "Testing" means dry-run installs and piping JSON into hooks.
 
-This repo is **Layer 1 (the engine)** of a three-layer architecture: the installer copies it into `~/.claude/<type>/sd/` (user scope, installed once). Layer 2 is per-project context (`CLAUDE.md`, `.specs/constitution.md`, `.specs/index.md`, `.claude/project-config.json` in each target repo). Layer 3 is the live Claude Code session. The engine must stay generic — all project specifics are read at runtime from Layer 2.
+This repo is **Layer 1 (the engine)** of a three-layer architecture: the installer copies it into `~/.gemini/<type>/sd/` (user scope, installed once). Layer 2 is per-project context (`GEMINI_CONSTITUTION.md`, `.specs/constitution.md`, `.specs/index.md`, `.gemini/project-config.json` in each target repo). Layer 3 is the live Gemini Code session. The engine must stay generic — all project specifics are read at runtime from Layer 2.
 
-Note: `templates/CLAUDE.template.md` is the template `/sd:setup` scaffolds into *target* projects. It is not this file.
+Note: `templates/GEMINI_CONSTITUTION.template.md` is the template `/sd:setup` scaffolds into *target* projects. It is not this file.
 
 ## Commands
 
@@ -44,17 +44,17 @@ Every PR adds a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog
 
 | Source | Installs to | Contents |
 |---|---|---|
-| `commands/` | `~/.claude/commands/sd/` | 11 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`) |
-| `agents/` | `~/.claude/agents/sd/` | 6 subagents (`sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer`) |
-| `hooks/powershell/` + `hooks/bash/` | `~/.claude/hooks/sd/` | 3 hooks × 2 platforms (`prompt-router`, `spec-gate`, `subagent-retro`) |
-| `templates/` | `~/.claude/templates/sd/` | 4 setup templates + 5 spec templates in `specs/` |
-| `skills/` | `~/.claude/skills/sd/` | 6 rule packs, one folder per skill with `SKILL.md` |
+| `commands/` | `~/.gemini/commands/sd/` | 11 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`) |
+| `agents/` | `~/.gemini/agents/sd/` | 6 subagents (`sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer`) |
+| `hooks/powershell/` + `hooks/bash/` | `~/.gemini/hooks/sd/` | 3 hooks × 2 platforms (`prompt-router`, `spec-gate`, `subagent-retro`) |
+| `templates/` | `~/.gemini/templates/sd/` | 4 setup templates + 5 spec templates in `specs/` |
+| `skills/` | `~/.gemini/skills/sd/` | 6 rule packs, one folder per skill with `SKILL.md` |
 
 Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespace comes from frontmatter `name:` and the `sd/` install subfolder. The namespace exists for collision avoidance and clean uninstall — never use bare names when assets reference each other.
 
 ## How the pieces interlock
 
-- **Commands** are phased workflow definitions with **hard gates** — checkpoints that STOP and wait for explicit user approval (silence ≠ approval). Phase 0 always bootstraps (read CLAUDE.md, constitution, project-config, index); a state machine at the top of each file defines resume behavior on re-invocation. Gates marked HARD (bug reproduction, perf baseline) have no override path.
+- **Commands** are phased workflow definitions with **hard gates** — checkpoints that STOP and wait for explicit user approval (silence ≠ approval). Phase 0 always bootstraps (read GEMINI_CONSTITUTION.md, constitution, project-config, index); a state machine at the top of each file defines resume behavior on re-invocation. Gates marked HARD (bug reproduction, perf baseline) have no override path.
 - **Agents** declare frontmatter: `name`, `description`, `color`, `model`, minimal `tools` allowlist, and a `skills:` list. Tool allowlists enforce roles structurally — the reviewer has no write tools, so it *cannot* auto-fix. Heavy reasoning agents (architect, debugger, reviewer) use `sonnet`; mechanical agents (explorer, implementer) use `haiku`.
 - **Skills** are shared rule packs loaded into agent context via frontmatter reference. A rule used by multiple agents (e.g. `sd-evidence-citation`, used by 3) lives in one `SKILL.md`, never copy-pasted into agent bodies.
 - **Hooks** inject context (`prompt-router` on UserPromptSubmit, `subagent-retro` on SubagentStop) or guard edits (`spec-gate` on PreToolUse blocks code edits with no in-progress spec). `spec-gate` denials emit a dual-format JSON object carrying both the new schema (`hookSpecificOutput.permissionDecision: "deny"`) and the legacy schema (`decision: "block"`) for CLI version compatibility.

@@ -106,6 +106,6 @@ Spec ID format: `RCA-<slug>-<YYYYMMDD>` using UTC date.
 
 - Filling cross-phase fields prematurely (bug root cause, perf results log, rca root cause).
 - Reordering sections in the template output — downstream agents key off section headers.
-- Hardcoding stack assumptions — always read `CLAUDE.md` first; never default to a stack from prior invocations.
+- Hardcoding stack assumptions — always read `GEMINI_CONSTITUTION.md` first; never default to a stack from prior invocations.
 - Producing the spec text in the prose response — write to the file; return only the summary + path.
 - Glossing over a constitution violation — if §1.1 is at risk, that is an Open question.

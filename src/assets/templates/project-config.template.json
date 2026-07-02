@@ -79,7 +79,7 @@
     "subagent_default": "haiku",
     "subagent_reasoning": "sonnet",
     "subagent_execution": "haiku",
-    "_comment": "Portable aliases (sonnet/haiku) — resolved to the current recommended version by Claude Code at runtime. Agents also use these aliases in frontmatter."
+    "_comment": "Portable aliases (sonnet/haiku) — resolved to the current recommended version by Gemini Code at runtime. Agents also use these aliases in frontmatter."
   },
 
   "mcp": {
