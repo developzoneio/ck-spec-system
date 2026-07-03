@@ -6,8 +6,9 @@
 # Exits 0 silently if jq is missing, if stdin is empty/invalid, or if no hints
 # apply. Never writes to disk.
 #
-# Note: we deliberately do NOT use `set -u` because bash's empty-associative-array
+# Note: we deliberately do NOT use `set -u` because bash 3.2's empty-array
 # expansion is brittle under it; the hook must never fail noisily.
+# Must stay bash-3.2 compatible (macOS system bash): no `declare -A`.
 
 # --- graceful exits -----------------------------------------------------------
 
@@ -58,8 +59,10 @@ index_path="${cwd}/${index_rel}"
 # --- keyword match ------------------------------------------------------------
 
 prompt_lower="$(printf '%s' "${prompt}" | tr '[:upper:]' '[:lower:]')"
-declare -A matched
-declare -A matched_terms
+# Parallel indexed arrays (bash 3.2 has no associative arrays): index i holds
+# the i-th matched workflow and its comma-joined matched terms.
+matched_workflows=()
+matched_terms_list=()
 
 match_keywords() {
     local workflow="$1"
@@ -69,7 +72,7 @@ match_keywords() {
     if [[ -z "${list}" ]]; then
         list="${default_list}"
     fi
-    local kw
+    local kw terms=""
     while IFS= read -r kw; do
         # Some jq builds (e.g. Windows jq.exe) emit CRLF for join("\n") output;
         # strip a trailing CR so the comparison below isn't corrupted.
@@ -78,14 +81,17 @@ match_keywords() {
         local kw_lower
         kw_lower="$(printf '%s' "${kw}" | tr '[:upper:]' '[:lower:]')"
         if [[ "${prompt_lower}" == *"${kw_lower}"* ]]; then
-            matched["${workflow}"]=1
-            if [[ -z "${matched_terms[${workflow}]:-}" ]]; then
-                matched_terms["${workflow}"]="${kw}"
+            if [[ -z "${terms}" ]]; then
+                terms="${kw}"
             else
-                matched_terms["${workflow}"]="${matched_terms[${workflow}]}, ${kw}"
+                terms="${terms}, ${kw}"
             fi
         fi
     done <<< "${list}"
+    if [[ -n "${terms}" ]]; then
+        matched_workflows+=("${workflow}")
+        matched_terms_list+=("${terms}")
+    fi
 }
 
 match_keywords bug      $'bug\nfix\nbroken\nerror\ncrash\nregression\ndefect'
@@ -145,7 +151,7 @@ fi
 
 # --- nothing to say? ----------------------------------------------------------
 
-if [[ ${#matched[@]} -eq 0 && ${#ticket_ids[@]} -eq 0 && ${#in_progress[@]} -eq 0 ]]; then
+if [[ ${#matched_workflows[@]} -eq 0 && ${#ticket_ids[@]} -eq 0 && ${#in_progress[@]} -eq 0 ]]; then
     exit 0
 fi
 
@@ -155,11 +161,11 @@ fi
     echo '<context-router>'
     echo 'Routing hints from specwright (UserPromptSubmit hook):'
 
-    if [[ ${#matched[@]} -gt 0 ]]; then
+    if [[ ${#matched_workflows[@]} -gt 0 ]]; then
         echo ''
         echo 'Workflow keyword matches:'
-        for k in "${!matched[@]}"; do
-            echo "  - /sd:${k}  (matched: ${matched_terms[${k}]})"
+        for ((i=0; i<${#matched_workflows[@]}; i++)); do
+            echo "  - /sd:${matched_workflows[i]}  (matched: ${matched_terms_list[i]})"
         done
     fi
 

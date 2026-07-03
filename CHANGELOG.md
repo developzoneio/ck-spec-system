@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails loudly instead of vacuously passing Check 5.
 
 ### Fixed
+- `hooks/bash/prompt-router.sh` emitted `- /sd:0` instead of `- /sd:<workflow>` under bash 3.2
+  (macOS system bash): `declare -A` is a bash-4 feature, so the associative arrays silently
+  degraded to indexed arrays with all string subscripts arithmetic-evaluating to `0`. Caught by
+  the macOS CI smoke test (`validate (macos-latest)` was red since the matrix gained macOS).
+  Rewrote keyword matching with parallel indexed arrays; the hook is now bash-3.2 compatible.
 - `hooks/powershell/subagent-retro.ps1`'s debounce silently stopped persisting/reading state on
   PowerShell 7+, found by writing `scripts/smoke-hooks.ps1`: (1) `Save-State`'s
   `Split-Path -LiteralPath $StatePath -Parent` throws "Parameter set cannot be resolved" on some
