@@ -53,8 +53,8 @@ Every BLOCK or WARN must pair a `file:line` with a `§N.M` anchor.
 | Code | `file:line` + snippet | "I recall the code does X" |
 | Logs | Artifact path + quoted line | "Logs probably show..." |
 | DB | Query output (read-only) | "The table is probably slow" |
-| Library | `mcp__context7__get-library-docs` result | Training-data memory |
-| Web | `mcp__tavily__search` result + URL | General knowledge |
+| Library | `mcp__context7__query-docs` result | Training-data memory |
+| Web | `mcp__tavily__tavily_search` result + URL | General knowledge |
 
 If evidence is unavailable (e.g. no prod log access), state it explicitly: "Evidence unavailable — log access required. Marking INCONCLUSIVE."
 

@@ -202,7 +202,8 @@ Behavior:
    - `status` is in `spec.lifecycle` from project-config.
    - Expected files present per status:
      - status >= `approved` -> `00-spec.md` must NOT have "<<placeholder>>" tokens remaining.
-     - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (except RCA).
+     - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (feature and refactor
+       only; bug, perf, and rca do not produce plan/tasks artifacts).
      - status == `done` -> `05-retro.md` exists with at least one entry.
    - Index row matches frontmatter status.
 2. Output: one line per spec with PASS / FAIL and the first failure reason.

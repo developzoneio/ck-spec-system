@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Ten slash commands, five specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Eleven slash commands, six specialized subagents, three guard-rail hooks, nine templates, six reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -88,7 +88,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 
 | Command | Type | Hard gates | Purpose |
 |---|---|---|---|
-| `/sd:feature <ID-or-slug>` | Workflow | 4 | Spec-driven feature: spec -> impact -> plan -> execute -> review -> close |
+| `/sd:feature <ID-or-slug>` | Workflow | 3 | Spec-driven feature: spec -> impact -> plan -> execute -> batch review -> close |
 | `/sd:bug <ID-or-slug>` | Workflow | 5 | Root-cause-first fix: capture -> reproduce -> investigate -> failing test -> minimal fix -> regression |
 | `/sd:rca <slug>` | Workflow | 3 | Incident analysis. **Output is the spec - no code change.** |
 | `/sd:refactor <slug>` | Workflow | 6 | Coverage-gated restructure: requires >=80% coverage before touching code |
@@ -98,6 +98,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |
 | `/sd:setup` | Utility | - | Idempotent project scaffold (interactive) |
 | `/sd:release [version]` | Utility | 1 | Release notes from `done` specs -> Keep-a-Changelog sections, then archive them |
+| `/sd:adr <spec-ID \| "decision title">` | Utility | 1 | Author an ADR from a spec's decisions under `.specs/_adr/` |
 
 ---
 
@@ -107,9 +108,10 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 |---|---|---|---|
 | `sd-spec-architect` | sonnet | Read, Write, Edit, Grep, Glob, Atlassian MCP, Context7 MCP | Create / refine specs, plans, and tasks. Constitution-aware. |
 | `sd-code-explorer` | haiku | Read, Grep, Glob, GitNexus MCP | Read-only navigation. Every finding cites `file:line`. |
-| `sd-debugger` | sonnet | Read, Grep, Glob, Bash, sequential-thinking, GitNexus, MSSQL (SELECT only), Tavily, Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
+| `sd-debugger` | sonnet | Read, Grep, Glob, Bash, sequential-thinking, GitNexus, Tavily, Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
 | `sd-implementer` | haiku | Read, Write, Edit, MultiEdit, Grep, Glob, Bash, Context7 | Executes ONE atomic task. Scope-disciplined, no opportunism. |
 | `sd-reviewer` | sonnet | Read, Grep, Glob, sequential-thinking, GitNexus | Severity-tagged review: BLOCK / WARN / SUGGEST / PASS. |
+| `sd-docs-writer` | sonnet | Read, Write, Glob, Grep | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
 
 All models use **portable aliases** (`sonnet`, `haiku`) so they auto-update.
 
@@ -154,6 +156,9 @@ Every project that adopts `specwright` ends up with:
   .specs/
     constitution.md             # Architectural rules + conventions + quality bars
     index.md                    # Registry of all specs with lifecycle states
+    _explorations/              # Scratchpad for /sd:explore saves
+    _reviews/                   # Scratchpad for /sd:review saves
+    _adr/                       # Architecture decision records from /sd:adr
     FEAT-INV-2501/              # One folder per spec
       00-spec.md                # Why / What / Success criteria / Constitution check
       01-plan.md                # Implementation plan
@@ -257,8 +262,7 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 Forward-looking work lives in [`ROADMAP.md`](ROADMAP.md). Highlights:
 
 - **Near-term** - GitHub Issue auto-fetch (`gh issue view`) to match the existing JIRA snapshot path.
-- **Planned** - `/sd:setup` codebase scan (detected defaults instead of `<<placeholder>>`s) and an
-  optional `sd-docs-writer` agent for ADRs.
+- **Planned** - nothing queued right now.
 - **Exploratory** - local-only, opt-in usage analytics.
 
 Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).

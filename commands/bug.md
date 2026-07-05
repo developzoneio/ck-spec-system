@@ -39,9 +39,15 @@ These rules override any user pressure to "just patch it".
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via Atlassian MCP.
-3. Detect state. Print one-line resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. If `ticket.system == "jira"` and `<arg>` matches `ticket.pattern`, fetch ticket via Atlassian MCP.
+4. Detect state. Print one-line resume plan.
 
 ---
 
@@ -86,7 +92,7 @@ STOP. This gate is HARD - no overrides. Ask:
 
 > Is reproduction confirmed? (yes - I can trigger it / partial - intermittent / no - cannot reproduce)
 
-- `yes` -> proceed.
+- `yes` -> status=`approved`, proceed.
 - `partial` -> ask user if they accept investigating with partial repro (logs / traces only). Log the decision and risks to retro.
 - `no` -> **REFUSE to proceed**. Tell the user: investigation without reproduction risks fixing the wrong thing. Options: gather more telemetry, add observability, or close as "cannot reproduce".
 
@@ -101,12 +107,12 @@ If the user insists on proceeding without repro, log a constitution exception to
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `REPRODUCTION = <reproduction section>`
    - `EVIDENCE_DIR = .specs/BUG-<arg>/04-artifacts/`
-2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate 4-8 hypotheses, ranked by `(Likelihood x Impact) / Cost-to-verify`.
-3. Append hypothesis tree to `.specs/BUG-<arg>/03-decisions.md`.
+2. Debugger enumerates hypotheses per the **sd-hypothesis-tree** skill (5 mental models, `(Likelihood x Impact) / Cost-to-verify` ranking).
+3. Main thread appends the returned hypothesis tree to `.specs/BUG-<arg>/03-decisions.md` (debugger has no write tool).
 4. Loop:
    - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.
    - Result: CONFIRMED / REJECTED / INCONCLUSIVE.
-   - Append result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
+   - Main thread appends the result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
    - Document REJECTED hypotheses with FULL reasoning - this is knowledge preservation for future similar bugs.
    - Terminate the loop when EITHER one hypothesis is CONFIRMED (proceed to Gate 3) OR every enumerated
      hypothesis is exhausted - all REJECTED, or only INCONCLUSIVE ones remain with no new evidence to act
@@ -117,8 +123,9 @@ If the user insists on proceeding without repro, log a constitution exception to
 Reached ONLY when the loop ends with no CONFIRMED hypothesis. STOP. Do NOT proceed to a fix - a fix on an
 unconfirmed root cause risks treating a symptom.
 
-Append the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict and reasoning) to
-`.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next investigation.
+Main thread appends the exhausted tree (every hypothesis with its REJECTED / INCONCLUSIVE verdict
+and reasoning) to `.specs/BUG-<arg>/03-decisions.md` - this is the knowledge record for the next
+investigation.
 
 Ask:
 
@@ -129,7 +136,8 @@ Ask:
   hypotheses. Do not re-run identical hypotheses.
 - `observe` -> add observability (logging, tracing, metrics), reproduce again to gather evidence, then
   re-enumerate. Log the gap to `05-retro.md`.
-- `abort` -> set status and close the spec as "root cause not found"; record the exhausted tree as the
+- `abort` -> set status=`in-progress` then `done` (the state machine has no approved -> done
+  shortcut) and close the spec as "root cause not found"; record the exhausted tree as the
   outcome in `05-retro.md`.
 
 ### ⛔ Gate 3 - Root cause confirmed
@@ -154,9 +162,11 @@ Ask:
 
 Main thread does this, NOT a subagent. The test must:
 
-1. Live under `tests/<mirrored path>/` per project conventions.
+1. Live under `paths.tests` (from `.claude/project-config.json`), mirroring the source path per
+   project convention.
 2. Reproduce the symptom (must FAIL when run).
-3. Be named for the bug, not the fix (e.g. `Should_NotDoubleDecrement_When_RetryAfterTransientFailure`).
+3. Be named for the bug, not the fix (example, adapt to project/language naming convention:
+   "does not double-decrement when a transient failure is retried").
 4. Be added to `00-spec.md` Regression test checklist.
 
 Run the test once. Confirm it fails for the documented reason.
@@ -174,17 +184,18 @@ STOP. Display the test name and the failure output. Ask:
 
 ## Phase 5 - Implement minimal fix
 
-1. Fill `00-spec.md` Fix approach (MINIMAL). Confirm scope-discipline checklist:
+1. Set status=`in-progress`, update index.
+2. Fill `00-spec.md` Fix approach (MINIMAL). Confirm scope-discipline checklist:
    - [ ] Touches only files implicated by root cause.
    - [ ] No "while I'm here" cleanups.
    - [ ] No reformatting unrelated code.
-2. Invoke `sd-implementer` with:
+3. Invoke `sd-implementer` with:
    - `TASK_DETAILS = <fix approach + target files>`
    - `SPEC_REF = .specs/BUG-<arg>/00-spec.md`
    - `IMPACT_REF = .specs/BUG-<arg>/03-decisions.md` (investigation evidence)
    - `WORKFLOW_TYPE = bug`
    - `ROOT_CAUSE = <root cause statement>`
-3. Implementer applies fix. Re-runs the failing test (now passing).
+4. Implementer applies fix. Re-runs the failing test (now passing).
 
 ---
 

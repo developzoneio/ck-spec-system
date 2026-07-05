@@ -3,7 +3,7 @@ name: sd-spec-architect
 color: blue
 description: Creates, refines, and plans specs across all 5 workflow types (feature, bug, refactor, perf, rca). Reads CLAUDE.md and constitution.md at runtime. Use this agent for any spec authoring or atomic-task planning.
 model: sonnet
-tools: Read, Write, Edit, Grep, Glob, mcp__atlassian__getJiraIssue, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssueRemoteIssueLinks, mcp__atlassian__getConfluencePage, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: Read, Write, Edit, Grep, Glob, mcp__atlassian__getJiraIssue, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssueRemoteIssueLinks, mcp__atlassian__getConfluencePage, mcp__context7__resolve-library-id, mcp__context7__query-docs
 skills:
   - sd-atomic-task-format
   - sd-spec-templates
@@ -72,6 +72,9 @@ For every task that creates a new file or introduces a new public symbol:
 2. If `IMPACT` lacks a suitable precedent, run your own discovery (max 2 Glob/Grep rounds) per the **sd-pattern-discipline** skill.
 3. Fill the task's `Pattern refs` field: 1-3 `file:line` refs, each with a one-line instruction of what to mirror.
 4. `none` only for tasks that exclusively edit existing files.
+5. If a task's `Acceptance` depends on an unfamiliar library API, verify current syntax via
+   `mcp__context7__resolve-library-id` + `mcp__context7__query-docs` before writing the criterion -
+   stale training data on library APIs is a real failure mode (same rule the implementer follows).
 
 ---
 
@@ -141,7 +144,7 @@ For every spec you produce, in the "Constitution check" section:
 
 ## Anti-patterns (do NOT do these)
 
-- **Hardcoding stack assumptions**. If you write `dotnet test` when the project is Node, you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
+- **Hardcoding stack assumptions**. If you write a build/test command from a prior invocation instead of reading this project's `commands.test` (via `CLAUDE.md`), you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
 - **Skipping the template structure**. The template is the contract. If you "improve" it by reordering sections, downstream agents that key off section headers break.
 - **Filling cross-phase fields prematurely**. Bug's Root cause is empty for a reason. Perf's Results log is empty for a reason.
 - **Inventing task structure**. The 9 required fields in the task format are required, not suggested.

@@ -126,15 +126,19 @@ A subagent is a markdown file with YAML frontmatter consumed by the `Task` tool.
 ```yaml
 ---
 name: sd-<role>
+color: <color>   # e.g. cyan, orange, purple, green, blue - used for display only
 description: One-line summary used by routing.
 model: sonnet   # MUST be an alias: sonnet | haiku | opus | inherit
 tools: Read, Grep, Glob, ...   # MINIMAL allowlist
+skills:
+  - sd-<shared-rule-pack>   # any skill this agent's body references; see Skills below
 ---
 ```
 
 **Critical:**
 - `model:` MUST be an alias. Full IDs like `claude-sonnet-4-7` are not portable and may not even exist. The alias `sonnet` auto-resolves to the latest Sonnet.
 - `tools:` should be the minimum set the agent needs. Read-only agents do not get `Write`. Implementer does not get `WebSearch`.
+- `skills:` must list every skill the agent body references (`**skill-name**` in prose). A rule used by multiple agents lives in one `SKILL.md`, never copy-pasted into agent bodies.
 - Agent must read `CLAUDE.md` and `constitution.md` at runtime. No hardcoded stack assumptions (no `cs`, `csproj`, `dotnet`, etc. literal references unless they come from project config).
 - Every finding cites `file:line`. No prose without citations.
 

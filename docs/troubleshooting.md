@@ -206,7 +206,7 @@ This lists every inconsistency. Then fix manually (recommended) or remove the mi
 
 **Cause**: skipping intermediate states.
 
-**Fix**: lifecycle is `draft -> approved -> in-progress -> done`. Use `/sd:spec status <ID> approved` then `in-progress` then `done`. If you're closing a spec that genuinely had no execution (e.g. an RCA that documents itself), `/sd:rca` flows directly to `done` at workflow end - don't manually transition.
+**Fix**: lifecycle is `draft -> approved -> in-progress -> done`. Use `/sd:spec status <ID> approved` then `in-progress` then `done`. Every workflow (`/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf`, `/sd:rca`) walks all four states itself, including specs with no code execution (e.g. an RCA or a PERF spec whose baseline already meets SLA) - don't manually transition mid-workflow.
 
 ### A spec is stuck in `in-progress` for weeks
 

@@ -39,6 +39,14 @@ function Read-StdinJson {
     }
 }
 
+$script:DefaultKeywords = [pscustomobject]@{
+    bug      = @('bug','fix','broken','error','crash','regression','defect')
+    feature  = @('feature','add','implement','new','support')
+    refactor = @('refactor','restructure','clean up','extract','rename')
+    perf     = @('perf','performance','slow','optimize','latency','throughput')
+    rca      = @('incident','outage','rca','root cause','post-mortem','postmortem')
+}
+
 function Get-ProjectConfig {
     param([string]$Cwd)
 
@@ -52,13 +60,7 @@ function Get-ProjectConfig {
             baseUrl = ''
         }
         workflow = [pscustomobject]@{
-            keywords = [pscustomobject]@{
-                bug      = @('bug','fix','broken','error','crash','regression','defect')
-                feature  = @('feature','add','implement','new','support')
-                refactor = @('refactor','restructure','clean up','extract','rename')
-                perf     = @('perf','performance','slow','optimize','latency','throughput')
-                rca      = @('incident','outage','rca','root cause','post-mortem','postmortem')
-            }
+            keywords = $script:DefaultKeywords
         }
         hooks = [pscustomobject]@{
             userPromptRouter = [pscustomobject]@{ enabled = $true }
@@ -90,13 +92,17 @@ function Test-HookEnabled {
 function Get-KeywordMatches {
     param(
         [string]$Prompt,
-        $KeywordMap
+        $KeywordMap,
+        $DefaultKeywordMap
     )
     $matches = @{}
-    if ($null -eq $KeywordMap) { return $matches }
     $lower = $Prompt.ToLowerInvariant()
     foreach ($workflow in @('bug','feature','refactor','perf','rca')) {
-        $list = $KeywordMap.$workflow
+        $list = $null
+        if ($null -ne $KeywordMap) { $list = $KeywordMap.$workflow }
+        if ($null -eq $list -or @($list).Count -eq 0) {
+            $list = $DefaultKeywordMap.$workflow
+        }
         if ($null -eq $list) { continue }
         foreach ($kw in $list) {
             $kwLower = $kw.ToLowerInvariant()
@@ -173,11 +179,11 @@ function Get-InProgressSpecs {
 
 # ---- main ----
 
-$input = Read-StdinJson
-if ($null -eq $input) { exit 0 }
+$hookInput = Read-StdinJson
+if ($null -eq $hookInput) { exit 0 }
 
-$prompt = $input.prompt
-$cwd    = $input.cwd
+$prompt = $hookInput.prompt
+$cwd    = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($prompt) -or [string]::IsNullOrWhiteSpace($cwd)) { exit 0 }
 if (-not (Test-Path -LiteralPath $cwd)) { exit 0 }
 
@@ -189,7 +195,7 @@ $indexFile = if ($config.spec.indexFile) { Join-Path $cwd $config.spec.indexFile
 $pattern   = if ($config.ticket.pattern) { $config.ticket.pattern }                else { '^[A-Z]+-[0-9]+$' }
 $kwMap     = $config.workflow.keywords
 
-$workflowMatches = Get-KeywordMatches -Prompt $prompt -KeywordMap $kwMap
+$workflowMatches = Get-KeywordMatches -Prompt $prompt -KeywordMap $kwMap -DefaultKeywordMap $script:DefaultKeywords
 $ticketIds       = Get-TicketIds      -Prompt $prompt -Pattern $pattern
 $ticketSpecs     = Find-SpecsByTicket -SpecDir $specDir -TicketIds $ticketIds
 $inProgress      = Get-InProgressSpecs -IndexPath $indexFile

@@ -35,6 +35,9 @@ desktop.ini
 .claude/settings.local.json
 .claude/.cache/
 
+# ---- Local AI work docs (not shipped) ----
+.ai-docs/
+
 # ---- Logs ----
 *.log
 logs/

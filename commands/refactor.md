@@ -41,10 +41,16 @@ Spec ID = `REF-<slug>-<YYYYMMDD>`.
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. Compute UTC date for spec ID.
-3. Read coverage threshold from project-config or default to 80%.
-4. Detect state. Print resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. Compute UTC date for spec ID.
+4. Read coverage threshold from project-config or default to 80%.
+5. Detect state. Print resume plan.
 
 ---
 
@@ -74,9 +80,12 @@ STOP. Display spec summary, especially Invariants and Out-of-scope. Ask:
 1. Invoke `sd-code-explorer` with:
    - `TASK = impact-map`
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
-   - `OUTPUT_APPEND_TO = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
+   - `OUTPUT_TARGET = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
 2. Explorer enumerates: direct callers, transitive callers (2-3 hop), test coverage scan of affected paths, DI / config grep, public API surface, risk assessment.
 3. Every finding cites file:line.
+4. Main thread appends the explorer's returned analysis to
+   `.specs/REF-<slug>-<YYYYMMDD>/03-decisions.md` (create the file if missing; never overwrite
+   existing content).
 
 No gate here - read-only.
 
@@ -100,7 +109,7 @@ STOP. Compare measured vs threshold.
 
 If user picks (1), enter the characterization sub-loop:
 1. Identify uncovered branches via coverage report.
-2. Invoke `sd-implementer` with `TASK_TYPE = characterization-test` per uncovered area.
+2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor` per uncovered area.
 3. Each new test must FAIL FAST if current behavior changes - characterization tests pin the CURRENT behavior, correct or not.
 4. Re-measure coverage.
 
@@ -122,22 +131,10 @@ If user picks (2) explicit exception, document the threshold reduction in `05-re
    - `SPEC = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`
    - `IMPACT = .specs/REF-<slug>-<YYYYMMDD>/03-decisions.md`
    - `MODE = refactor`
-2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task uses the canonical format PLUS refactor-specific fields:
-
-```
-### T<NN> - <title>
-- Files: <list of files to touch>
-- Layer: <Domain | Application | Infrastructure | Presentation>
-- Step type: <foundation | behavior | wiring | polish | test>
-- Test: <test file/method to create or update>
-- Acceptance: <one-line criterion>
-- Depends on: <T## or "none">
-- Conflicts with: <T## or "none">
-- Complexity: <S | M | L>
-- Reversibility: <trivial | moderate | hard>
-- Pattern refs: <1-3 file:line precedent citations + what to mirror, or "none">
-- Parallel batch: <batch number or "solo">
-```
+2. Architect writes `01-plan.md` (sequencing) and `02-tasks.md`. Each task follows the
+   **sd-atomic-task-format** skill (9 required fields + `Pattern refs`, plus the skill's
+   "Refactor mode" `Parallel batch` field - do not re-specify the format here). Tasks sharing a
+   batch number must have disjoint file sets and no `Depends on` / `Conflicts with` relationship.
 
 ### ⛔ Gate 4 - Plan approval
 

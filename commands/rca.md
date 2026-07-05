@@ -27,9 +27,15 @@ Drives an incident analysis from raw signals to a documented root cause, recorde
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. Compute current UTC date for the spec ID stamp.
-3. Detect state. Print resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. Compute current UTC date for the spec ID stamp.
+4. Detect state. Print resume plan.
 
 ---
 
@@ -67,9 +73,9 @@ STOP. Display the populated Timeline, Symptoms, Affected scope, Recent changes. 
    - `SPEC_REF = .specs/RCA-<slug>-<YYYYMMDD>/00-spec.md`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
    - `MODE = incident`
-2. Debugger uses sequential-thinking + 5 mental models (boundary / state / concurrency / recent-changes / environment) to enumerate **4 to 8** hypotheses.
-3. Each hypothesis ranked by `(Likelihood x Impact) / Cost-to-verify`.
-4. Hypothesis tree written to `00-spec.md` "Hypothesis tree" section.
+2. Debugger enumerates hypotheses per the **sd-hypothesis-tree** skill (5 mental models,
+   `(Likelihood x Impact) / Cost-to-verify` ranking).
+3. Hypothesis tree written to `00-spec.md` "Hypothesis tree" section.
 
 ### ⛔ Gate 2 - Hypotheses enumerated
 
@@ -91,8 +97,9 @@ For each hypothesis in rank order:
    - `TASK = verify`
    - `HYPOTHESIS = <H#>`
    - `EVIDENCE_DIR = .specs/RCA-<slug>-<YYYYMMDD>/04-artifacts/`
-2. Debugger gathers evidence (logs, queries, code reads). For MSSQL, **SELECT / EXPLAIN only** - never UPDATE / DELETE / INSERT.
-3. Result: `CONFIRMED` / `REJECTED` / `INCONCLUSIVE`. Append result with evidence pointers to "Verification results (Phase 3)".
+2. Debugger gathers evidence (logs, queries, code reads). Database access (via the project's MCP
+   tool or CLI) is **SELECT / EXPLAIN only** - never UPDATE / DELETE / INSERT.
+3. Result: `CONFIRMED` / `REJECTED` / `INCONCLUSIVE`. Main thread appends the result with evidence pointers to "Verification results (Phase 3)" (debugger has no write tool).
 4. Document REJECTED with FULL reasoning. This is knowledge preservation.
 5. Continue until one hypothesis is `CONFIRMED`.
 
@@ -107,18 +114,19 @@ Ask:
 
 > Confirm root cause: <one-line>. Proceed to mitigation documentation? (yes / dig deeper / abort)
 
-- `yes` -> proceed.
+- `yes` -> status=`approved`, proceed.
 - `dig deeper` -> back to Phase 3, additional hypotheses if needed.
 
 ---
 
 ## Phase 4 - Isolate + document
 
-1. Fill in `00-spec.md`:
+1. Set status=`in-progress`, update index.
+2. Fill in `00-spec.md`:
    - **Affected components** - file:line, service names, config keys.
    - **Why this is root cause** - the "why" chain (use 5-whys discipline; stop when answer is fixable).
-2. Fill **Mitigation applied** - what stopped the bleeding. Reference timestamps from Timeline.
-3. Note: mitigation IS NOT a fix. It is the immediate action that contained the impact. The actual fix lands in a spawned BUG-* spec.
+3. Fill **Mitigation applied** - what stopped the bleeding. Reference timestamps from Timeline.
+4. Note: mitigation IS NOT a fix. It is the immediate action that contained the impact. The actual fix lands in a spawned BUG-* spec.
 
 No gate here - documentation-only phase.
 
@@ -152,6 +160,6 @@ No gate here - documentation-only phase.
 - Reproduction is rarely possible for incidents (the incident is over). Verification relies on logs, traces, queries, and code reads from the relevant time window.
 - All evidence lives under `04-artifacts/` with descriptive filenames. Never reference "the dashboard" - save a screenshot or query.
 - Rejected hypotheses are documented in full. They are as valuable as the confirmed one for future incidents.
-- MSSQL access (via MCP) is SELECT / EXPLAIN only. Any UPDATE attempt is a constitution violation.
+- Database access (via the project's MCP tool or CLI) is SELECT / EXPLAIN only. Any UPDATE attempt is a constitution violation.
 - The Spawned specs section is a CONTRACT. Each reserved ID should be created within the agreed timeline; if not, log to retro.
 - RCAs do not get a `revive` action. New incident -> new RCA.

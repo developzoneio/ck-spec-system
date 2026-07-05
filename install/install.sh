@@ -13,7 +13,7 @@
 #   - Interactive prompt on differing files (y / N / a=all). Suppressed by --force.
 #   - chmod +x for bash hooks after install.
 
-set -e
+set -euo pipefail
 
 # ---- defaults --------------------------------------------------------------
 
@@ -71,9 +71,9 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base-path)
-            BASE_PATH="$2"; shift 2 ;;
+            BASE_PATH="${2:-}"; shift 2 ;;
         --prefix)
-            PREFIX="$2"; shift 2 ;;
+            PREFIX="${2:-}"; shift 2 ;;
         --dry-run)
             DRY_RUN=1; shift ;;
         --force)
@@ -86,14 +86,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ---- prefix safety guard ---------------------------------------------------
+# Mirrors uninstall.sh's guard exactly - install and uninstall must accept the
+# same set of prefixes, or a prefix legal for one and rejected by the other
+# leaves orphaned or unreachable files.
+
+if [[ -z "${PREFIX// /}" || "$PREFIX" == */* || "$PREFIX" == *\\* || "$PREFIX" == *..* ]]; then
+    fail "Invalid prefix '$PREFIX'. Must be a plain folder name (no separators, no '..')."
+    exit 1
+fi
+
 # ---- portable helpers ------------------------------------------------------
 
 sha256_of() {
     local f="$1"
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$f" 2>/dev/null | awk '{print $1}'
+        sha256sum "$f" 2>/dev/null | awk '{print $1}' || true
     elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$f" 2>/dev/null | awk '{print $1}'
+        shasum -a 256 "$f" 2>/dev/null | awk '{print $1}' || true
     else
         echo ""
     fi
@@ -176,6 +186,23 @@ SKIPPED_SAME=0
 SKIPPED_DECLINE=0
 BACKED_UP=0
 
+# ---- partial-install guard --------------------------------------------------
+# No transactional rollback (per-file backups already protect overwritten
+# files) - on an unexpected failure mid-copy, tell the user what already
+# landed and how to clean up rather than leaving a silent partial install.
+
+on_error() {
+    local code=$?
+    if [[ $DRY_RUN -ne 1 && $INSTALLED -gt 0 ]]; then
+        echo
+        fail "Install aborted (exit $code) after installing $INSTALLED file(s)."
+        warn "Partial install at '$BASE_PATH' (prefix '$PREFIX'). Run:"
+        warn "  ./install/uninstall.sh --base-path \"$BASE_PATH\" --prefix \"$PREFIX\" --force"
+        warn "then retry the install."
+    fi
+}
+trap on_error ERR
+
 # ---- copy one file ---------------------------------------------------------
 
 copy_one() {
@@ -250,7 +277,7 @@ for entry in "${PLAN[@]}"; do
     tgt_root="$BASE_PATH/$tgt"
 
     while IFS= read -r -d '' f; do
-        rel="${f#$src_root/}"
+        rel="${f#"$src_root"/}"
         copy_one "$f" "$tgt_root/$rel" "$exec_flag"
     done < <(find "$src_root" -type f -print0)
 done

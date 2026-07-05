@@ -24,8 +24,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hard approval gate. The agent (model `sonnet`, tools Read/Write/Glob/Grep, skill `sd-evidence-citation`)
   writes only the ADR file and never invents decisions; the command owns numbering and supersession links.
   Bumps command count 10 -> 11 and agent count 5 -> 6 across docs and the validators.
+- `scripts/smoke-hooks.sh` + `scripts/smoke-hooks.ps1` - pipe fixture Claude Code hook JSON into
+  `prompt-router`, `spec-gate`, and `subagent-retro` against a temp `.specs/` tree and assert exit
+  codes AND key output substrings, not just "did not crash": keyword-match routing (bash and
+  PowerShell must agree), spec-gate allow/warn/block across in-progress / header-only-marker /
+  docs-edit / malformed-stdin cases, and subagent-retro naming the real spec ID then debouncing a
+  second run. `.github/workflows/ci.yml` adds `macos-latest` to the OS matrix (exercising the
+  BSD-specific `stat -f %m` / `date -j -f` fallback branches that only run there) and a smoke-test
+  step on every OS.
+
+### Changed
+- Removed hardcoded MSSQL/C#/TS references from `agents/debugger.md`, `commands/perf.md`,
+  `commands/rca.md`, and `commands/bug.md`, per CLAUDE.md's stack-agnostic rule. `sd-debugger`'s
+  tool allowlist no longer bakes in `mcp__mssql__execute_sql`; its "Database discipline" section
+  (renamed from "MSSQL discipline") now describes the same read-only SELECT/EXPLAIN discipline
+  generically, deferring to whatever database MCP tool or CLI client the project provides.
+  `templates/project-config.template.json`'s `mcp.mssql` entry is renamed to `mcp.database`.
+  `perf.md`/`rca.md` generalize "MSSQL access (via MCP)" to "database access (via the project's
+  MCP tool or CLI)"; `perf.md`'s final-review check drops the C#/TS-specific `dynamic`/`any`
+  example in favor of "type-safety escapes for the project's language (as defined in
+  `constitution.md`)"; `bug.md`'s failing-test step now references `paths.tests` from
+  project-config instead of a hardcoded `tests/<mirrored path>/` with a C#-style example name.
+- De-duplicated rules that were copy-pasted from skills into agent bodies and commands (CLAUDE.md:
+  "a rule used by multiple agents lives in one `SKILL.md`, never copy-pasted"), replacing each
+  copy with a reference to the owning skill: `agents/debugger.md`'s and `agents/reviewer.md`'s
+  Anti-patterns sections no longer restate `sd-hypothesis-tree`/`sd-severity-taxonomy`/
+  `sd-evidence-citation` (role-specific bullets are kept); `agents/code-explorer.md`'s
+  Anti-patterns section no longer restates `sd-evidence-citation`. `commands/feature.md` and
+  `commands/refactor.md` no longer inline the atomic task-block format - both now point at
+  `sd-atomic-task-format`, which gains a documented "Refactor mode" `Parallel batch` field (the
+  field `refactor.md`'s inline copy had already drifted to include while `feature.md`'s copy
+  lacked it). `commands/bug.md` and `commands/rca.md` no longer restate the 5-mental-models /
+  `(Likelihood x Impact) / Cost-to-verify` method inline - both now point at `sd-hypothesis-tree`.
+- `scripts/validate.sh` and `scripts/validate.ps1` now derive their expected install-target
+  counts (commands / agents / skills / hooks / templates) from the source tree instead of
+  hardcoding them as literals in both files - a new command/agent/skill/template only needs to
+  land in its source dir, never a constant bumped in two scripts (this already bit PR #12, which
+  had to bump both). Each derived count is asserted `> 0` so an empty or misnamed source dir
+  fails loudly instead of vacuously passing Check 5.
 
 ### Fixed
+- `hooks/bash/prompt-router.sh` emitted `- /sd:0` instead of `- /sd:<workflow>` under bash 3.2
+  (macOS system bash): `declare -A` is a bash-4 feature, so the associative arrays silently
+  degraded to indexed arrays with all string subscripts arithmetic-evaluating to `0`. Caught by
+  the macOS CI smoke test (`validate (macos-latest)` was red since the matrix gained macOS).
+  Rewrote keyword matching with parallel indexed arrays; the hook is now bash-3.2 compatible.
+- `hooks/powershell/subagent-retro.ps1`'s debounce silently stopped persisting/reading state on
+  PowerShell 7+, found by writing `scripts/smoke-hooks.ps1`: (1) `Save-State`'s
+  `Split-Path -LiteralPath $StatePath -Parent` throws "Parameter set cannot be resolved" on some
+  PS7 builds (`-LiteralPath` there has no `-Parent` parameter set) - the surrounding `try/catch`
+  swallowed it, so the state directory/file were never written; switched to `Split-Path -Path`
+  (safe here - `-Parent` does no filesystem globbing, only `-Resolve` would). (2) Even once the
+  state file wrote, `Test-DebounceElapsed` re-broke: PS7's `ConvertFrom-Json` auto-converts an
+  ISO-8601 `...Z` string to a `[datetime]` (PS 5.1 leaves it as a string), and re-`Parse`-ing an
+  already-converted `[datetime]` stringifies it with the local culture - dropping the UTC marker -
+  so `[datetimeoffset]::Parse` silently re-interpreted it as local time, skewing `$age` by the
+  machine's UTC offset exactly like the bug fixed earlier in this file, just triggered a different
+  way. Both are PowerShell-only; `hooks/bash/subagent-retro.sh` was unaffected (no bash twin
+  change needed).
+- `install/install.sh` hardening: aligned to `set -euo pipefail` (was `set -e` only, so unset-
+  variable typos and mid-pipeline failures - e.g. a `sha256sum`/`shasum` error - passed silently;
+  those two pipelines now end `|| true` since a hash-tool failure is expected-recoverable, not a
+  reason to abort); added the same `--prefix` safety guard `uninstall.sh` already had (empty,
+  `/`, `\`, or `..` components rejected) to `install/install.ps1` too, so install and uninstall
+  accept the same set of prefixes on both platforms - previously only uninstall validated it, so
+  `--prefix ../evil` would have written outside the intended tree; quoted the unquoted
+  `rel="${f#$src_root/}"` strip pattern (glob-interpreted `$src_root` broke on a repo path
+  containing `[`, `*`, or `?`); and added an `ERR` trap that reports how many files already
+  landed and the exact `uninstall.sh` command to run if a copy fails mid-install (no full
+  transactional rollback - per-file `.bak.*` backups already protect overwritten files).
+- Post-1.3.0 docs drift: `README.md`'s tagline said "Ten slash commands, five specialized
+  subagents" (now eleven / six); the Commands table was missing `/sd:adr` and listed
+  `/sd:feature` at 4 hard gates (the merged review+integration gate makes it 3); the Agents table
+  was missing `sd-docs-writer` and listed a hardcoded `MSSQL` tool for `sd-debugger`; the `.specs/`
+  tree diagram omitted `_explorations/`, `_reviews/`, `_adr/`; the Roadmap highlights repeated two
+  items that already shipped. `ROADMAP.md`'s `## Planned` section still listed the `/sd:setup`
+  codebase scan and `sd-docs-writer` agent, both shipped in 1.3.0+ (CHANGELOG is the source of
+  truth for shipped work). `docs/usage.md`'s Utility commands section had no `/sd:adr` entry.
+  `templates/project-config.template.json`'s `workflow.gates.feature` still listed the pre-merge
+  4-gate sequence; collapsed to 3 and marked `_comment`-descriptive since no hook or command reads
+  the block. `CONTRIBUTING.md`'s agent frontmatter example omitted the mandated `color:` and
+  `skills:` fields. `examples/README.md` gated a promised-features list on "not in v1.0.0", three
+  minor versions after v1.0.0; reworded to point at `ROADMAP.md`.
+- Phase 0 of `/sd:feature`, `/sd:bug`, `/sd:refactor`, `/sd:perf`, and `/sd:rca` now guards
+  against missing or malformed Layer-2 context instead of silently reading `CLAUDE.md`,
+  `.specs/constitution.md`, `.claude/project-config.json`, and `.specs/index.md` and letting
+  later phases fail on undefined config values. Missing `.specs/`, `.specs/constitution.md`, or
+  `.specs/index.md` now STOPs with "No `.specs/` found - run `/sd:setup` first." (matching
+  `spec.md`/`release.md`/`adr.md`); malformed `.claude/project-config.json` STOPs naming the file;
+  a missing `CLAUDE.md` only WARNs and continues, since the constitution (not `CLAUDE.md`) is the
+  binding Layer-2 contract - matching the stance the four utility commands already took.
+- `sd-code-explorer`'s `impact-map` task no longer instructs the agent to APPEND to
+  `OUTPUT_APPEND_TO` - its tool allowlist has no `Write`/`Edit`, so it physically could not
+  perform that write, silently starving `03-decisions.md` (and everything downstream that reads
+  it as `IMPACT`). The task now returns the structured analysis as final output; the informational
+  `OUTPUT_TARGET` input names the file, and the calling command appends it. `commands/feature.md`
+  and `commands/refactor.md` each gained an explicit main-thread append step after the impact-map
+  invocation. `commands/perf.md`, `commands/bug.md`, and `commands/rca.md`'s equivalent
+  "Append ... to `03-decisions.md`" steps after `sd-debugger` invocations (also write-tool-less)
+  are now explicitly labeled as main-thread steps for the same reason.
+- `/sd:bug`, `/sd:rca`, and `/sd:perf` now walk every state in `/sd:spec`'s
+  `draft -> approved -> in-progress -> done -> archived` machine instead of jumping straight from
+  `draft`/`approved` to `done` - a history `/sd:spec status` itself would have refused as an
+  illegal transition. `bug.md` sets `approved` at Gate 2 (reproduction confirmed) and
+  `in-progress` at the start of Phase 5 (fix implementation); its Gate 3a "abort" (hypothesis tree
+  exhausted) now passes through `in-progress` on its way to `done` instead of jumping directly
+  from `approved`. `rca.md` sets `approved` at Gate 3 (root cause confirmed) and `in-progress` at
+  the start of Phase 4 (isolate + document) - RCAs produce no code, so "in-progress" now means
+  report-writing is underway. `perf.md` sets `draft` at spec creation (previously jumped straight
+  to `approved` at Gate 1) and `in-progress` at the start of Phase 4 (the per-hotspot loop),
+  including the Gate 2 Case A shortcut (baseline already meets SLA) which now passes through
+  `in-progress` before `done`. `docs/troubleshooting.md`'s "Illegal status transition" entry no
+  longer tells users that `/sd:rca` intentionally skips straight to `done`.
 - `/sd:setup` now migrates `.claude/*` drift instead of exiting blind on a `complete` project. A
   new Phase 1.5 (drift check & migrate) runs whenever `.claude/project-config.json` or
   `.claude/settings.json` exists (states `complete` and `partial`) and rule-based-compares them
@@ -38,6 +148,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-existent `~/.claude/hooks/ck/` directory after the `ck` -> `specwright` rename.
 - `/sd:setup` Phase 7 (and Phase 1.5) now verify every hook `command` path in
   `.claude/settings.json` resolves to a file on disk, warning loudly when a hook is not firing.
+- `hooks/powershell/subagent-retro.ps1`, `prompt-router.ps1`, and `spec-gate.ps1` no longer assign
+  parsed hook JSON to `$input` - PowerShell's reserved automatic pipeline variable. Assigning to it
+  threw a non-terminating `ParameterBindingException` on every real (piped/redirected) stdin
+  invocation, leaving it unbound and causing every PowerShell hook to exit silently before reading
+  any input. Renamed to `$hookInput` in all three files.
+- `hooks/bash/spec-gate.sh` in-progress detection now requires `in-progress` and a spec ID on the
+  SAME line, matching `spec-gate.ps1` and `prompt-router.sh`'s existing same-line semantics. The
+  previous two independent file-wide `grep`s let an `in-progress` legend/header line combine with a
+  spec ID on an unrelated `done` row, so bash allowed a code edit that PowerShell would warn/block
+  on the identical `.specs/index.md`.
+- `commands/feature.md` subagent invocations now use the field names `sd-spec-architect` and
+  `sd-code-explorer` actually read: `TICKET_CONTEXT` (was `TICKET_DATA`), `TASK`/`SPEC`/`IMPACT`
+  (was `TASK_TYPE`/`SPEC_REF`/`IMPACT_REF`), a full `feature.template.md` filename (was the bare
+  `feature`), and both `refine` invocations now carry the required `SPEC` path. `sd-reviewer`
+  invocations, which legitimately use `TASK_TYPE`/`SPEC_REF` as their own contract, are unchanged.
+  `commands/refactor.md`'s characterization-test loop now invokes `sd-implementer` with
+  `TASK_DETAILS`/`SPEC_REF`/`WORKFLOW_TYPE` instead of the unrecognized `TASK_TYPE`, matching every
+  other implementer invocation in the repo.
+- `/sd:spec validate` no longer requires `01-plan.md`/`02-tasks.md` for in-progress bug and perf
+  specs. Only `/sd:feature` and `/sd:refactor` produce those artifacts; `/sd:bug` and `/sd:perf`
+  go straight from spec to investigation/baseline artifacts, so the old "except RCA" exemption
+  reported FAIL on every correctly executed bug/perf spec. Also corrected the same overgeneralized
+  claim in `docs/usage.md`'s resume heuristic.
+- `hooks/powershell/subagent-retro.ps1`'s debounce check now parses `lastReminderUtc` as UTC via
+  `[datetimeoffset]::Parse(...).UtcDateTime` instead of `[datetime]::Parse(...)`, which returned a
+  local-`Kind` value silently converted from the UTC string, skewing `$age` by the machine's UTC
+  offset (negative for ~UTC offset hours on UTC+N machines, wrongly suppressing reminders; always
+  past-debounce on UTC-N machines, never suppressing). The bash twin was already correct
+  (epoch seconds throughout).
+- `hooks/powershell/prompt-router.ps1` now applies the built-in default keyword list PER WORKFLOW
+  when the loaded `.claude/project-config.json` has no list (or an empty list) for that workflow,
+  matching `prompt-router.sh`'s per-workflow fallback. Previously PS only fell back to defaults
+  when the config file itself was absent/unparseable, then silently skipped any workflow whose
+  list was `$null` once a config file existed - so a valid config that simply omitted
+  `workflow.keywords` (or one workflow's entry) lost keyword routing hints on Windows while bash
+  kept emitting them from defaults on Linux/macOS. The five built-in keyword lists are unchanged,
+  just reused instead of duplicated.
+- Agent frontmatter `tools:` allowlists and body instructions in `agents/code-explorer.md`,
+  `agents/debugger.md`, `agents/reviewer.md`, `agents/implementer.md`, `agents/spec-architect.md`,
+  `commands/explore.md`, and `skills/sd-evidence-citation/SKILL.md` referenced MCP tool names that
+  no longer exist on the live servers (`mcp__gitnexus__search`/`get_file`/`find_references`/
+  `get_call_graph`/`list_symbols`, `mcp__context7__get-library-docs`, `mcp__tavily__search`),
+  so every "verify via MCP" instruction pointed at a dead tool. Remapped to the current GitNexus
+  surface (`query`, `context`, `impact`, `list_repos`) and renamed `context7`/`tavily` tools to
+  their current names (`query-docs`, `tavily_search`), keeping each agent's frontmatter allowlist
+  and body usage in parity.
+- `hooks/bash/prompt-router.sh`'s per-workflow keyword lookup silently dropped every keyword but
+  the last in a workflow's list when `.claude/project-config.json` defined `workflow.keywords`:
+  some `jq` builds (observed with a Windows `jq.exe`) emit CRLF line endings for `join("\n")`
+  output even from an LF-only input, so `while IFS= read -r kw` left a trailing `\r` on every
+  keyword but the final one, and `[[ "$prompt_lower" == *"$kw_lower"* ]]` never matched a
+  CR-suffixed keyword. Found by piping real prompts through the hook against a live project's
+  config (not the smoke-test fixture, which omitted `workflow.keywords` and only ever exercised
+  the hardcoded default-list fallback). Fixed by stripping a trailing `\r` off each line read from
+  the list; also added a `workflow.keywords` block to both `scripts/smoke-hooks.sh` and
+  `scripts/smoke-hooks.ps1` fixtures so the `jq`/config-driven path is exercised going forward.
+  `hooks/powershell/prompt-router.ps1` was unaffected (native `ConvertFrom-Json`, no `jq`).
 
 ---
 

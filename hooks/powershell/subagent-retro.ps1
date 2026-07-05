@@ -72,7 +72,7 @@ function Get-IndexSpecs {
         return $result
     }
     foreach ($line in $lines) {
-        if ($line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+' -and $line -match 'in-progress') {
+        if ($line -match 'in-progress' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
             $id = $Matches[0]
             $type = ($id -split '-')[0]
             $obj = [pscustomobject]@{
@@ -120,7 +120,16 @@ function Test-DebounceElapsed {
     if (-not (Test-Path -LiteralPath $StatePath)) { return $true }
     try {
         $st = Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 | ConvertFrom-Json
-        $last = [datetime]::Parse($st.lastReminderUtc)
+        # PowerShell 7's ConvertFrom-Json auto-converts an ISO-8601 "...Z" string to a
+        # [datetime] with Kind=Utc; PowerShell 5.1 leaves it as a plain string. Re-Parse-ing
+        # an already-converted [datetime] stringifies it with the local culture (dropping the
+        # UTC marker), so [datetimeoffset]::Parse silently re-interprets it as local time -
+        # skewing $age by the machine's UTC offset. Only Parse when it is still a string.
+        if ($st.lastReminderUtc -is [datetime]) {
+            $last = $st.lastReminderUtc.ToUniversalTime()
+        } else {
+            $last = [datetimeoffset]::Parse([string]$st.lastReminderUtc).UtcDateTime
+        }
         $age = (Get-Date).ToUniversalTime() - $last
         return ($age.TotalMinutes -ge $DebounceMinutes)
     } catch {
@@ -131,7 +140,10 @@ function Test-DebounceElapsed {
 function Save-State {
     param([string]$StatePath)
     try {
-        $dir = Split-Path -LiteralPath $StatePath -Parent
+        # -Path, not -LiteralPath: some PowerShell builds reject -LiteralPath combined
+        # with -Parent as an unresolvable parameter set. -Parent does no filesystem
+        # globbing (only -Resolve would), so -Path is exactly as safe here.
+        $dir = Split-Path -Path $StatePath -Parent
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
@@ -156,14 +168,14 @@ function Remove-StaleStateFiles {
 
 # ---- main ----
 
-$input = Read-StdinJson
-if ($null -eq $input) { exit 0 }
+$hookInput = Read-StdinJson
+if ($null -eq $hookInput) { exit 0 }
 
-$cwd = $input.cwd
+$cwd = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = (Get-Location).Path }
 if (-not (Test-Path -LiteralPath $cwd)) { exit 0 }
 
-$sessionId = $input.session_id
+$sessionId = $hookInput.session_id
 if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = 'no-session' }
 
 $config = Get-ProjectConfig -Cwd $cwd

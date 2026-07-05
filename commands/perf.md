@@ -38,9 +38,15 @@ Drives an optimization from a measured baseline to a measured improvement, with 
 
 ## Phase 0 - Bootstrap
 
-1. Read `CLAUDE.md`, `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`.
-2. Compute UTC date for spec ID.
-3. Detect state. Print resume plan.
+1. Read `CLAUDE.md`. If missing, WARN and continue - print "No `CLAUDE.md` found; stack
+   conventions may be incomplete." (the constitution is the binding Layer-2 contract, not
+   `CLAUDE.md`).
+2. Read `.specs/constitution.md`, `.claude/project-config.json`, `.specs/index.md`. If `.specs/`
+   or any of these is missing, STOP: "No `.specs/` found - run `/sd:setup` first." If
+   `.claude/project-config.json` is present but fails to parse as JSON, STOP:
+   "`.claude/project-config.json` failed to parse - fix it or re-run `/sd:setup`."
+3. Compute UTC date for spec ID.
+4. Detect state. Print resume plan.
 
 ---
 
@@ -52,6 +58,7 @@ Drives an optimization from a measured baseline to a measured improvement, with 
    - `SPEC_ID = PERF-<slug>-<YYYYMMDD>`
 2. Architect fills Target (metric, goal SLA, environment, load profile, workload type), Measurement methodology, Constraints, Out of scope.
 3. Architect leaves **Current observed EMPTY** and **Results log EMPTY**. These are filled by measurement, not by assumption.
+4. Register in `.specs/index.md` with status=`draft`.
 
 ### ⛔ Gate 1 - Target defined
 
@@ -80,7 +87,8 @@ STOP. Two cases:
 
 **Case A: baseline already meets SLA goal.**
 > Baseline p95=<X> already meets SLA goal p95<<goal>. No optimization needed. Close PERF-<slug> as 'done' with no changes? (yes / proceed anyway / abort)
-- `yes` -> jump to Phase 6 close-out with summary "no work needed".
+- `yes` -> set status=`in-progress` (no hotspot work occurs, but the state machine has no
+  approved -> done shortcut), then jump to Phase 6 close-out with summary "no work needed".
 - `proceed anyway` -> requires explicit constitution exception ("optimizing past SLA"). Log to retro.
 
 **Case B: baseline below SLA goal.**
@@ -98,7 +106,7 @@ This gate is HARD - the workflow CANNOT enter Phase 3 without a checked-in basel
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `BASELINE_ARTIFACT = .specs/PERF-<slug>-<YYYYMMDD>/04-artifacts/baseline-<...>.json`
 2. Debugger's job: identify the 80/20 hotspots from profile data, query plans, or code reads. Output: ranked list of hotspots with file:line citations and contribution percentage to total latency / CPU / memory.
-3. Append hotspot ranking to `03-decisions.md`.
+3. Main thread appends the returned hotspot ranking to `03-decisions.md` (debugger has no write tool).
 
 ### ⛔ Gate 3 - Hotspot identified
 
@@ -113,6 +121,8 @@ STOP. Display hotspot ranking. Ask:
 
 ## Phase 4 - Per-hotspot loop
 
+Set status=`in-progress`, update index (once, on first entry to this phase).
+
 For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple loop iterations.
 
 ### 4a. Deep dive
@@ -125,7 +135,7 @@ For each selected hotspot, repeat this entire loop. Multiple hotspots = multiple
    - Expected impact (e.g. "p95 -200ms based on current 350ms in this function").
    - Implementation cost (S / M / L).
    - Risk profile (correctness risk, scope of change, reversibility).
-3. Append hypotheses to `03-decisions.md`.
+3. Main thread appends the returned hypotheses to `03-decisions.md` (debugger has no write tool).
 
 ### ⛔ Gate 4 - Select hypothesis
 
@@ -227,7 +237,7 @@ STOP. Display final test results + final measurement. Ask:
    - `SPEC_REF = .specs/PERF-<slug>-<YYYYMMDD>/00-spec.md`
    - `CHANGED_FILES = <all files touched across kept attempts>`
    - `RESULTS_LOG = <Results log>`
-2. Reviewer checks: correctness preserved (no test edits to make them pass), no behavior change beyond what spec accepted under "Trade-offs", no new constitution exceptions, no static state introduced, no `dynamic` (C#) / `any` (TS) sneaked in.
+2. Reviewer checks: correctness preserved (no test edits to make them pass), no behavior change beyond what spec accepted under "Trade-offs", no new constitution exceptions, no static state introduced, no type-safety escapes for the project's language (as defined in `constitution.md`) sneaked in.
 
 ### ⛔ Gate 8 - Final review pass
 
@@ -259,5 +269,5 @@ STOP. Display reviewer verdict. Ask:
 - Revert on no measurable improvement. The Results log is the source of truth.
 - Reverted attempts are LOGGED, not deleted. They are knowledge.
 - Correctness tests must remain unchanged. If the optimization requires changing a test, it changes behavior - that needs a FEAT-* or BUG-* spec, not PERF-*.
-- MSSQL access (via MCP) for hotspot analysis is SELECT / EXPLAIN only.
+- Database access (via the project's MCP tool or CLI) for hotspot analysis is read-only: SELECT / EXPLAIN only.
 - If SLA cannot be met after exhausting hypotheses, close the PERF spec with the documented gap and lessons. Do not "ship anyway".

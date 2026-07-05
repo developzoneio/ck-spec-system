@@ -17,7 +17,8 @@ It covers:
 
 ## What this folder will hold over time
 
-Future additions (not in v1.0.0):
+Ideas under consideration, no committed timeline (see [`../ROADMAP.md`](../ROADMAP.md) for what
+is actually scheduled):
 
 - `examples/fixture-projects/` - tiny example repos (Node, .NET, Python) with pre-populated `.specs/` for demoing.
 - `examples/transcripts/` - anonymized real-run transcripts showing prompt-router and spec-gate behavior.

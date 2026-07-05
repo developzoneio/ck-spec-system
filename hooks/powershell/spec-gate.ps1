@@ -166,13 +166,13 @@ function Write-BlockDecision {
 
 # ---- main ----
 
-$input = Read-StdinJson
-if ($null -eq $input) { exit 0 }
+$hookInput = Read-StdinJson
+if ($null -eq $hookInput) { exit 0 }
 
-$toolName = $input.tool_name
+$toolName = $hookInput.tool_name
 if ($toolName -ne 'Edit' -and $toolName -ne 'Write' -and $toolName -ne 'MultiEdit') { exit 0 }
 
-$cwd = $input.cwd
+$cwd = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = (Get-Location).Path }
 
 $config = Get-ProjectConfig -Cwd $cwd
@@ -188,7 +188,7 @@ $mode = 'warn'
 try { if ($config.hooks.specGate.mode) { $mode = [string]$config.hooks.specGate.mode } } catch { }
 if ($mode -eq 'off') { exit 0 }
 
-$filePath = $input.tool_input.file_path
+$filePath = $hookInput.tool_input.file_path
 if ([string]::IsNullOrWhiteSpace($filePath)) { exit 0 }
 
 $rel = ConvertTo-RelativePath -Cwd $cwd -FilePath $filePath

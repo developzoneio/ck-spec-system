@@ -12,14 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       # --- Run the full invariant validator (platform-native) ---------------
       - name: Validate (bash)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         shell: bash
         run: bash scripts/validate.sh
 
@@ -28,9 +28,21 @@ jobs:
         shell: pwsh
         run: ./scripts/validate.ps1
 
+      # --- Hook smoke tests: pipe fixture JSON into every hook, assert exit
+      # codes and key output substrings (not just "did not crash") -----------
+      - name: Hook smoke tests (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/smoke-hooks.sh
+
+      - name: Hook smoke tests (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/smoke-hooks.ps1
+
       # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
       - name: Install -> uninstall round-trip (bash)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
