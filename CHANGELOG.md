@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-05
+
 ### Added
 - `ROADMAP.md` - published roadmap of near-term, planned, and exploratory work, linked from
   `README.md` (new `## Roadmap` section + Documentation entry). Migrated the forward-looking items
@@ -432,7 +434,8 @@ Each hook ships in two flavours:
 - Operating systems: Windows 11 + PowerShell 5.1 / 7.x, macOS 13+, Ubuntu 22.04+.
 - Optional MCP servers: Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily.
 
-[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/developzoneio/specwright/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/developzoneio/specwright/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/developzoneio/specwright/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/developzoneio/specwright/compare/v1.0.0...v1.1.0
