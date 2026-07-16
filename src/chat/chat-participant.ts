@@ -30,7 +30,17 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
       return { metadata: { command } };
     }
 
-    stream.markdown(`Xin chào! Tôi là Specwright Developer Gemini. Bạn có thể gọi tôi với các lệnh \`/feature\`, \`/bug\`, hoặc \`/refactor\` để bắt đầu các quy trình làm việc tương ứng.`);
+    if (command === 'setup') {
+      stream.markdown('Đang mở form khởi tạo dự án...\n\n');
+
+      vscode.commands.executeCommand('specwright.setup').then(undefined, (err: any) => {
+        console.error('Failed to execute setup command from chat', err);
+      });
+
+      return { metadata: { command } };
+    }
+
+    stream.markdown(`Xin chào! Tôi là Specwright Developer Gemini. Bạn có thể gọi tôi với các lệnh \`/feature\`, \`/bug\`, \`/refactor\`, hoặc \`/setup\` để bắt đầu các quy trình làm việc tương ứng.`);
     return {};
   };
 

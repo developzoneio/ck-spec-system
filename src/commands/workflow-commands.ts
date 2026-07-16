@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { StateMachine } from '../orchestrator/StateMachine';
+import { FeatureWorkflow } from '../orchestrator/FeatureWorkflow';
 import { WorkflowEvent, WorkflowState } from '../orchestrator/WorkflowContext';
 import { promptForTicketIdOrDescription } from '../ui/input-forms';
 import { parseCommandInput } from '../parsers/command-parser';
@@ -39,13 +40,21 @@ export async function handleWorkflowCommand(type: string, context: vscode.Extens
 
   // Start the workflow
   const workflowId = `wf-${Date.now()}`;
-  const stateMachine = new StateMachine(workflowId, {
-    // For now, we just pass the param as if it's the ticket ID or description
-    // In the future, this would fetch from Jira if it looks like an ID
-  });
+  let stateMachine: StateMachine;
+
+  if (type === 'feature') {
+    stateMachine = new FeatureWorkflow(workflowId, {});
+  } else {
+    stateMachine = new StateMachine(workflowId, {});
+  }
 
   stateMachine.onStateChange((event) => {
-    if (event.newState === WorkflowState.Pending_Approval) {
+    if (
+      event.newState === WorkflowState.Pending_Approval ||
+      event.newState === WorkflowState.Gate1_Spec_Approval ||
+      event.newState === WorkflowState.Gate2_Plan_Approval ||
+      event.newState === WorkflowState.Gate3_Visual_Diff
+    ) {
       const docPath = stateMachine.context.filePaths?.[0];
       if (docPath) {
         ApprovalPanel.show(context, docPath, stateMachine);
@@ -58,3 +67,4 @@ export async function handleWorkflowCommand(type: string, context: vscode.Extens
   vscode.window.showInformationMessage(`Specwright: Đang bắt đầu quy trình ${type} cho ${param}...`);
   stateMachine.dispatch(WorkflowEvent.START);
 }
+

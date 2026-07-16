@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { buildSystemInstruction } from '../compiler/prompt-builder';
-import { SpecDocument, PLAN_DOCUMENT_SCHEMA, SPEC_DOCUMENT_SCHEMA, PlanDocument } from '../schemas';
+import { SpecDocument, PLAN_DOCUMENT_SCHEMA, SPEC_DOCUMENT_SCHEMA, PlanDocument, SetupFormData } from '../schemas';
 import { IDE_READ_FILE_DECLARATION, IDE_LIST_DIRECTORY_DECLARATION, IDE_SEARCH_TEXT_DECLARATION } from '../tools/ide-tools.declarations';
 import { IdeToolHandlers } from '../tools/ide-tools.handlers';
 
@@ -50,6 +50,17 @@ export class SpecArchitectAgent {
     }
 
     return buildSystemInstruction(this.skills, template);
+  }
+
+  private getConstitutionTemplate(): string {
+    const assetsDir = path.resolve(__dirname, '..', 'assets', 'templates');
+    const templatePath = path.join(assetsDir, 'GEMINI_CONSTITUTION.template.md');
+
+    if (fs.existsSync(templatePath)) {
+      return fs.readFileSync(templatePath, 'utf8');
+    }
+
+    return '';
   }
 
   private async runPass<T>(prompt: string, schema: any, contextMessages: any[] = []): Promise<{ result: T, messages: any[] }> {
@@ -152,4 +163,56 @@ export class SpecArchitectAgent {
 
     return { spec, plan };
   }
+
+  /**
+   * Generates a personalized GEMINI_CONSTITUTION.md using the Gemini API.
+   * Takes setup form data (tech stack, framework, team rules) and produces
+   * a filled-in constitution markdown tailored to the project.
+   */
+  public async generateConstitution(formData: SetupFormData): Promise<string> {
+    const template = this.getConstitutionTemplate();
+
+    const prompt = `You are a senior software architect. Generate a complete, filled-in GEMINI_CONSTITUTION.md file for a project with the following setup:
+
+Project Name: ${formData.projectName}
+Language: ${formData.language}
+Framework: ${formData.framework}
+Database: ${formData.database || 'Not specified'}
+Shell: ${formData.shell}
+
+Team-specific coding rules and conventions:
+${formData.teamRules || 'No specific rules provided.'}
+
+Use the following template as the structure. Replace ALL <<placeholder>> tokens with appropriate values based on the project setup. Keep the Specwright workflow table and "Read on demand" section exactly as-is. Fill in the Stack, Commands, Architecture, Code conventions, Forbidden patterns, and Quality bars sections with best-practice defaults for the specified tech stack, merged with any team rules provided above.
+
+--- TEMPLATE START ---
+${template}
+--- TEMPLATE END ---
+
+Output ONLY the final markdown content. Do not wrap it in code fences. Do not include any explanation before or after the markdown.`;
+
+    const systemInstruction = 'You are a technical documentation generator for the Specwright spec-driven development system. You produce clean, production-ready markdown files.';
+
+    const config: any = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      temperature: 0.3,
+    };
+
+    const response = await this.ai.models.generateContent({
+      model: this.model,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config,
+    } as any);
+
+    const responseText = response.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+
+    if (!responseText) {
+      throw new Error('No content returned from model for constitution generation.');
+    }
+
+    return responseText.trim();
+  }
 }
+

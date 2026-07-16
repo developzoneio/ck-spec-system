@@ -43,6 +43,10 @@
         "command": "specwright.diff.reject",
         "title": "Ask AI to Fix",
         "icon": "$(wand)"
+      },
+      {
+        "command": "specwright.setup",
+        "title": "Specwright: Project Setup"
       }
     ],
     "chatParticipants": [
@@ -63,6 +67,10 @@
           {
             "name": "refactor",
             "description": "Start a refactor workflow"
+          },
+          {
+            "name": "setup",
+            "description": "Initialize or update project setup"
           }
         ]
       }

@@ -6,6 +6,7 @@ import { registerWorkflowCommands } from './commands/workflow-commands';
 import { registerChatParticipant } from './chat/chat-participant';
 import { registerDiffCommands } from './commands/diff-commands';
 import { registerQuickFixCommands } from './commands/quick-fix-commands';
+import { registerSetupCommands } from './commands/setup-commands';
 import { ReviewerCodeActionProvider } from './providers/reviewer-code-action-provider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -14,6 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerChatParticipant(context);
   registerDiffCommands(context);
   registerQuickFixCommands(context);
+  registerSetupCommands(context);
 
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(

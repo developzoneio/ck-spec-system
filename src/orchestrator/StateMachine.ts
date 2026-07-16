@@ -8,10 +8,10 @@ export interface StateChangeEvent {
 }
 
 export class StateMachine {
-  private _currentState: WorkflowState;
-  private _context: WorkflowContext;
+  protected _currentState: WorkflowState;
+  protected _context: WorkflowContext;
   
-  private _onStateChange = new vscode.EventEmitter<StateChangeEvent>();
+  protected _onStateChange = new vscode.EventEmitter<StateChangeEvent>();
   public readonly onStateChange = this._onStateChange.event;
 
   constructor(workflowId: string, initialContext?: Partial<WorkflowContext>) {
