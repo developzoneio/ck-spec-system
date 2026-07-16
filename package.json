@@ -17,8 +17,70 @@
       {
         "command": "specwright.hello",
         "title": "Specwright: Hello"
+      },
+      {
+        "command": "specwright.runReviewer",
+        "title": "Specwright: Run Reviewer"
+      },
+      {
+        "command": "specwright.newFeature",
+        "title": "Specwright: New Feature"
+      },
+      {
+        "command": "specwright.fixBug",
+        "title": "Specwright: Fix Bug"
+      },
+      {
+        "command": "specwright.refactor",
+        "title": "Specwright: Refactor"
+      },
+      {
+        "command": "specwright.diff.accept",
+        "title": "Accept Changes",
+        "icon": "$(check)"
+      },
+      {
+        "command": "specwright.diff.reject",
+        "title": "Ask AI to Fix",
+        "icon": "$(wand)"
       }
-    ]
+    ],
+    "chatParticipants": [
+      {
+        "id": "specwright.chat",
+        "name": "sdgm",
+        "description": "Specwright Developer Gemini",
+        "isDefault": false,
+        "commands": [
+          {
+            "name": "feature",
+            "description": "Start a new feature workflow"
+          },
+          {
+            "name": "bug",
+            "description": "Start a fix bug workflow"
+          },
+          {
+            "name": "refactor",
+            "description": "Start a refactor workflow"
+          }
+        ]
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "specwright.diff.accept",
+          "when": "isInDiffEditor && resourceScheme == 'specwright-diff'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "specwright.diff.reject",
+          "when": "isInDiffEditor && resourceScheme == 'specwright-diff'",
+          "group": "navigation@2"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run build",

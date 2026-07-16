@@ -18,5 +18,6 @@ export interface WorkflowContext {
   ticketId?: string;
   filePaths: string[];
   approvalStatus: 'none' | 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
   metadata?: Record<string, any>;
 }

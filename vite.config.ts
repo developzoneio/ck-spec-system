@@ -9,7 +9,17 @@ export default defineConfig({
       fileName: () => 'extension.js',
     },
     rollupOptions: {
-      external: ['vscode'],
+      external: [
+        'vscode', 
+        'child_process', 
+        'fs', 
+        'path', 
+        'os', 
+        'crypto', 
+        'events', 
+        'stream', 
+        'util'
+      ],
       output: {
         entryFileNames: 'extension.js',
       },
