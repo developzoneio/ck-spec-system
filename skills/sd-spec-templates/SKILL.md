@@ -9,7 +9,11 @@ Each template has a dedicated section below. Read only the section matching the 
 
 - Output goes to the **file**, not to the prose response. Response = one-paragraph summary + file path.
 - Follow the template structure **exactly** — sections, order, headings. Reordering breaks downstream agents.
-- Cross-phase fields marked `TBD - Phase N fills` must be left empty. Do not pre-fill them.
+- Cross-phase fields carry a `<<PHASE-N: description>>` token. Leave the token **verbatim** — do
+  not pre-fill it, do not delete it. Phase N of the owning workflow replaces it with measured
+  evidence. `/sd:spec validate` fails a `draft` or `approved` spec whose phase-deferred tokens are
+  already filled, so pre-filling is caught, not just discouraged.
+- Author-fill fields use the plain `<<description>>` token and must be replaced before `approved`.
 - `created` = current UTC date in `YYYY-MM-DD`.
 - If anything is genuinely uncertain, surface as an **Open question** — never silently allow.
 
@@ -17,12 +21,16 @@ Each template has a dedicated section below. Read only the section matching the 
 
 | Type | Fields |
 |---|---|
-| All | `id`, `type`, `status: draft`, `created` |
+| All | `id`, `type`, `status: draft`, `created`, `linked_specs` |
 | Feature | `jira` (or `none`) |
 | Bug | `severity` (P0–P3), `jira` |
 | Refactor | `smell` |
 | Perf | `target_metric` |
 | RCA | `severity`, `incident_started`, `incident_resolved` |
+
+`linked_specs` is always `[]` at authoring time. Cross-references are written later by
+`/sd:spec link`, which maintains the inverse entry on the other spec — never hand-write the list,
+and never add a "Linked specs" body section. A one-sided link fails `/sd:spec validate`.
 
 ---
 

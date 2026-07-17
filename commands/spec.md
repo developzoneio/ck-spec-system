@@ -130,22 +130,47 @@ Args:
 - `<ID-B>` (required).
 
 Behavior:
-1. Verify both spec folders exist.
-2. Validate relation is in the allow-list.
-3. Update both specs:
-   - In `00-spec.md` "Linked specs" section of ID-A: add line `<relation>: <ID-B>`.
-   - In ID-B add the inverse: `<inverse-relation>: <ID-A>`.
-4. Inverse map:
+1. Verify both spec folders exist. A link to a non-existent ID is REFUSED - do not create a
+   dangling entry.
+2. Validate relation is in the allow-list, then normalize it (see below).
+3. Refuse a self-link (`ID-A` == `ID-B`).
+4. If the link already exists on either side, do nothing and say so - `link` is idempotent.
+5. Update the `linked_specs` frontmatter list on both specs:
+   - On ID-A: add `- <canonical-relation>: <ID-B>`.
+   - On ID-B: add `- <inverse-relation>: <ID-A>`.
+6. Append a log line to both retros.
 
-| Relation | Inverse |
-|---|---|
-| `depends-on` | `blocks` (other side has `blocked-by`) |
-| `spawns` | `spawned-by` |
-| `supersedes` | `superseded-by` |
-| `related-to` | `related-to` (symmetric) |
-| `duplicate-of` | `duplicate-of` (symmetric) |
+### Relation vocabulary
 
-5. Append a log line to both retros.
+`blocked-by` is an **input alias**, not a stored relation: "A is blocked-by B" and "A depends-on B"
+assert the same edge, so storing both would let one spec carry two spellings of one fact and make
+symmetry unverifiable. `link` normalizes `blocked-by` to `depends-on` and reports the rewrite.
+The other eight inputs are already canonical and are stored as given.
+
+| Input | Stored as | Inverse written on the other side |
+|---|---|---|
+| `depends-on` | `depends-on` | `blocks` |
+| `blocked-by` | `depends-on` (alias) | `blocks` |
+| `blocks` | `blocks` | `depends-on` |
+| `spawns` | `spawns` | `spawned-by` |
+| `spawned-by` | `spawned-by` | `spawns` |
+| `supersedes` | `supersedes` | `superseded-by` |
+| `superseded-by` | `superseded-by` | `supersedes` |
+| `related-to` | `related-to` | `related-to` (symmetric) |
+| `duplicate-of` | `duplicate-of` | `duplicate-of` (symmetric) |
+
+The map is total and closed: every stored relation has exactly one inverse, and that inverse is
+itself a stored relation. This is what makes the link-symmetry check in `validate` decidable.
+
+### linked_specs format
+
+A YAML list of single-key maps in `00-spec.md` frontmatter. Empty is `[]`.
+
+```yaml
+linked_specs:
+  - depends-on: FEAT-INV-2501
+  - related-to: BUG-1247
+```
 
 ---
 
@@ -194,19 +219,110 @@ Args:
 - `<ID>` (optional, default `--all`).
 
 Behavior:
-1. For each target spec:
+1. Per-spec checks. For each target spec:
    - Frontmatter present and parseable.
-   - Required fields per type: `id`, `type`, `status`, `created`. Bugs need `severity`. RCAs need `incident_started`.
+   - Required fields present, per type (see "Required frontmatter fields" below).
    - `id` field matches the folder name.
    - `type` matches the prefix.
    - `status` is in `spec.lifecycle` from project-config.
+   - Placeholder discipline (see "Placeholder tokens" below).
    - Expected files present per status:
-     - status >= `approved` -> `00-spec.md` must NOT have "<<placeholder>>" tokens remaining.
      - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (feature and refactor
        only; bug, perf, and rca do not produce plan/tasks artifacts).
      - status == `done` -> `05-retro.md` exists with at least one entry.
    - Index row matches frontmatter status.
-2. Output: one line per spec with PASS / FAIL and the first failure reason.
+   - Transition history is legal (see "Transition replay" below).
+   - Links resolve and are symmetric (see "Link integrity" below).
+2. Tree-wide checks (run once, only when the target is `--all`):
+   - Index <-> folder symmetry (see below).
+3. Output: one line per spec with PASS / FAIL and the first failure reason, then any tree-wide
+   findings. Tree-wide findings are not attributable to one spec - never fold them into a spec's
+   line.
+
+### Index <-> folder symmetry
+
+Only meaningful for `--all`; a single-ID run cannot see orphans. Compare the set of spec folders
+under `spec.dir` against the set of rows in `spec.indexFile`:
+
+- **Orphan folder**: a spec folder with no index row. The spec is invisible to `list` / `stats`.
+- **Ghost row**: an index row whose folder does not exist. Points at nothing.
+- **Duplicate row**: the same ID on more than one index row.
+
+Directories whose name starts with `_` are engine-reserved (`_explorations/`, `_reviews/`,
+`_adr/`, `_archived/`) and are NOT specs - skip them. Skip `index.md` and `constitution.md` too.
+
+### Transition replay
+
+`05-retro.md` is the append-only status log written by `status` / `link`. Replay it against the
+state machine in the `status` section above:
+
+- Parse every `- [<ts>] Status: <old> -> <new>.` line, in file order.
+- Each `<old> -> <new>` must be a legal edge. `archived -> in-progress` is legal only when the
+  entry's reason is non-empty (that edge exists only via `revive`).
+- The chain must be contiguous: each entry's `<old>` equals the previous entry's `<new>`.
+- The last entry's `<new>` must equal the current frontmatter `status`. A mismatch means a
+  status was hand-edited, bypassing `status` - which is exactly what the log exists to catch.
+- A spec with no retro and status `draft` is fine (nothing has transitioned yet). Any other
+  status with no retro is a failure.
+
+Replay reads only committed history - it cannot see a transition that was never logged. A
+hand-edit that updated frontmatter, index, *and* forged a matching log line is out of scope.
+
+### Link integrity
+
+For every entry in a spec's `linked_specs`:
+
+- The relation is a **stored** relation from the `link` vocabulary. A stored `blocked-by` is a
+  failure: it is an input alias that `link` normalizes away, so its presence means the field was
+  hand-edited.
+- The target ID resolves to an existing spec folder (no dangling links).
+- The inverse entry exists on the target, pointing back (no one-sided links). Symmetric relations
+  (`related-to`, `duplicate-of`) require the same relation back.
+- No self-link, no duplicate entries.
+
+### Required frontmatter fields
+
+Presence is what is checked, not value - a field may legitimately hold a `<<placeholder>>` at
+`draft`. The "Placeholder tokens" rules below govern when a value must be real.
+
+Every type additionally requires `linked_specs` (a YAML list; `[]` when the spec stands alone).
+
+| Type | Required fields (beyond `linked_specs`) |
+|---|---|
+| `feature` | `id`, `type`, `status`, `jira`, `created` |
+| `bug` | `id`, `type`, `severity`, `status`, `jira`, `created` |
+| `refactor` | `id`, `type`, `smell`, `status`, `created` |
+| `perf` | `id`, `type`, `status`, `target_metric`, `created` |
+| `rca` | `id`, `type`, `status`, `severity`, `incident_started`, `incident_resolved`, `created` |
+
+`jira` is required to be present but may hold `none`. `incident_resolved` may hold a placeholder
+while an incident is still open - an RCA for an unresolved incident cannot pass `approved`.
+`linked_specs` must be present and a list; `[]` is the valid empty form, a bare `none` is not.
+
+### Placeholder tokens
+
+Two token forms with opposite rules. Both live in `00-spec.md`.
+
+| Form | Meaning | Filled by |
+|---|---|---|
+| `<<description>>` | Author-fill. Written when the spec is drafted. | The spec author |
+| `<<PHASE-N: description>>` | Phase-deferred. MUST NOT be pre-filled - the workflow's Phase N fills it from measured evidence. | Phase N of the owning workflow |
+
+The reference set of phase-deferred tokens for a type is the `<<PHASE-N: ...>>` tokens in
+`~/.claude/templates/sd/specs/<type>.template.md`. If that template is unreadable, report the
+placeholder checks as SKIPPED for that spec - never silently pass them.
+
+Rules:
+- status >= `approved` -> no author-fill `<<...>>` token remains. Phase-deferred tokens are
+  exempt and are NOT a failure.
+- status in {`draft`, `approved`} -> every reference `<<PHASE-N: ...>>` token MUST still be
+  present verbatim. A filled-in phase-deferred field at these states is a failure: it means the
+  value was written from memory rather than measured. This is the check that makes the
+  cross-phase discipline enforceable rather than advisory.
+- status == `in-progress` -> no assertion either way. The lifecycle records status, not which
+  phase is current, so a phase-deferred token may legitimately be filled or unfilled. This is a
+  known blind spot, not an oversight: narrowing it would mean tracking phase in frontmatter.
+- status == `done` -> no `<<PHASE-N: ...>>` token remains.
 
 ---
 

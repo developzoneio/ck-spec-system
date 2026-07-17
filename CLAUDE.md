@@ -58,7 +58,7 @@ Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespac
 - **Agents** declare frontmatter: `name`, `description`, `color`, `model`, minimal `tools` allowlist, and a `skills:` list. Tool allowlists enforce roles structurally — the reviewer has no write tools, so it *cannot* auto-fix. Heavy reasoning agents (architect, debugger, reviewer) use `sonnet`; mechanical agents (explorer, implementer) use `haiku`.
 - **Skills** are shared rule packs loaded into agent context via frontmatter reference. A rule used by multiple agents (e.g. `sd-evidence-citation`, used by 3) lives in one `SKILL.md`, never copy-pasted into agent bodies.
 - **Hooks** inject context (`prompt-router` on UserPromptSubmit, `subagent-retro` on SubagentStop) or guard edits (`spec-gate` on PreToolUse blocks code edits with no in-progress spec). `spec-gate` denials emit a dual-format JSON object carrying both the new schema (`hookSpecificOutput.permissionDecision: "deny"`) and the legacy schema (`decision: "block"`) for CLI version compatibility.
-- **Spec artifacts** (`.specs/<ID>/00-spec.md` … `05-retro.md`) are the input contract between agents, not after-the-fact docs. Spec templates intentionally leave cross-phase fields empty with `<!-- Filled by Phase N -->` comments — workflows enforce sequencing through those empty fields. Do not pre-fill them.
+- **Spec artifacts** (`.specs/<ID>/00-spec.md` … `05-retro.md`) are the input contract between agents, not after-the-fact docs. Spec templates intentionally leave cross-phase fields empty, marked with a `<<PHASE-N: ...>>` token (plus an explanatory `<!-- ... -->` comment) — workflows enforce sequencing through those empty fields. Do not pre-fill them.
 
 ## Hard rules when editing
 
@@ -67,7 +67,10 @@ Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespac
 3. **Model fields are aliases only** (`sonnet`, `haiku`, `opus`, `inherit`) — never full model IDs.
 4. **Stack-agnostic, no exceptions.** Commands and agents must not contain hardcoded stack commands (`dotnet test`, `npm test`) or language assumptions; reference `commands.test` etc. from `project-config.json`. An agent that hardcodes a stack is a bug.
 5. **Minimal tool allowlists.** Read-only agents never get `Write`; add a tool only if the role requires it.
-6. **Templates** use `<<placeholder>>` for user-filled fields and stay short.
+6. **Templates** use `<<placeholder>>` for user-filled fields and stay short. Spec templates also
+   use `<<PHASE-N: ...>>` for cross-phase fields that Phase N must fill from measured evidence —
+   the two forms have opposite rules (author-fill must be gone by `approved`; phase-deferred must
+   still be there), and `/sd:spec validate` enforces both. Never pre-fill a `<<PHASE-N: ...>>`.
 
 ## Style
 

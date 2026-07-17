@@ -6,6 +6,7 @@ severity: <<P0|P1|P2|P3>>
 incident_started: <<YYYY-MM-DD HH:MM UTC>>
 incident_resolved: <<YYYY-MM-DD HH:MM UTC>>
 created: <<YYYY-MM-DD>>
+linked_specs: []
 ---
 
 # RCA: <<short incident name, e.g. Payment outage on 2026-01-08>>
@@ -64,15 +65,15 @@ Artifacts: see `04-artifacts/` for logs, screenshots, query results.
 
 **Status**: TBD - filled by Phase 2 enumeration.
 
-<<hypothesis tree with rankings and verification plans>>
+<<PHASE-2: hypothesis tree with rankings and verification plans>>
 
 ### Verification results (Phase 3)
 
 <!-- Each hypothesis gets: CONFIRMED / REJECTED / INCONCLUSIVE with evidence pointers. -->
 <!-- Document REJECTED with FULL reasoning - this is knowledge preservation. -->
 
-- <<H1>>: <<CONFIRMED|REJECTED|INCONCLUSIVE>> - <<evidence>>
-- <<H2>>: <<status>> - <<evidence>>
+- <<PHASE-3: H1>>: <<PHASE-3: CONFIRMED|REJECTED|INCONCLUSIVE>> - <<PHASE-3: evidence>>
+- <<PHASE-3: H2>>: <<PHASE-3: status>> - <<PHASE-3: evidence>>
 
 ## Root cause
 
@@ -81,7 +82,7 @@ Artifacts: see `04-artifacts/` for logs, screenshots, query results.
 
 **Status**: TBD - filled when Gate 3 (Root cause confirmed) passes.
 
-<<root cause statement>>
+<<PHASE-3: root cause statement>>
 
 ## Affected components
 

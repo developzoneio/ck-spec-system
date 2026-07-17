@@ -128,6 +128,7 @@ type: feature
 status: draft
 jira: INV-2501
 created: 2026-01-14
+linked_specs: []
 ---
 
 # Add low-stock alert webhook for inventory threshold breaches
@@ -175,10 +176,10 @@ manual poll and reduces mean time-to-restock by an estimated 4 hours.
 - §3 Quality: >=80% coverage on changed lines; integration test for
   the threshold-breach -> webhook-fire path.
 
-## Linked specs
-- Depends on: none
-- Related to: none
 ```
+
+(Cross-references live in the `linked_specs` frontmatter field, written by `/sd:spec link` -
+not in a body section.)
 
 Then Gate 1:
 

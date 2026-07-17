@@ -4,6 +4,7 @@ type: refactor
 smell: <<extract-method|extract-class|rename|inline|move|replace-conditional|reduce-coupling|other>>
 status: draft
 created: <<YYYY-MM-DD>>
+linked_specs: []
 ---
 
 # <<Short imperative title - what is being restructured>>
@@ -26,7 +27,7 @@ created: <<YYYY-MM-DD>>
 - **Primary file**: <<src/path/to/file.ext>> (<<N>> lines)
 - **Structure**: <<brief description of current shape, e.g. "single class with 7 public methods + 12 private helpers + 4 inline cache calls">>
 - **Test coverage**: <<currently N% - filled from coverage report>>
-- **Used by**: <<list callers - filled by sd-code-explorer in Phase 2>>
+- **Used by**: <<PHASE-2: list callers - filled by sd-code-explorer>>
 
 ## Target state
 
@@ -61,7 +62,7 @@ created: <<YYYY-MM-DD>>
 
 **Status**: TBD - filled by Phase 2 impact mapping.
 
-<<impact analysis with file:line citations>>
+<<PHASE-2: impact analysis with file:line citations>>
 
 ## Test coverage prerequisite
 
@@ -69,9 +70,9 @@ created: <<YYYY-MM-DD>>
 <!-- Default threshold: 80% line coverage on changed files. -->
 
 - **Threshold**: >= <<80>>% line coverage on files in "Current state"
-- **Current measured**: <<N% - filled in Phase 3>>
-- **Gap**: <<N% - filled in Phase 3>>
-- **Plan to close gap** (if any): <<list characterization tests to add - filled in Phase 3>>
+- **Current measured**: <<PHASE-3: N% measured on files in "Current state">>
+- **Gap**: <<PHASE-3: N% below threshold, or "none">>
+- **Plan to close gap** (if any): <<PHASE-3: list characterization tests to add>>
 
 **Gate 2 (Coverage threshold)** is HARD. If coverage is below threshold, characterization tests are written FIRST, then re-measured, then proceed.
 

@@ -4,6 +4,7 @@ type: feature
 status: draft
 jira: <<TICKET-ID-or-none>>
 created: <<YYYY-MM-DD>>
+linked_specs: []
 ---
 
 # <<Short imperative title - what this feature does>>
@@ -73,10 +74,9 @@ created: <<YYYY-MM-DD>>
 - **§3 Quality bars**: <<coverage target and integration-test requirements for this change>>
 - **Risk of violation**: <<none | low | medium - explain>>
 
-## Linked specs
+<!-- Cross-references live in the `linked_specs` frontmatter field, not in a body section.
+     They are written by `/sd:spec link <ID-A> <relation> <ID-B>`, which maintains the inverse
+     entry on the other spec. Do not hand-edit `linked_specs` - the two sides must stay in sync,
+     and `/sd:spec validate` fails a one-sided link. -->
 
-<!-- Cross-references. Empty if this spec stands alone. -->
 
-- Depends on: <<spec ID or none>>
-- Related to: <<spec ID or none>>
-- Spawns: <<spec ID or none - filled if this feature reveals a needed refactor / perf work>>

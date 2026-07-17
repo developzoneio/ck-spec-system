@@ -5,6 +5,7 @@ severity: <<P0|P1|P2|P3>>
 status: draft
 jira: <<TICKET-ID-or-none>>
 created: <<YYYY-MM-DD>>
+linked_specs: []
 ---
 
 # <<Short imperative title - what is broken>>
@@ -54,9 +55,9 @@ created: <<YYYY-MM-DD>>
 
 **Status**: TBD - filled by Phase 3 investigation.
 
-<<root cause statement with file:line citations>>
+<<PHASE-3: root cause statement with file:line citations>>
 
-**Why this is root cause, not a symptom**: <<explanation>>
+**Why this is root cause, not a symptom**: <<PHASE-3: explanation>>
 
 ## Fix approach
 
@@ -66,8 +67,8 @@ created: <<YYYY-MM-DD>>
 
 **Status**: TBD - filled after root cause confirmed.
 
-- <<change 1, with target file>>
-- <<change 2, with target file>>
+- <<PHASE-3: change 1, with target file>>
+- <<PHASE-3: change 2, with target file>>
 
 **Scope discipline check**:
 - [ ] Fix touches only files implicated by root cause

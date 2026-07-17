@@ -51,7 +51,7 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
    - `TEMPLATE = feature.template.md`
    - `TICKET_CONTEXT = <fetched or pasted>`
    - `SPEC_ID = FEAT-<arg>`
-3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check, Linked specs.
+3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check. Cross-references are not authored here - they go in the `linked_specs` frontmatter field via `/sd:spec link`.
 4. If a ticket was fetched, spec-architect also snapshots it (ticket content + related tickets + linked Confluence pages, per its Ticket snapshot protocol) to `.specs/FEAT-<arg>/04-artifacts/ticket/`.
 5. Register in `.specs/index.md` with status=`draft`.
 

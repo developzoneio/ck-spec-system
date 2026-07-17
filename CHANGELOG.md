@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `linked_specs` frontmatter field on all five spec templates (SW-4, seam 2), replacing the
+  "Linked specs" body section that only `feature.template.md` ever had - `/sd:spec link` accepted
+  any spec ID but had nowhere to write on the other four types. Cross-references are now a
+  structured YAML list maintained by `link` on both sides.
+- Four structural checks in `/sd:spec validate` (SW-4, seam 2): index <-> folder symmetry (orphan
+  folders, ghost rows, duplicate rows), transition replay against the state machine from the
+  `05-retro.md` append-only log (catches a hand-edited status that bypassed `/sd:spec status`),
+  link resolution (no dangling links), and link symmetry (no one-sided links).
+- `<<PHASE-N: ...>>` token in the spec templates (SW-4, seam 1 of the `/sd:spec validate` linter):
+  a distinguishable marker for cross-phase fields, replacing 20 phase-deferred fields that were
+  previously indistinguishable from author-fill `<<placeholder>>`s. This makes the engine's
+  cross-phase discipline machine-checkable in both directions - `validate` can now assert that an
+  author-fill token is *gone* by `approved` and that a phase-deferred token is *still there*, so
+  pre-filling a field from memory is caught rather than merely discouraged.
 - `specwright.manifest.json` (SW-3): canonical inventory contract declaring where assets live
   (`areas`) and where the docs publish numbers about them (`docClaims`). Stores no counts - they
   are derived from disk at runtime, so adding a command/agent/skill/template means adding the file
@@ -22,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `/sd:spec link` inverse map (SW-4) was partial and ambiguous: it accepted 9 relations but
+  defined inverses for only 5, so `blocks`, `blocked-by`, `spawned-by` and `superseded-by` had no
+  defined other side. `depends-on` and `blocked-by` also asserted the same edge in two spellings.
+  `blocked-by` is now an input alias normalized to `depends-on`, and the map is total and closed -
+  every stored relation has exactly one inverse, which is what makes link symmetry checkable.
+- `/sd:spec validate` required-field rules (SW-4) had drifted from
+  `skills/sd-spec-templates/SKILL.md`, the skill that authors the specs: `validate` checked only
+  `id`/`type`/`status`/`created` (+`severity` for bug, +`incident_started` for rca), so it passed
+  malformed specs missing `target_metric` (perf), `smell` (refactor), `jira` (feature/bug) and
+  `incident_resolved` (rca). The rules are now per-type and match the skill.
+- `/sd:spec validate` placeholder rule (SW-4) contradicted the templates it validates: "status >=
+  `approved` -> no `<<placeholder>>` remaining" failed a *correct* perf spec, whose baseline field
+  must still be unfilled at `approved` by the cross-phase rule in `CLAUDE.md`. Author-fill and
+  phase-deferred tokens are now separate forms with separate rules.
 - Doc count/inventory drift (SW-1): `README.md` listed `/sd:setup` at no gates (`-` -> `2`, matching
   the two approval gates in `commands/setup.md`) and omitted `sd-docs-writer` from
   `sd-evidence-citation`'s "Used by" list (4 agents, not 3).
