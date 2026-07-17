@@ -16,9 +16,23 @@ Every finding must carry exactly one severity marker. Severities are NOT interch
 
 ---
 
+## Anchors
+
+Every BLOCK or WARN must cite an anchor. **No anchor = no BLOCK/WARN.** Which anchors are legal
+depends on what is being reviewed — they are not interchangeable, and a caller may use only the
+row that matches its target:
+
+| Target | Legal anchors | Used by |
+|---|---|---|
+| Code | A constitution `§N.M` section OR a spec acceptance criterion | `sd-reviewer` |
+| The `.specs/` tree itself | A lint rule ID (e.g. `SL003`) from the rule table in `/sd:spec validate` | `/sd:spec validate` |
+
+The code row is the strict one and stays strict: reviewing code against a lint rule ID is not a
+thing, and "the spec tree has its own anchors" is never a reason to relax it. A code finding with
+no `§N.M` and no acceptance criterion is still not a finding.
+
 ## Rules
 
-- Every BLOCK or WARN must cite a constitution `§N.M` section OR a spec acceptance criterion. No anchor = no BLOCK/WARN.
 - SUGGEST is "if you have time". WARN is "we should address this". Never conflate them.
 - Style preferences are WARN at most. Constitution-mandated style is the only exception that can be BLOCK.
 - PASS findings are short (one-liner) and used sparingly to flag non-obvious compliance.
@@ -70,5 +84,5 @@ If a section has zero findings, write `_No findings._` — do not omit the secti
 
 - Conflating SUGGEST with WARN.
 - Marking style preferences as BLOCK (unless constitution-mandated).
-- Issuing BLOCK without a `§N.M` reference or spec acceptance criterion.
+- Issuing BLOCK without a legal anchor for the target (see "Anchors").
 - Omitting PASS notes on non-obvious compliant areas (reviewer reports are also a positive signal).

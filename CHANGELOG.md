@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Severity-tagged output for `/sd:spec validate` (SW-4, seam 3), with a stable rule table
+  (`SL001`-`SL054`). BLOCK is reserved for a registry that lies about itself or evidence that was
+  fabricated; WARN for a real but recoverable problem that leaves the registry truthful. The
+  command reads `sd-severity-taxonomy` and `sd-evidence-citation` from disk at runtime, because
+  only agents load skills via frontmatter and `validate` invokes no subagent.
+- Anchor table in `sd-severity-taxonomy` (SW-4, seam 3): BLOCK/WARN still requires an anchor, but
+  the legal anchor now depends on the target - a constitution `§N.M` or acceptance criterion for
+  code, a lint rule ID for the `.specs/` tree. The code row stays strict.
+- `examples/spec-lint-fixture/` (SW-4, seam 3): a clean `.specs/` tree that must report all-PASS
+  and a seeded-broken one covering 18 of the 26 lint rules, each violation self-documented with a
+  `SEEDED` comment. The two perf specs are a matched pair guarding the seam-1 regression: the
+  correct one (unfilled baseline at `approved`) must PASS and the fabricated one must BLOCK.
+  Run by hand - the linter is a prompt, so CI cannot execute it; see the fixture README.
 - `linked_specs` frontmatter field on all five spec templates (SW-4, seam 2), replacing the
   "Linked specs" body section that only `feature.template.md` ever had - `/sd:spec link` accepted
   any spec ID but had nowhere to write on the other four types. Cross-references are now a

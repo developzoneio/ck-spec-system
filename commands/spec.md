@@ -235,9 +235,91 @@ Behavior:
    - Links resolve and are symmetric (see "Link integrity" below).
 2. Tree-wide checks (run once, only when the target is `--all`):
    - Index <-> folder symmetry (see below).
-3. Output: one line per spec with PASS / FAIL and the first failure reason, then any tree-wide
-   findings. Tree-wide findings are not attributable to one spec - never fold them into a spec's
-   line.
+3. Report every finding using the severity taxonomy (see "Output" below). Do not stop at the
+   first failure - a spec with three problems reports three findings.
+
+### Rule table
+
+Every finding cites one of these IDs. The ID is the finding's anchor - the taxonomy forbids a
+BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who has pinned a rule.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `SL001` | Frontmatter missing or unparseable | 🔴 BLOCK |
+| `SL002` | Required field missing for type | 🔴 BLOCK |
+| `SL003` | `id` does not match folder name | 🔴 BLOCK |
+| `SL004` | `type` does not match ID prefix | 🔴 BLOCK |
+| `SL005` | `status` not in `spec.lifecycle` | 🔴 BLOCK |
+| `SL006` | `linked_specs` missing, or present but not a list | 🔴 BLOCK |
+| `SL010` | Author-fill `<<...>>` token remains at status >= `approved` | 🔴 BLOCK |
+| `SL011` | Phase-deferred `<<PHASE-N: ...>>` token pre-filled at `draft` / `approved` | 🔴 BLOCK |
+| `SL012` | Phase-deferred token still unfilled at `done` | 🟠 WARN |
+| `SL013` | Type template unreadable - placeholder checks could not run | 🟠 WARN |
+| `SL020` | Required artifact missing for status | 🔴 BLOCK |
+| `SL021` | Status `done` but `05-retro.md` has no entry | 🔴 BLOCK |
+| `SL030` | Index row status disagrees with frontmatter status | 🔴 BLOCK |
+| `SL031` | Orphan folder - spec exists but has no index row | 🔴 BLOCK |
+| `SL032` | Ghost row - index row whose folder does not exist | 🔴 BLOCK |
+| `SL033` | Duplicate index rows for one ID | 🔴 BLOCK |
+| `SL040` | Illegal transition edge in the retro log | 🔴 BLOCK |
+| `SL041` | Transition chain not contiguous | 🔴 BLOCK |
+| `SL042` | Last logged transition disagrees with frontmatter status | 🔴 BLOCK |
+| `SL043` | Status is not `draft` but there is no retro log | 🔴 BLOCK |
+| `SL044` | `archived -> in-progress` logged with an empty reason | 🟠 WARN |
+| `SL050` | Link target does not resolve to an existing spec | 🔴 BLOCK |
+| `SL051` | One-sided link - inverse entry missing on the target | 🔴 BLOCK |
+| `SL052` | Self-link | 🔴 BLOCK |
+| `SL053` | Stored relation is `blocked-by` - an input alias, so the field was hand-edited | 🟠 WARN |
+| `SL054` | Duplicate entry in `linked_specs` | 🟠 WARN |
+
+Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
+so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
+(`SL011` - a measured field filled from memory). WARN is for a real problem that leaves the
+registry still truthful and is recoverable by re-running a command. There is no SUGGEST rule
+today; the section is still printed, per the taxonomy.
+
+### Output
+
+Read `~/.claude/skills/sd/sd-severity-taxonomy/SKILL.md` and
+`~/.claude/skills/sd/sd-evidence-citation/SKILL.md` before emitting the report, and follow them.
+This command has no `skills:` frontmatter - only agents load skills that way, and `validate`
+invokes no subagent - so the rules are read at runtime instead. If either file is unreadable, say
+so and fall back to plain PASS / FAIL lines rather than inventing a format.
+
+Structure: the taxonomy's mandated output, plus a per-spec summary table above it.
+
+```markdown
+# Spec lint: <N> spec(s) under `.specs/`
+
+**Verdict**: <N> 🔴 BLOCK, <N> 🟠 WARN, <N> 🟡 SUGGEST, <N> 🟢 PASS across <N> specs.
+
+| Spec | Status | Result |
+|---|---|---|
+| `FEAT-INV-2501` | in-progress | PASS |
+| `BUG-1247` | done | 2 findings (1 BLOCK, 1 WARN) |
+
+## 🔴 BLOCK
+
+### B1: `id` does not match folder name
+- **File:line**: `.specs/BUG-1247/00-spec.md:2`
+- **Rule**: `SL003`
+- **Finding**: Frontmatter declares `id: BUG-1246` but the folder is `BUG-1247`. `show` and
+  `link` resolve by folder, `list` renders the frontmatter - so the two disagree about what
+  this spec is called.
+- **Suggested direction**: Decide which ID is real, then fix the other side and the index row.
+```
+
+Citation rules for this command, applying `sd-evidence-citation`:
+
+- Every finding cites `file:line`, relative to the project root.
+- A finding about something **absent** (a missing artifact, a missing inverse link) has no line
+  of its own. Cite the line that **creates the obligation** - e.g. for `SL020`, the `status:`
+  line whose value requires the artifact - and name the absent path in the finding text. Never
+  cite a bare directory: the skill rejects it, and the obligation line is the better evidence.
+- Tree-wide findings (`SL031` / `SL032` / `SL033`) cite `.specs/index.md:<row>` where a row
+  exists, and `.specs/<ID>/00-spec.md:1` for an orphan folder that has no row to point at.
+- A clean tree prints the summary table with every spec `PASS`, and `_No findings._` under each
+  of the four severity sections. Do not omit the empty sections.
 
 ### Index <-> folder symmetry
 
@@ -309,16 +391,20 @@ Two token forms with opposite rules. Both live in `00-spec.md`.
 | `<<PHASE-N: description>>` | Phase-deferred. MUST NOT be pre-filled - the workflow's Phase N fills it from measured evidence. | Phase N of the owning workflow |
 
 The reference set of phase-deferred tokens for a type is the `<<PHASE-N: ...>>` tokens in
-`~/.claude/templates/sd/specs/<type>.template.md`. If that template is unreadable, report the
-placeholder checks as SKIPPED for that spec - never silently pass them.
+`~/.claude/templates/sd/specs/<type>.template.md`. If that template is unreadable, raise `SL013`
+and skip only the placeholder checks for that spec - never silently pass them.
 
 Rules:
 - status >= `approved` -> no author-fill `<<...>>` token remains. Phase-deferred tokens are
   exempt and are NOT a failure.
-- status in {`draft`, `approved`} -> every reference `<<PHASE-N: ...>>` token MUST still be
-  present verbatim. A filled-in phase-deferred field at these states is a failure: it means the
-  value was written from memory rather than measured. This is the check that makes the
-  cross-phase discipline enforceable rather than advisory.
+- status in {`draft`, `approved`} -> for each phase `N`, the spec MUST carry at least as many
+  `<<PHASE-N: ...>>` tokens as the template does. A filled-in phase-deferred field at these
+  states is a failure: it means the value was written from memory rather than measured. This is
+  the check that makes the cross-phase discipline enforceable rather than advisory.
+
+  Match on the `<<PHASE-N:` prefix and count per phase - do NOT require the description text to
+  match the template verbatim. Filling a field deletes its token, which the count catches;
+  trimming an example out of a token's description is not pre-filling and must not fail.
 - status == `in-progress` -> no assertion either way. The lifecycle records status, not which
   phase is current, so a phase-deferred token may legitimately be filled or unfilled. This is a
   known blind spot, not an oversight: narrowing it would mean tracking phase in frontmatter.

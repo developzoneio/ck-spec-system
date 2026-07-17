@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+
+  "project": {
+    "name": "spec-lint-fixture-clean",
+    "description": "Fixture: a .specs/ tree that /sd:spec validate must report as all-PASS",
+    "owner": "specwright",
+    "repo": "https://github.com/Developzone/specwright"
+  },
+
+  "spec": {
+    "dir": ".specs",
+    "indexFile": ".specs/index.md",
+    "constitutionFile": ".specs/constitution.md",
+    "prefixes": {
+      "feature": "FEAT",
+      "bug": "BUG",
+      "refactor": "REF",
+      "perf": "PERF",
+      "rca": "RCA"
+    },
+    "lifecycle": ["draft", "approved", "in-progress", "done", "archived"],
+    "archiveAfterDays": 90
+  }
+}
