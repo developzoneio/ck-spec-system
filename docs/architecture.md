@@ -89,7 +89,7 @@ Each subagent has a focused role, a minimal tool allowlist, and a model assignme
 |---|---|---|---|
 | `sd-spec-architect` | sonnet | Read/Write/Edit + Grep/Glob + Atlassian + Context7 | Authors specs, plans, tasks. Constitution-aware. |
 | `sd-code-explorer` | haiku | Read/Grep/Glob + GitNexus | Read-only navigation. Every finding cites `file:line`. |
-| `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + MSSQL (SELECT only) + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
+| `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
 | `sd-implementer` | haiku | Read/Write/Edit/MultiEdit/Grep/Glob/Bash + Context7 | Executes ONE atomic task with scope discipline. |
 | `sd-reviewer` | sonnet | Read/Grep/Glob + sequential-thinking + GitNexus | Severity-tagged review (🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PASS). Cannot write. |
 | `sd-docs-writer` | sonnet | Read/Write/Glob/Grep + sd-evidence-citation | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
@@ -306,7 +306,7 @@ specwright is built around a small set of MCP servers most useful for spec-drive
 |---|---|---|
 | `atlassian` | Fetch JIRA tickets for `<ID>` arguments + snapshot ticket / related tickets / linked Confluence pages | spec-architect, commands |
 | `gitnexus` | Fast symbol search, callers, call graph | code-explorer, debugger, reviewer |
-| `mssql` (SELECT/EXPLAIN only) | Inspect schema and query plans | debugger |
+| `database` (project-provided, e.g. `mssql`, `postgres`; SELECT/EXPLAIN only) | Inspect schema and query plans | debugger |
 
 The split exists because user-scope servers are generic (any project benefits from `context7`), while project-scope servers carry project-specific connection strings or credentials.
 

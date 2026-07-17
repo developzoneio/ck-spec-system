@@ -274,7 +274,7 @@ Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't for
 
 **Fix**: trigger a re-index from the GitNexus client. While indexing, code-explorer falls back to grep with a noted caveat.
 
-### MSSQL: "Cannot execute UPDATE / DELETE / INSERT"
+### Database: "Cannot execute UPDATE / DELETE / INSERT"
 
 **Cause**: this is the intended behavior. The debugger has read-only access by constitution.
 

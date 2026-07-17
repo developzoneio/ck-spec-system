@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Doc count/inventory drift (SW-1): `README.md` listed `/sd:setup` at no gates (`-` -> `2`, matching
+  the two approval gates in `commands/setup.md`) and omitted `sd-docs-writer` from
+  `sd-evidence-citation`'s "Used by" list (4 agents, not 3).
+- Stale `MSSQL` references in the docs, left over from the stack-agnostic database rename
+  (`mcp.mssql` -> `mcp.database`): `docs/architecture.md` listed a hardcoded MSSQL tool in
+  `sd-debugger`'s tool surface and an `mssql` server in the project-scope MCP table; `README.md`
+  named MSSQL in the MCP-friendly summary and the MCP table; `docs/troubleshooting.md` had an
+  MSSQL-titled section. All now describe the project-provided database MCP, matching
+  `agents/debugger.md` and `templates/project-config.template.json`. Addresses `REVIEW-TODO.md`
+  item 5's doc half; the `agents/debugger.md` body-vs-allowlist defect it also names remains open.
+
 ## [1.4.0] - 2026-07-05
 
 ### Added

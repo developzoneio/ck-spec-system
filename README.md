@@ -32,7 +32,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
 | **6 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline` |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
-| **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily |
+| **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, your project's database MCP, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
 | **Cost-aware** | Sonnet for reasoning, Haiku for execution. Typical feature run ~$2-3 |
 
@@ -96,7 +96,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:spec <subcommand>` | Utility | - | Spec registry: list, show, status, link, archive, revive, search, validate, stats |
 | `/sd:explore <target-or-query>` | Utility | - | Read-only code navigation, single subagent call, optional save |
 | `/sd:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |
-| `/sd:setup` | Utility | - | Idempotent project scaffold (interactive) |
+| `/sd:setup` | Utility | 2 | Idempotent project scaffold (interactive) |
 | `/sd:release [version]` | Utility | 1 | Release notes from `done` specs -> Keep-a-Changelog sections, then archive them |
 | `/sd:adr <spec-ID \| "decision title">` | Utility | 1 | Author an ADR from a spec's decisions under `.specs/_adr/` |
 
@@ -126,7 +126,7 @@ Skills are shared markdown rules that agents reference via frontmatter. They liv
 | `sd-severity-taxonomy` | `sd-reviewer` | BLOCK / WARN / SUGGEST / PASS severity rules and the mandatory review output format. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate-and-verify protocol with the 5 mental models, score formula, and proximate-vs-root "why" ladder. |
 | `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The atomic task block (9 required fields + `Pattern refs`), canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
-| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
+| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |
 
@@ -221,7 +221,7 @@ Full architecture: [`docs/architecture.md`](docs/architecture.md).
 | **Context7** | `sd-spec-architect`, `sd-implementer`, `sd-debugger` | Pull current library docs (no stale training-data examples) |
 | **sequential-thinking** | `sd-debugger`, `sd-reviewer` | Structured hypothesis enumeration and verification |
 | **GitNexus** | `sd-code-explorer`, `sd-debugger`, `sd-reviewer` | Fast symbol search, callers, call graph |
-| **MSSQL** | `sd-debugger` (SELECT/EXPLAIN only) | Inspect schema and query plans during investigation |
+| **Database** (project-provided, e.g. `mssql`, `postgres`) | `sd-debugger` (SELECT/EXPLAIN only) | Inspect schema and query plans during investigation |
 | **Playwright** | optional | E2E reproduction for `/sd:bug` |
 | **Tavily** | `sd-debugger` | Web search for error signatures / library issues |
 
