@@ -1,0 +1,175 @@
+{
+  "$comment": [
+    "Canonical inventory contract for specwright. Read by scripts/validate.ps1 and",
+    "scripts/validate.sh (Check 7: docs consistency).",
+    "",
+    "This file stores NO counts. Counts are derived from the globs below at runtime, so",
+    "adding a command/agent/skill means adding the file and nothing else. A manifest that",
+    "hardcoded numbers would become a third place to update and would reintroduce exactly",
+    "the drift this check exists to prevent.",
+    "",
+    "Each area declares EITHER a 'glob' or an explicit 'files' list, never both.",
+    "Glob semantics: matches FILES only (directories are never counted), non-recursive,",
+    "with '*' matching one path segment. Supported by bash globbing and PowerShell",
+    "Get-ChildItem alike - do not introduce '**' without teaching both validators.",
+    "",
+    "Regex semantics: patterns must be valid in BOTH POSIX ERE (bash [[ =~ ]]) and .NET",
+    "(PowerShell Select-String). Use [0-9] not \\d, no lookarounds, and do not escape",
+    "backticks. Exactly one capture group, wrapping the number under test."
+  ],
+
+  "areas": {
+    "commands": {
+      "glob": "commands/*.md",
+      "installTo": "commands/sd/",
+      "description": "Slash command workflow definitions"
+    },
+    "agents": {
+      "glob": "agents/*.md",
+      "installTo": "agents/sd/",
+      "description": "Subagent prompt files"
+    },
+    "skills": {
+      "glob": "skills/*/SKILL.md",
+      "installTo": "skills/sd/",
+      "description": "Reusable rule packs, one folder per skill"
+    },
+    "hooksPowerShell": {
+      "glob": "hooks/powershell/*.ps1",
+      "installTo": "hooks/sd/",
+      "description": "Hook scripts installed on Windows"
+    },
+    "hooksBash": {
+      "glob": "hooks/bash/*.sh",
+      "installTo": "hooks/sd/",
+      "description": "Hook scripts installed on Unix. Hook-pair parity (Check 3) already asserts this equals hooksPowerShell."
+    },
+    "templatesSetup": {
+      "glob": "templates/*",
+      "installTo": "templates/sd/",
+      "description": "Top-level setup templates. NOT a *.md glob - 2 of the 4 are .json."
+    },
+    "templatesSpec": {
+      "glob": "templates/specs/*",
+      "installTo": "templates/sd/specs/",
+      "description": "Per-workflow spec templates"
+    },
+    "workflowCommands": {
+      "files": [
+        "commands/feature.md",
+        "commands/bug.md",
+        "commands/rca.md",
+        "commands/refactor.md",
+        "commands/perf.md"
+      ],
+      "installTo": "commands/sd/",
+      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 5 of the 11'; the validators also assert each file exists."
+    }
+  },
+
+  "derived": {
+    "templatesTotal": ["templatesSetup", "templatesSpec"],
+    "installTotal": [
+      "commands",
+      "agents",
+      "skills",
+      "hooksPowerShell",
+      "templatesSetup",
+      "templatesSpec"
+    ]
+  },
+
+  "historicalExclusions": [
+    "docs/history/",
+    "docs/superpowers/",
+    "CHANGELOG.md",
+    "_bmad/",
+    "_bmad-output/",
+    "design-artifacts/",
+    "node_modules/",
+    ".claude/"
+  ],
+
+  "$exclusionsComment": [
+    "These paths intentionally contain superseded counts ('10 commands / 5 agents') as a",
+    "past-state record. They are excluded from the undeclared-claim scan and must never be",
+    "'fixed' to match current disk state. CHANGELOG.md is historical by definition.",
+    "The remaining entries are untracked/vendored noise, not documentation."
+  ],
+
+  "claimPhrases": [
+    "[0-9]+ slash commands",
+    "[0-9]+ workflow (commands|definitions)",
+    "[0-9]+ (specialized )?subagents",
+    "[0-9]+ subagent (definitions|prompt files)",
+    "[0-9]+ specialist agents",
+    "[0-9]+ (cross-platform )?hooks",
+    "[0-9]+ (PowerShell|bash) hooks",
+    "[0-9]+ (cross-platform )?hook scripts",
+    "[0-9]+ (setup|spec) templates",
+    "[0-9]+ templates",
+    "[0-9]+ (reusable )?skills",
+    "[0-9]+ (reusable )?rule packs"
+  ],
+
+  "$claimPhrasesComment": [
+    "Vocabulary of what an inventory claim looks like. Any line in a tracked .md file that",
+    "matches one of these but is NOT covered by a docClaims entry below fails Check 7 as an",
+    "undeclared claim. This is what keeps docClaims canonical: a new doc that publishes a",
+    "number cannot silently escape the check. Files under historicalExclusions are skipped."
+  ],
+
+  "docClaims": [
+    { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) slash commands\\*\\* \\|", "equals": "commands" },
+    { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) specialized subagents\\*\\* \\|", "equals": "agents" },
+    { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) cross-platform hooks\\*\\* \\|", "equals": "hooksPowerShell" },
+    { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) templates\\*\\* \\|", "equals": "templatesTotal" },
+    { "file": "README.md", "pattern": "templates\\*\\* \\| ([0-9]+) setup templates", "equals": "templatesSetup" },
+    { "file": "README.md", "pattern": "setup templates \\+ ([0-9]+) spec templates", "equals": "templatesSpec" },
+    { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) reusable skills\\*\\* \\|", "equals": "skills" },
+
+    { "file": "CLAUDE.md", "pattern": "commands/sd/` \\| ([0-9]+) slash commands", "equals": "commands" },
+    { "file": "CLAUDE.md", "pattern": "agents/sd/` \\| ([0-9]+) subagents", "equals": "agents" },
+    { "file": "CLAUDE.md", "pattern": "hooks/sd/` \\| ([0-9]+) hooks ", "equals": "hooksPowerShell" },
+    { "file": "CLAUDE.md", "pattern": "templates/sd/` \\| ([0-9]+) setup templates", "equals": "templatesSetup" },
+    { "file": "CLAUDE.md", "pattern": "setup templates \\+ ([0-9]+) spec templates in", "equals": "templatesSpec" },
+    { "file": "CLAUDE.md", "pattern": "skills/sd/` \\| ([0-9]+) rule packs", "equals": "skills" },
+
+    { "file": "CONTRIBUTING.md", "pattern": "^ +commands/ +# ([0-9]+) slash commands", "equals": "commands" },
+    { "file": "CONTRIBUTING.md", "pattern": "^ +agents/ +# ([0-9]+) subagent definitions", "equals": "agents" },
+    { "file": "CONTRIBUTING.md", "pattern": "^ +powershell/ +# ([0-9]+) PowerShell hooks", "equals": "hooksPowerShell" },
+    { "file": "CONTRIBUTING.md", "pattern": "^ +bash/ +# ([0-9]+) bash hooks", "equals": "hooksBash" },
+    { "file": "CONTRIBUTING.md", "pattern": "^ +templates/ +# ([0-9]+) setup templates", "equals": "templatesSetup" },
+    { "file": "CONTRIBUTING.md", "pattern": "^ +specs/ +# ([0-9]+) spec templates", "equals": "templatesSpec" },
+
+    { "file": "install/README.md", "pattern": "commands/sd/ +([0-9]+) slash commands", "equals": "commands" },
+    { "file": "install/README.md", "pattern": "agents/sd/ +([0-9]+) subagent definitions", "equals": "agents" },
+    { "file": "install/README.md", "pattern": "hooks/sd/ +([0-9]+) hook scripts", "equals": "hooksPowerShell" },
+    { "file": "install/README.md", "pattern": "templates/sd/ +([0-9]+) templates", "equals": "templatesTotal" },
+    { "file": "install/README.md", "pattern": "templates \\(([0-9]+) setup", "equals": "templatesSetup" },
+    { "file": "install/README.md", "pattern": "setup \\+ ([0-9]+) spec\\)", "equals": "templatesSpec" },
+    { "file": "install/README.md", "pattern": "skills/sd/ +([0-9]+) skills", "equals": "skills" },
+    { "file": "install/README.md", "pattern": "^\\| `commands/` \\| `commands/sd/` \\| ([0-9]+) \\|", "equals": "commands" },
+    { "file": "install/README.md", "pattern": "^\\| `agents/` \\| `agents/sd/` \\| ([0-9]+) \\|", "equals": "agents" },
+    { "file": "install/README.md", "pattern": "^\\| `hooks/powershell/`.*\\| ([0-9]+) \\|", "equals": "hooksPowerShell" },
+    { "file": "install/README.md", "pattern": "^\\| `hooks/bash/`.*\\| ([0-9]+) \\|", "equals": "hooksBash" },
+    { "file": "install/README.md", "pattern": "`templates/sd/` \\| ([0-9]+) \\+ [0-9]+ \\|", "equals": "templatesSetup" },
+    { "file": "install/README.md", "pattern": "`templates/sd/` \\| [0-9]+ \\+ ([0-9]+) \\|", "equals": "templatesSpec" },
+    { "file": "install/README.md", "pattern": "^\\| `skills/` \\| `skills/sd/` \\| ([0-9]+) \\|", "equals": "skills" },
+    { "file": "install/README.md", "pattern": "\\*\\*Total\\*\\*: ([0-9]+) files per OS", "equals": "installTotal" },
+
+    { "file": "docs/architecture.md", "pattern": "commands/sd/ +([0-9]+) workflow definitions", "equals": "commands" },
+    { "file": "docs/architecture.md", "pattern": "agents/sd/ +([0-9]+) subagent prompt files", "equals": "agents" },
+    { "file": "docs/architecture.md", "pattern": "hooks/sd/ +([0-9]+) cross-platform hook scripts", "equals": "hooksPowerShell" },
+    { "file": "docs/architecture.md", "pattern": "templates/sd/ +([0-9]+) setup \\+", "equals": "templatesSetup" },
+    { "file": "docs/architecture.md", "pattern": "setup \\+ ([0-9]+) spec templates", "equals": "templatesSpec" },
+    { "file": "docs/architecture.md", "pattern": "skills/sd/ +([0-9]+) reusable rule packs", "equals": "skills" },
+    { "file": "docs/architecture.md", "pattern": "lists all ([0-9]+) commands", "equals": "commands" },
+    { "file": "docs/architecture.md", "pattern": "^The ([0-9]+) workflow commands have these gate counts", "equals": "workflowCommands" },
+
+    { "file": "commands/setup.md", "pattern": "commands/sd/ +\\(([0-9]+) workflow commands\\)", "equals": "commands" },
+    { "file": "commands/setup.md", "pattern": "agents/sd/ +\\(([0-9]+) specialist agents\\)", "equals": "agents" },
+    { "file": "commands/setup.md", "pattern": "hooks/sd/ +\\(([0-9]+) hooks\\)", "equals": "hooksPowerShell" },
+    { "file": "commands/setup.md", "pattern": "skills/sd/ +\\(([0-9]+) skills:", "equals": "skills" }
+  ]
+}

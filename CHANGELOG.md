@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `specwright.manifest.json` (SW-3): canonical inventory contract declaring where assets live
+  (`areas`) and where the docs publish numbers about them (`docClaims`). Stores no counts - they
+  are derived from disk at runtime, so adding a command/agent/skill/template means adding the file
+  and nothing else.
+- Check 7 (docs consistency) in `scripts/validate.{ps1,sh}`: fails the build when a published
+  number disagrees with disk. Also fails on a *vacuous* claim (a pattern that matches nothing, i.e.
+  a reworded doc that silently disabled its own check) and on an *undeclared* claim (a number no
+  `docClaims` entry covers). Closes the gap that let SW-1's drift reach `main` with CI green.
+- `scripts/selftest-docs.{ps1,sh}`: negative self-test proving Check 7 still bites, by corrupting a
+  throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
+
 ### Fixed
 - Doc count/inventory drift (SW-1): `README.md` listed `/sd:setup` at no gates (`-` -> `2`, matching
   the two approval gates in `commands/setup.md`) and omitted `sd-docs-writer` from

@@ -40,6 +40,19 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke-hooks.ps1
 
+      # --- Docs-consistency self-test: the validator above proves the docs are
+      # right; this proves the validator would NOTICE if they were wrong. Without
+      # it, a Check 7 that rotted into a no-op would still report green ---------
+      - name: Docs-consistency self-test (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/selftest-docs.sh
+
+      - name: Docs-consistency self-test (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/selftest-docs.ps1
+
       # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
       - name: Install -> uninstall round-trip (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'

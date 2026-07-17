@@ -10,6 +10,8 @@
 #   5. Install-target count: a real install to a temp base lands the expected
 #      file counts under each <area>/sd/ subfolder.
 #   6. CHANGELOG gate: the [Unreleased] section is non-empty.
+#   7. Docs consistency: published numbers in the docs match disk, per
+#      specwright.manifest.json.
 #
 # Exit 0 = all checks passed; 1 = at least one failed.
 
@@ -64,7 +66,7 @@ echo "  Repo root: $repo_root"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-section "Check 1/6: Pure-ASCII scan (*.ps1)"
+section "Check 1/7: Pure-ASCII scan (*.ps1)"
 ascii_bad=0
 ps1_count=0
 while IFS= read -r -d '' f; do
@@ -81,7 +83,7 @@ if [[ $ascii_bad -eq 0 ]]; then ok "$ps1_count .ps1 file(s) are pure ASCII"; fi
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-section "Check 2/6: bash -n syntax (*.sh)"
+section "Check 2/7: bash -n syntax (*.sh)"
 syn_bad=0
 sh_count=0
 while IFS= read -r -d '' f; do
@@ -98,7 +100,7 @@ if [[ $syn_bad -eq 0 ]]; then ok "$sh_count .sh file(s) pass bash -n"; fi
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-section "Check 3/6: Hook-pair parity"
+section "Check 3/7: Hook-pair parity"
 parity_bad=0
 ps_count=0
 for psf in "$repo_root"/hooks/powershell/*.ps1; do
@@ -124,7 +126,7 @@ if [[ $parity_bad -eq 0 ]]; then ok "$ps_count hook pair(s) present on both plat
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-section "Check 4/6: Agent model aliases"
+section "Check 4/7: Agent model aliases"
 model_bad=0
 agent_count=0
 for af in "$repo_root"/agents/*.md; do
@@ -152,7 +154,7 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-section "Check 5/6: Install-target counts"
+section "Check 5/7: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
 cleanup_tmp() { [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true; }
@@ -183,7 +185,7 @@ trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/6: CHANGELOG [Unreleased] gate"
+section "Check 6/7: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
@@ -204,6 +206,146 @@ elif printf '%s\n' "$next_header" \
 else
     fail "[Unreleased] section is empty (add a changelog entry)"
     add_failure "changelog: [Unreleased] empty"
+fi
+
+# ---- Check 7: docs consistency ---------------------------------------------
+
+section "Check 7/7: Docs consistency (published numbers vs disk)"
+manifest="$repo_root/specwright.manifest.json"
+if [[ ! -f "$manifest" ]]; then
+    fail "specwright.manifest.json not found at repo root"
+    add_failure "docs: manifest missing"
+elif ! command -v jq >/dev/null 2>&1; then
+    # Hooks exit 0 silently when jq is absent so they never block a user on their own
+    # bugs. A validator must do the opposite: a missing jq that passed would turn CI
+    # green while checking nothing.
+    fail "jq is required to parse specwright.manifest.json - install jq"
+    add_failure "docs: jq not installed"
+else
+    docs_bad=0
+    declare -A quantities=()
+    declare -A file_patterns=()
+
+    # Some jq builds (notably jq.exe on Windows) emit CRLF. An unstripped \r rides on the
+    # last field of every record and silently breaks glob matches, array keys and prefix
+    # tests - failures that look like real drift but are not.
+    mjq() { jq -r "$1" "$manifest" | tr -d '\r'; }
+
+    # Area counts are derived from disk, never stored in the manifest.
+    shopt -s nullglob
+    while IFS=$'\t' read -r area_name area_kind area_value; do
+        area_count=0
+        if [[ "$area_kind" == "glob" ]]; then
+            for p in "$repo_root"/$area_value; do
+                [[ -f "$p" ]] && area_count=$((area_count + 1))
+            done
+        else
+            for rel_f in $area_value; do
+                if [[ -f "$repo_root/$rel_f" ]]; then
+                    area_count=$((area_count + 1))
+                else
+                    fail "area '$area_name' lists a file that does not exist: $rel_f"
+                    add_failure "docs: area $area_name missing $rel_f"
+                    docs_bad=$((docs_bad + 1))
+                fi
+            done
+        fi
+        if [[ $area_count -eq 0 ]]; then
+            fail "area '$area_name' ($area_kind '$area_value') matched 0 files"
+            add_failure "docs: area $area_name derived 0"
+            docs_bad=$((docs_bad + 1))
+        fi
+        quantities["$area_name"]=$area_count
+    done < <(mjq '.areas | to_entries[] | "\(.key)\t\(if .value.glob then "glob" else "files" end)\t\(.value.glob // (.value.files | join(" ")))"')
+    shopt -u nullglob
+
+    while IFS=$'\t' read -r der_name der_parts; do
+        der_total=0
+        for part in $der_parts; do
+            der_total=$((der_total + ${quantities["$part"]:-0}))
+        done
+        quantities["$der_name"]=$der_total
+    done < <(mjq '.derived | to_entries[] | "\(.key)\t\(.value | join(" "))"')
+
+    while IFS=$'\t' read -r c_file c_pattern c_equals; do
+        file_patterns["$c_file"]="${file_patterns["$c_file"]:-}${c_pattern}"$'\n'
+
+        target="$repo_root/$c_file"
+        if [[ ! -f "$target" ]]; then
+            fail "$c_file : declared claim file does not exist"
+            add_failure "docs: missing claim file $c_file"
+            docs_bad=$((docs_bad + 1))
+            continue
+        fi
+        expected="${quantities["$c_equals"]:-}"
+        if [[ -z "$expected" ]]; then
+            fail "$c_file : claim references unknown quantity '$c_equals'"
+            add_failure "docs: unknown quantity $c_equals"
+            docs_bad=$((docs_bad + 1))
+            continue
+        fi
+
+        hits=0
+        lineno=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            lineno=$((lineno + 1))
+            if [[ "$line" =~ $c_pattern ]]; then
+                hits=$((hits + 1))
+                found="${BASH_REMATCH[1]}"
+                if [[ "$found" != "$expected" ]]; then
+                    fail "$c_file:$lineno : says $found, disk has $expected ($c_equals)"
+                    add_failure "docs: $c_file:$lineno $c_equals says $found not $expected"
+                    docs_bad=$((docs_bad + 1))
+                fi
+            fi
+        done < "$target"
+
+        # A pattern that matches nothing is a rotted regex, not a pass - without this
+        # a reworded doc sentence silently turns the claim into a no-op.
+        if [[ $hits -eq 0 ]]; then
+            fail "$c_file : pattern matched no lines (reworded?): $c_pattern"
+            add_failure "docs: vacuous claim in $c_file ($c_equals)"
+            docs_bad=$((docs_bad + 1))
+        fi
+    done < <(mjq '.docClaims[] | "\(.file)\t\(.pattern)\t\(.equals)"')
+
+    # Undeclared-claim scan: any line that looks like an inventory claim but is not
+    # covered by a docClaims entry. This is what keeps the manifest canonical - a new
+    # doc cannot publish a number that nothing checks.
+    phrases_re="$(mjq '.claimPhrases | join("|")')"
+    mapfile -t exclusions < <(mjq '.historicalExclusions[]')
+
+    while IFS= read -r -d '' f; do
+        rel="${f#"$repo_root"/}"
+        skip=0
+        for ex in "${exclusions[@]}"; do
+            if [[ "$rel" == "$ex"* ]]; then skip=1; break; fi
+        done
+        [[ $skip -eq 1 ]] && continue
+
+        lineno=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            lineno=$((lineno + 1))
+            [[ "$line" =~ $phrases_re ]] || continue
+            covered=0
+            if [[ -n "${file_patterns["$rel"]:-}" ]]; then
+                while IFS= read -r pat; do
+                    [[ -z "$pat" ]] && continue
+                    if [[ "$line" =~ $pat ]]; then covered=1; break; fi
+                done <<< "${file_patterns["$rel"]}"
+            fi
+            if [[ $covered -eq 0 ]]; then
+                fail "$rel:$lineno : undeclared inventory claim (add a docClaims entry or an exclusion)"
+                add_failure "docs: undeclared claim $rel:$lineno"
+                docs_bad=$((docs_bad + 1))
+            fi
+        done < "$f"
+    done < <(find "$repo_root" -type f -name '*.md' -not -path '*/.git/*' -print0)
+
+    if [[ $docs_bad -eq 0 ]]; then
+        claim_total="$(mjq '.docClaims | length')"
+        ok "$claim_total published claim(s) match disk; no undeclared claims"
+    fi
 fi
 
 # ---- summary ---------------------------------------------------------------

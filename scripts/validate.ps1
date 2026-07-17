@@ -13,6 +13,8 @@
       5. Install-target count: a real install to a temp base lands the expected
          file counts under each <area>/sd/ subfolder.
       6. CHANGELOG gate: the [Unreleased] section is non-empty.
+      7. Docs consistency: published numbers in the docs match disk, per
+         specwright.manifest.json.
 
     Exit code 0 = all checks passed; 1 = at least one check failed.
 
@@ -119,7 +121,7 @@ Write-Host "  Repo root: $repoRoot"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-Write-Section 'Check 1/6: Pure-ASCII scan (*.ps1)'
+Write-Section 'Check 1/7: Pure-ASCII scan (*.ps1)'
 $ps1Files = Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
     Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 $asciiBad = 0
@@ -136,7 +138,7 @@ if ($asciiBad -eq 0) { Write-Ok "$($ps1Files.Count) .ps1 file(s) are pure ASCII"
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-Write-Section 'Check 2/6: bash -n syntax (*.sh)'
+Write-Section 'Check 2/7: bash -n syntax (*.sh)'
 $shFiles = @()
 foreach ($sub in @('hooks\bash', 'install', 'scripts')) {
     $dir = Join-Path $repoRoot $sub
@@ -164,7 +166,7 @@ if ($null -eq $bashExe) {
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-Write-Section 'Check 3/6: Hook-pair parity'
+Write-Section 'Check 3/7: Hook-pair parity'
 $psHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File |
     ForEach-Object { $_.BaseName }
 $shHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\bash') -Filter *.sh -File |
@@ -188,7 +190,7 @@ if ($parityBad -eq 0) { Write-Ok "$($psHooks.Count) hook pair(s) present on both
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-Write-Section 'Check 4/6: Agent model aliases'
+Write-Section 'Check 4/7: Agent model aliases'
 $agentFiles = Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File
 $modelBad = 0
 foreach ($f in $agentFiles) {
@@ -211,7 +213,7 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-Write-Section 'Check 5/6: Install-target counts'
+Write-Section 'Check 5/7: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
 $psExe = (Get-Process -Id $PID).Path
@@ -255,7 +257,7 @@ try {
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/6: CHANGELOG [Unreleased] gate'
+Write-Section 'Check 6/7: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -283,6 +285,140 @@ if ($start -lt 0) {
     } else {
         Write-FailMsg '[Unreleased] section is empty (add a changelog entry)'
         Add-Failure 'changelog: [Unreleased] empty'
+    }
+}
+
+# ---- Check 7: docs consistency ---------------------------------------------
+
+Write-Section 'Check 7/7: Docs consistency (published numbers vs disk)'
+$manifestPath = Join-Path $repoRoot 'specwright.manifest.json'
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+    Write-FailMsg 'specwright.manifest.json not found at repo root'
+    Add-Failure 'docs: manifest missing'
+} else {
+    $docsBad = 0
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $quantities = @{}
+    $filePatterns = @{}
+
+    # Area counts are derived from disk, never stored in the manifest.
+    foreach ($areaProp in $manifest.areas.PSObject.Properties) {
+        $areaName = $areaProp.Name
+        $area = $areaProp.Value
+        $areaCount = 0
+        if ($area.glob) {
+            $globPath = Join-Path $repoRoot ($area.glob -replace '/', '\')
+            $areaCount = @(Get-ChildItem -Path $globPath -File -ErrorAction SilentlyContinue).Count
+        } else {
+            foreach ($relFile in $area.files) {
+                $full = Join-Path $repoRoot ($relFile -replace '/', '\')
+                if (Test-Path -LiteralPath $full -PathType Leaf) {
+                    $areaCount++
+                } else {
+                    Write-FailMsg "area '$areaName' lists a file that does not exist: $relFile"
+                    Add-Failure "docs: area $areaName missing $relFile"
+                    $docsBad++
+                }
+            }
+        }
+        if ($areaCount -eq 0) {
+            Write-FailMsg "area '$areaName' matched 0 files"
+            Add-Failure "docs: area $areaName derived 0"
+            $docsBad++
+        }
+        $quantities[$areaName] = $areaCount
+    }
+
+    foreach ($derProp in $manifest.derived.PSObject.Properties) {
+        $derTotal = 0
+        foreach ($part in $derProp.Value) {
+            if ($quantities.ContainsKey($part)) { $derTotal += [int]$quantities[$part] }
+        }
+        $quantities[$derProp.Name] = $derTotal
+    }
+
+    foreach ($claim in $manifest.docClaims) {
+        if (-not $filePatterns.ContainsKey($claim.file)) {
+            $filePatterns[$claim.file] = New-Object System.Collections.Generic.List[string]
+        }
+        $filePatterns[$claim.file].Add($claim.pattern)
+
+        $target = Join-Path $repoRoot ($claim.file -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            Write-FailMsg "$($claim.file) : declared claim file does not exist"
+            Add-Failure "docs: missing claim file $($claim.file)"
+            $docsBad++
+            continue
+        }
+        if (-not $quantities.ContainsKey($claim.equals)) {
+            Write-FailMsg "$($claim.file) : claim references unknown quantity '$($claim.equals)'"
+            Add-Failure "docs: unknown quantity $($claim.equals)"
+            $docsBad++
+            continue
+        }
+        $expected = "$($quantities[$claim.equals])"
+
+        $hits = 0
+        $lineNo = 0
+        foreach ($line in (Get-Content -LiteralPath $target)) {
+            $lineNo++
+            # [regex] rather than -match: PowerShell's -match is case-insensitive by
+            # default, which would silently diverge from the bash twin's [[ =~ ]].
+            $m = [regex]::Match($line, $claim.pattern)
+            if ($m.Success) {
+                $hits++
+                $found = $m.Groups[1].Value
+                if ($found -ne $expected) {
+                    Write-FailMsg "$($claim.file):$lineNo : says $found, disk has $expected ($($claim.equals))"
+                    Add-Failure "docs: $($claim.file):$lineNo $($claim.equals) says $found not $expected"
+                    $docsBad++
+                }
+            }
+        }
+
+        # A pattern that matches nothing is a rotted regex, not a pass - without this
+        # a reworded doc sentence silently turns the claim into a no-op.
+        if ($hits -eq 0) {
+            Write-FailMsg "$($claim.file) : pattern matched no lines (reworded?): $($claim.pattern)"
+            Add-Failure "docs: vacuous claim in $($claim.file) ($($claim.equals))"
+            $docsBad++
+        }
+    }
+
+    # Undeclared-claim scan: any line that looks like an inventory claim but is not
+    # covered by a docClaims entry. This is what keeps the manifest canonical - a new
+    # doc cannot publish a number that nothing checks.
+    $phrasesRe = ($manifest.claimPhrases) -join '|'
+    $mdFiles = Get-ChildItem -Path $repoRoot -Recurse -Filter *.md -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
+    foreach ($f in $mdFiles) {
+        $rel = (Get-RelPath $f.FullName) -replace '\\', '/'
+        $skip = $false
+        foreach ($ex in $manifest.historicalExclusions) {
+            if ($rel.StartsWith($ex)) { $skip = $true; break }
+        }
+        if ($skip) { continue }
+
+        $lineNo = 0
+        foreach ($line in (Get-Content -LiteralPath $f.FullName)) {
+            $lineNo++
+            if (-not [regex]::IsMatch($line, $phrasesRe)) { continue }
+            $covered = $false
+            if ($filePatterns.ContainsKey($rel)) {
+                foreach ($pat in $filePatterns[$rel]) {
+                    if ([regex]::IsMatch($line, $pat)) { $covered = $true; break }
+                }
+            }
+            if (-not $covered) {
+                Write-FailMsg "${rel}:$lineNo : undeclared inventory claim (add a docClaims entry or an exclusion)"
+                Add-Failure "docs: undeclared claim ${rel}:$lineNo"
+                $docsBad++
+            }
+        }
+    }
+
+    if ($docsBad -eq 0) {
+        Write-Ok "$($manifest.docClaims.Count) published claim(s) match disk; no undeclared claims"
     }
 }
 

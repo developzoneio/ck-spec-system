@@ -1,0 +1,163 @@
+#requires -Version 5.1
+<#
+.SYNOPSIS
+    Negative self-test for validate.ps1 Check 7 (docs consistency), Windows.
+
+.DESCRIPTION
+    Mirror of scripts/selftest-docs.sh.
+
+    Check 7 only earns its place in CI if it FAILS when the docs lie. A check that
+    silently degrades into a no-op still reports success, so this test corrupts a
+    throwaway copy of the repo in three ways and asserts the validator catches each:
+
+      1. Clean copy               -> passes.
+      2. A wrong published number -> fails, naming the number and the truth.
+      3. A reworded claim         -> fails as vacuous (pattern matched no lines).
+      4. An undeclared new claim  -> fails as undeclared.
+
+    Scenarios 3 and 4 are what stop the check rotting: without them someone could
+    reword or add docs and quietly leave Check 7 guarding nothing.
+
+    Exit code 0 = the check behaves correctly; 1 = the check is broken.
+
+    PURE ASCII. Scanned by validate.ps1 Check 1.
+
+.EXAMPLE
+    .\scripts\selftest-docs.ps1
+#>
+
+param()
+
+$ErrorActionPreference = 'Stop'
+
+$scriptDir = $PSScriptRoot
+$repoRoot  = Split-Path -Parent $scriptDir
+
+function Write-Section { param([string]$Title) Write-Host ''; Write-Host "=== $Title ===" -ForegroundColor Cyan }
+function Write-Ok      { param([string]$m) Write-Host "  [OK]   $m" -ForegroundColor Green }
+function Write-FailMsg { param([string]$m) Write-Host "  [FAIL] $m" -ForegroundColor Red }
+
+$script:Failures = 0
+
+# Working dirs are throwaway copies - the real repo is never mutated.
+$SkipTop = @('.git', 'node_modules', '_bmad', '_bmad-output', 'design-artifacts', '.claude', 'dist')
+
+$workRoot = Join-Path $env:TEMP "sd-selftest-docs-$PID"
+$psExe = (Get-Process -Id $PID).Path
+
+function New-RepoCopy {
+    param([string]$Dest)
+    New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+    foreach ($entry in (Get-ChildItem -LiteralPath $repoRoot -Force)) {
+        if ($SkipTop -contains $entry.Name) { continue }
+        Copy-Item -LiteralPath $entry.FullName -Destination $Dest -Recurse -Force
+    }
+}
+
+function Edit-File {
+    param([string]$Path, [string]$From, [string]$To)
+    $text = Get-Content -LiteralPath $Path -Raw
+    $updated = $text -replace $From, $To
+    Set-Content -LiteralPath $Path -Value $updated -NoNewline
+    return ($updated -ne $text)
+}
+
+# Run the validator inside a copy and assert exit status + expected message.
+# ExpectPass -> exit 0 required; otherwise non-zero AND $Needle in the output.
+function Invoke-Case {
+    param(
+        [string]$Name,
+        [bool]$ExpectPass,
+        [string]$Needle,
+        [string]$Dir
+    )
+    $validator = Join-Path $Dir 'scripts\validate.ps1'
+    $out = & $psExe -NoProfile -ExecutionPolicy Bypass -File $validator 2>&1 | Out-String
+    $status = $LASTEXITCODE
+
+    if ($ExpectPass) {
+        if ($status -eq 0) {
+            Write-Ok "$Name : validator passed as expected"
+        } else {
+            Write-FailMsg "$Name : expected exit 0, got $status"
+            Write-Host $out
+            $script:Failures++
+        }
+        return
+    }
+
+    if ($status -eq 0) {
+        Write-FailMsg "$Name : expected non-zero exit, got 0 - THE CHECK DID NOT BITE"
+        $script:Failures++
+        return
+    }
+    if ($out.Contains($Needle)) {
+        Write-Ok "$Name : failed with the right reason (exit $status)"
+    } else {
+        # Non-zero for the wrong reason is not a pass - it would mask a broken check.
+        Write-FailMsg "$Name : exited $status but never said '$Needle'"
+        Write-Host $out
+        $script:Failures++
+    }
+}
+
+try {
+    if (Test-Path -LiteralPath $workRoot) { Remove-Item -Recurse -Force $workRoot }
+
+    Write-Section 'selftest: docs-consistency check (Check 7)'
+    Write-Host "  Repo root: $repoRoot"
+    Write-Host "  Sandbox:   $workRoot"
+
+    # ---- Scenario 1: clean copy passes -------------------------------------
+
+    Write-Section 'Scenario 1/4: clean copy passes'
+    $clean = Join-Path $workRoot 'clean'
+    New-RepoCopy -Dest $clean
+    Invoke-Case -Name 'clean' -ExpectPass $true -Needle '' -Dir $clean
+
+    # ---- Scenario 2: a wrong published number fails -------------------------
+
+    Write-Section 'Scenario 2/4: wrong README number fails'
+    $wrong = Join-Path $workRoot 'wrong-number'
+    New-RepoCopy -Dest $wrong
+    $planted = Edit-File -Path (Join-Path $wrong 'README.md') `
+        -From '\*\*11 slash commands\*\*' -To '**12 slash commands**'
+    if (-not $planted) {
+        Write-FailMsg 'fixture setup: could not plant the wrong number in README.md'
+        $script:Failures++
+    }
+    Invoke-Case -Name 'wrong-number' -ExpectPass $false -Needle 'says 12, disk has 11' -Dir $wrong
+
+    # ---- Scenario 3: a reworded claim fails as vacuous ----------------------
+
+    Write-Section 'Scenario 3/4: reworded claim fails as vacuous'
+    $reworded = Join-Path $workRoot 'reworded'
+    New-RepoCopy -Dest $reworded
+    $null = Edit-File -Path (Join-Path $reworded 'README.md') `
+        -From '\*\*11 slash commands\*\*' -To '**11 slash cmds**'
+    Invoke-Case -Name 'reworded' -ExpectPass $false -Needle 'pattern matched no lines' -Dir $reworded
+
+    # ---- Scenario 4: an undeclared claim fails ------------------------------
+
+    Write-Section 'Scenario 4/4: undeclared claim in a new doc fails'
+    $undeclared = Join-Path $workRoot 'undeclared'
+    New-RepoCopy -Dest $undeclared
+    Add-Content -LiteralPath (Join-Path $undeclared 'docs\usage.md') `
+        -Value "`nThe engine ships 99 reusable skills."
+    Invoke-Case -Name 'undeclared' -ExpectPass $false -Needle 'undeclared inventory claim' -Dir $undeclared
+
+    # ---- summary -----------------------------------------------------------
+
+    Write-Section 'Summary'
+    if ($script:Failures -eq 0) {
+        Write-Ok 'Check 7 bites on all 4 scenarios.'
+        exit 0
+    } else {
+        Write-FailMsg "$($script:Failures) scenario(s) behaved wrong - Check 7 is not trustworthy."
+        exit 1
+    }
+} finally {
+    if (Test-Path -LiteralPath $workRoot) {
+        Remove-Item -Recurse -Force $workRoot -ErrorAction SilentlyContinue
+    }
+}
