@@ -33,6 +33,10 @@ safe_id="$(printf '%s' "${session_id}" | tr -c 'A-Za-z0-9_-' '_')"
 
 # --- load config --------------------------------------------------------------
 
+# An empty object is a safe fallback HERE only because every value this hook
+# reads has a `//` default below, and those defaults are the same values as
+# $defaults in subagent-retro.ps1. Any new read must keep that property or the
+# fallback has to become a full default document, as it is in spec-gate.sh.
 config_path="${cwd}/.claude/project-config.json"
 config_json="{}"
 if [[ -f "${config_path}" ]] && jq -e . "${config_path}" >/dev/null 2>&1; then

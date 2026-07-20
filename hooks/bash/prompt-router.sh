@@ -35,6 +35,11 @@ fi
 
 # --- load config (defaults if missing) ---------------------------------------
 
+# An empty object is a safe fallback HERE only because every value this hook
+# reads has a `//` default below (and match_keywords has $default_list), and
+# those defaults are the same values as $defaults in prompt-router.ps1. Any new
+# read must keep that property or the fallback has to become a full default
+# document, as it is in spec-gate.sh.
 config_path="${cwd}/.claude/project-config.json"
 config_json="{}"
 if [[ -f "${config_path}" ]]; then

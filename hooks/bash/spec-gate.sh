@@ -44,8 +44,14 @@ fi
 
 # --- load config --------------------------------------------------------------
 
+# A project with no .claude/project-config.json (the normal state before
+# /sd:setup has run) must still get the built-in protected paths, so the
+# fallback is a full default document rather than an empty object. This must
+# stay byte-identical in meaning to $defaults in spec-gate.ps1.
+default_config='{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[".specs/constitution.md",".specs/index.md","LICENSE"]},"hooks":{"specGate":{"enabled":true,"mode":"warn"}}}'
+
 config_path="${cwd}/.claude/project-config.json"
-config_json="{}"
+config_json="${default_config}"
 if [[ -f "${config_path}" ]] && jq -e . "${config_path}" >/dev/null 2>&1; then
     config_json="$(cat "${config_path}")"
 fi

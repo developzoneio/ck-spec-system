@@ -65,6 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `spec-gate.sh` applied NO protected paths when `.claude/project-config.json` was absent or
+  unparseable (SW-5), while `spec-gate.ps1` applied its built-in defaults - so on a project that
+  had not run `/sd:setup` yet, the most common state there is, editing `.specs/constitution.md`
+  was blocked under PowerShell and silently allowed under bash. The bash fallback is now the same
+  full default document (`.specs/constitution.md`, `.specs/index.md`, `LICENSE` protected;
+  `mode: warn`) instead of `{}`. `Get-ProjectConfig` in all three PowerShell hooks now reads the
+  config with `-ErrorAction Stop`, since the script-wide `SilentlyContinue` preference could
+  otherwise turn a malformed config into a non-terminating error that skips the `catch` and
+  returns `$null` rather than the defaults. `prompt-router` and `subagent-retro` were checked for
+  the same asymmetry and have none - every value they read has a matching `//` default - which is
+  now stated in both scripts so a future read does not quietly reintroduce it.
 - Conformance decision objects were too coarse to prove much (SW-5). `spec-gate` decisions kept
   only `decision`/`permissionDecision` and threw away the human-readable `reason`, which the two
   implementations hand-duplicate - the reason strings could have drifted completely and all 20

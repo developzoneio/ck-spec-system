@@ -54,8 +54,14 @@ function Get-ProjectConfig {
 
     $cfgPath = Join-Path $Cwd '.claude/project-config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { return $defaults }
+    # -ErrorAction Stop is required: the script-wide SilentlyContinue preference
+    # would otherwise make a malformed config a NON-terminating error, so the
+    # catch never fires and the function returns $null instead of the defaults.
     try {
-        return (Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+        $loaded = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 -ErrorAction Stop |
+            ConvertFrom-Json -ErrorAction Stop
+        if ($null -eq $loaded) { return $defaults }
+        return $loaded
     } catch {
         return $defaults
     }
