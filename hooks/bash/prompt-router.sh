@@ -43,8 +43,8 @@ if [[ -f "${config_path}" ]]; then
     fi
 fi
 
-# Hook enabled? `//` treats explicit `false` as absent, so compare directly
-# against `false` instead of relying on the alternative operator here.
+# Hook enabled? The jq alternative operator treats an explicit `false` as
+# absent, so compare directly against `false` instead of relying on it here.
 enabled="$(printf '%s' "${config_json}" | jq -r 'if .hooks.userPromptRouter.enabled == false then "false" else "true" end' 2>/dev/null)"
 if [[ "${enabled}" == "false" ]]; then
     exit 0

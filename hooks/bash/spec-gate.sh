@@ -105,8 +105,9 @@ emit_block() {
 
 is_protected=0
 while IFS= read -r p; do
-    # Some jq builds (e.g. Windows jq.exe) emit CRLF for join-style output;
-    # strip a trailing CR so the comparison below isn't corrupted.
+    # Some jq builds (e.g. Windows jq.exe) emit CRLF when a filter yields
+    # multiple values, as this array iteration does; strip a trailing CR so
+    # the exact-match comparison below isn't corrupted.
     p="${p%$'\r'}"
     [[ -z "${p}" ]] && continue
     p_norm="${p//\\//}"
