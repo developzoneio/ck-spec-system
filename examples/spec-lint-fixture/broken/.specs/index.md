@@ -13,3 +13,8 @@ Active specs (auto-updated by /sd:spec status transitions):
 | FEAT-BROKEN-007 | feature | approved | 2026-07-06 | Add audit log |
 | BUG-BROKEN-008 | bug | draft | 2026-07-07 | Session expires early |
 | REF-BROKEN-009 | refactor | done | 2026-07-08 | Inline config reader |
+| BUG-BROKEN-010 | feature | draft | 2026-07-09 | Timestamps render in server timezone |
+| FEAT-BROKEN-011 | feature | reviewing | 2026-07-10 | Add saved search filters |
+| PERF-BROKEN-012 | perf | done | 2026-07-11 | Cut peak memory on the nightly export job |
+| REF-BROKEN-013 | refactor | done | 2026-07-12 | Split InvoiceHandler |
+| FEAT-BROKEN-014 | feature | in-progress | 2026-07-13 | Add bulk tag assignment |

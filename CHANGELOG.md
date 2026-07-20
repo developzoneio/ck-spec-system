@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Six more seeded lint rules in `examples/spec-lint-fixture/broken/` (SW-4, seam 4), taking
+  coverage from 18 of 26 rules to 24: `SL004` (type/prefix mismatch), `SL005` + `SL043` (illegal
+  status, which cannot have a legal retro log and so always drags `SL043` with it), `SL021`
+  (`done` with a header-only retro), `SL041` (non-contiguous transition chain) and `SL044`
+  (`archived -> in-progress` with an empty reason, the one WARN in the transition family). The
+  two remaining rules, `SL001` and `SL013`, need the fixture or the engine install itself to be
+  broken, so they need a corrupting harness rather than another seeded spec.
+- Boundary documentation on the four seeds whose neighbouring rules overlap (SW-4, seam 4). The
+  transition rules `SL040`-`SL044` are close enough that a linter can collapse several into one
+  and still look correct, so each seed is built to make exactly one fire and names in-file which
+  others must stay silent - e.g. `PERF-BROKEN-012` separates `SL021` (retro exists but is empty)
+  from `SL043` (no retro at all), and `REF-BROKEN-013` isolates `SL041` behind two legal edges,
+  a matching last entry and a present retro.
 - Severity-tagged output for `/sd:spec validate` (SW-4, seam 3), with a stable rule table
   (`SL001`-`SL054`). BLOCK is reserved for a registry that lies about itself or evidence that was
   fabricated; WARN for a real but recoverable problem that leaves the registry truthful. The
@@ -49,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- Three spec stubs in `examples/spec-lint-fixture/broken/` (SW-4, seam 4) raised an unlisted
+  `SL011` BLOCK: `BUG-BROKEN-001` and `BUG-BROKEN-008` carried none of the bug template's four
+  phase-3 tokens and `RCA-BROKEN-005` carried four of the rca template's seven, because each had
+  dropped the enclosing section wholesale. At `draft` a spec must carry at least its template's
+  per-phase token count, so all three failed a rule the fixture's expected-findings table does
+  not list - which would have read as a linter bug rather than a fixture one. Found by running
+  the linter against the tree rather than by inspection, which is the first time the SW-4
+  acceptance criterion was executed end-to-end rather than reasoned about.
+- Placeholder tokens spelled out inside `<!-- SEEDED: ... -->` comments in the fixture (SW-4,
+  seam 4). A token named in a comment is indistinguishable from a real one to any linter that
+  scans line-wise rather than parsing, so the comments explaining the placeholder rules were
+  themselves seeding phantom findings in a tree whose contract is "these findings and no others".
+  The comments now describe tokens in prose.
 - `/sd:spec link` inverse map (SW-4) was partial and ambiguous: it accepted 9 relations but
   defined inverses for only 5, so `blocks`, `blocked-by`, `spawned-by` and `superseded-by` had no
   defined other side. `depends-on` and `blocked-by` also asserted the same edge in two spellings.

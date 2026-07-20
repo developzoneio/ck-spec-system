@@ -10,8 +10,11 @@ linked_specs: none
 # Add audit log
 
 <!-- SEEDED: SL006 - `linked_specs` is `none`, a scalar. It must be a list; the empty form is []. -->
-<!-- SEEDED: SL010 - author-fill tokens below survive at status `approved`. These are plain
-     <<...>> tokens, not <<PHASE-N: ...>>, so they had to be replaced before approval. -->
+<!-- SEEDED: SL010 - author-fill tokens below survive at status `approved`. They are plain
+     author-fill tokens, not phase-deferred ones, so they had to be replaced before approval.
+     This comment names no token syntax on purpose: a token spelled out inside a comment is a
+     decoy for any linter that scans line-wise rather than parsing, and this tree must produce
+     its listed findings and no others. -->
 
 ## Why
 

@@ -11,8 +11,8 @@ linked_specs: []
 
 <!-- SEEDED: SL011 - the PHASE-2 baseline token is gone, replaced by a number, while status is
      still `approved`. Phase 2 has not run, so this value was written from memory. This is the
-     case the old rule could not see: the previous "no <<placeholder>> at >= approved" rule would
-     have PASSED this spec and FAILED the correct one in ../clean/. -->
+     case the old rule could not see: the previous "no author-fill token at >= approved" rule
+     would have PASSED this spec and FAILED the correct one in ../clean/. -->
 
 ## Target
 

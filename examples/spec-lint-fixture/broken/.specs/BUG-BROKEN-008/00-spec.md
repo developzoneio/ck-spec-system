@@ -37,3 +37,22 @@ Sessions last 30 minutes.
 
 - **Users / scope**: all tenants
 - **Workaround available**: yes - re-login
+
+## Root cause
+
+<!-- The phase-deferred tokens below are load-bearing, not filler. At `draft` a spec must carry
+     at least as many PHASE-N tokens as its template, so a stub that simply omits these sections
+     raises SL011 - a finding this fixture does not list. This spec seeds link rules only. -->
+
+**Status**: TBD - filled by Phase 3 investigation.
+
+<<PHASE-3: root cause statement with file:line citations>>
+
+**Why this is root cause, not a symptom**: <<PHASE-3: explanation>>
+
+## Fix approach
+
+**Status**: TBD - filled after root cause confirmed.
+
+- <<PHASE-3: change 1, with target file>>
+- <<PHASE-3: change 2, with target file>>

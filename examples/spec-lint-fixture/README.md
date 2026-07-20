@@ -69,7 +69,29 @@ can be traced to an intentional seed rather than an accident.
 | `REF-BROKEN-009` | `SL040` | BLOCK | Retro logs `draft -> done`, not an edge in the machine |
 | `REF-BROKEN-009` | `SL020` | BLOCK | `done` refactor with no `01-plan.md` / `02-tasks.md` |
 | `REF-BROKEN-009` | `SL012` | WARN | `PHASE-2` / `PHASE-3` tokens unfilled at `done` |
+| `BUG-BROKEN-010` | `SL004` | BLOCK | `type: feature` in a folder whose `BUG` prefix means `bug` |
+| `FEAT-BROKEN-011` | `SL005` | BLOCK | `status: reviewing` is not in `spec.lifecycle` |
+| `FEAT-BROKEN-011` | `SL043` | BLOCK | Status is not `draft` and there is no retro log |
+| `PERF-BROKEN-012` | `SL021` | BLOCK | `done` with a `05-retro.md` that has only its header |
+| `REF-BROKEN-013` | `SL041` | BLOCK | Retro jumps `approved` -> an entry opening at `in-progress` |
+| `FEAT-BROKEN-014` | `SL044` | WARN | `archived -> in-progress` logged with an empty reason |
 | _(tree-wide)_ | `SL032` | BLOCK | `BUG-GHOST-006` row in `index.md` has no folder |
+
+`FEAT-BROKEN-011` is the one spec that seeds two rules on purpose. An illegal `status` cannot
+have a legal retro log - no edge in the state machine ends at `reviewing` - so `SL005` always
+drags `SL043` with it, and adding a retro to silence `SL043` would raise `SL040` instead.
+
+### Rules these seeds hold apart
+
+Four of the new seeds exist as much to keep neighbouring rules **from** firing as to make their
+own rule fire. Each `00-spec.md` explains its own boundary; the summary:
+
+| Seed | Must fire | Must stay silent, and why |
+|---|---|---|
+| `BUG-BROKEN-010` | `SL004` | `SL002` / `SL011` - it carries both types' required fields and the bug template's phase tokens, so neither type resolution yields a second finding |
+| `PERF-BROKEN-012` | `SL021` | `SL043` (the retro file exists) and `SL042` (no last entry to disagree with) |
+| `REF-BROKEN-013` | `SL041` | `SL040` (both edges are legal), `SL042` (last entry matches frontmatter), `SL043` (a retro exists) |
+| `FEAT-BROKEN-014` | `SL044` at **WARN** | `SL040` / `SL041` / `SL042` - the chain is contiguous, legal, and ends where frontmatter says |
 
 ---
 
@@ -82,18 +104,17 @@ of the rules, which is precisely the drift that SW-1 and SW-3 exist to prevent. 
 trade-off is decided, this fixture makes the acceptance criterion **reproducible**, not
 **enforced**.
 
-**Rule coverage is partial: 18 of the 26 rules are seeded.** Not seeded, and why:
+**Rule coverage is partial: 24 of the 26 rules are seeded.** Not seeded, and why:
 
 | Rule | Why not seeded |
 |---|---|
 | `SL001` | Unparseable frontmatter would break the fixture for every other reader/tool. |
-| `SL004` | `type` vs prefix mismatch - cheap to add, simply not written yet. |
-| `SL005` | Illegal `status` value - cheap to add, simply not written yet. |
 | `SL013` | Needs an unreadable template, i.e. a broken engine install - not reproducible from a checked-in tree. |
-| `SL021` | `done` with an empty retro - cheap to add, simply not written yet. |
-| `SL041` | Non-contiguous transition chain - cheap to add, simply not written yet. |
-| `SL043` | Non-`draft` status with no retro at all - cheap to add, simply not written yet. |
-| `SL044` | `archived -> in-progress` with an empty reason - needs an archived spec; not written yet. |
+
+Both remaining gaps are structural rather than unwritten work: each needs the fixture itself, or
+the engine install underneath it, to be broken in a way a checked-in tree cannot express. Closing
+them means a harness that corrupts a throwaway copy - the shape `scripts/selftest-docs.{ps1,sh}`
+already uses for Check 7 - not another seeded spec.
 
 A linter run over `broken/` that reports a rule from this second table has found a real bug in the
 fixture, not in the spec tree.

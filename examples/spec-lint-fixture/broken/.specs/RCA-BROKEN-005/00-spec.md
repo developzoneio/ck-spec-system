@@ -46,6 +46,7 @@ All tenants using the reporting dashboard.
 ### Verification results (Phase 3)
 
 - <<PHASE-3: H1>>: <<PHASE-3: CONFIRMED|REJECTED|INCONCLUSIVE>> - <<PHASE-3: evidence>>
+- <<PHASE-3: H2>>: <<PHASE-3: status>> - <<PHASE-3: evidence>>
 
 ## Root cause
 
