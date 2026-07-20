@@ -111,8 +111,13 @@ function Test-IsAllowListed {
     foreach ($d in $allowDirs) {
         if ($RelPath.StartsWith($d, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
     }
+    # Only EXTENSION-LESS project files are allow-listed by name; anything with
+    # an extension is decided by the extension rules below. The old pattern
+    # accepted one optional extension, which allow-listed README.py outright and
+    # (having no multi-dot form) split hairs over README.old.py. Neither should
+    # bypass the gate - they are source files whatever they are called.
     $name = [System.IO.Path]::GetFileName($RelPath)
-    if ($name -match '^(README|CHANGELOG|CONTRIBUTING|LICENSE|NOTICE|AUTHORS)(\.[A-Za-z]+)?$') { return $true }
+    if ($name -match '^(README|CHANGELOG|CONTRIBUTING|LICENSE|NOTICE|AUTHORS)$') { return $true }
 
     $ext = [System.IO.Path]::GetExtension($RelPath).ToLowerInvariant()
     $docExts = @('.md','.markdown','.txt','.rst','.adoc','.json','.yaml','.yml','.toml','.ini','.env','.example')

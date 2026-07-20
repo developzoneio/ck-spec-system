@@ -71,7 +71,16 @@ fi
 index_rel="$(printf '%s' "${config_json}" | jq -r '.spec.indexFile // ".specs/index.md"' 2>/dev/null)"
 index_path="${cwd}/${index_rel}"
 
-# --- normalize to relative path ----------------------------------------------
+# --- path helpers -------------------------------------------------------------
+
+# All path comparisons in this hook are case-INSENSITIVE, matching
+# spec-gate.ps1's OrdinalIgnoreCase. Windows and macOS filesystems are
+# case-insensitive by default, so a case-sensitive gate is bypassable there by
+# simply retyping the path in a different case - unacceptable for a rule whose
+# whole job is to protect specific files.
+to_lower() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
 
 normalize_rel() {
     local fp="$1" base="$2"
@@ -83,8 +92,13 @@ normalize_rel() {
     # Strip prefix if it begins with base.
     local fp_norm="${fp//\\//}"
     local base_norm="${base//\\//}"
-    if [[ "${fp_norm}" == "${base_norm}"* ]]; then
-        local rel="${fp_norm#${base_norm}}"
+    local fp_lower base_lower
+    fp_lower="$(to_lower "${fp_norm}")"
+    base_lower="$(to_lower "${base_norm}")"
+    if [[ "${fp_lower}" == "${base_lower}"* ]]; then
+        # Cut by the base's LENGTH, not by pattern, so the surviving remainder
+        # keeps its original case for the user-facing reason string.
+        local rel="${fp_norm:${#base_norm}}"
         rel="${rel#/}"
         printf '%s' "${rel}"
     else
@@ -110,14 +124,15 @@ emit_block() {
 # --- Rule 1: protected paths -> block ----------------------------------------
 
 is_protected=0
+rel_lower="$(to_lower "${rel}")"
 while IFS= read -r p; do
     # Some jq builds (e.g. Windows jq.exe) emit CRLF when a filter yields
     # multiple values, as this array iteration does; strip a trailing CR so
     # the exact-match comparison below isn't corrupted.
     p="${p%$'\r'}"
     [[ -z "${p}" ]] && continue
-    p_norm="${p//\\//}"
-    if [[ "${rel}" == "${p_norm}" ]]; then
+    p_norm="$(to_lower "${p//\\//}")"
+    if [[ "${rel_lower}" == "${p_norm}" ]]; then
         is_protected=1
         break
     fi
@@ -132,15 +147,19 @@ fi
 
 is_allowed=0
 for d in .specs/ .claude/ tests/ test/ docs/ spec/; do
-    if [[ "${rel}" == "${d}"* ]]; then
+    if [[ "${rel_lower}" == "${d}"* ]]; then
         is_allowed=1
         break
     fi
 done
 
 basename_only="$(basename "${rel}")"
-case "${basename_only}" in
-    README|README.*|CHANGELOG|CHANGELOG.*|CONTRIBUTING|CONTRIBUTING.*|LICENSE|LICENSE.*|NOTICE|NOTICE.*|AUTHORS|AUTHORS.*)
+# Only EXTENSION-LESS project files are allow-listed by name; anything with an
+# extension is decided by the extension rules below. A name like README.old.py
+# must not be allow-listed just because it starts with README - it is a Python
+# file, and the gate exists to catch code edits.
+case "$(to_lower "${basename_only}")" in
+    readme|changelog|contributing|license|notice|authors)
         is_allowed=1
         ;;
 esac

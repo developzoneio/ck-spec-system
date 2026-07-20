@@ -65,6 +65,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `spec-gate` path matching disagreed on case (SW-5). `spec-gate.ps1` compared with
+  `OrdinalIgnoreCase` throughout; `spec-gate.sh` used case-sensitive `==` and `case` globs, so a
+  protected entry of `.specs/Constitution.md` blocked an edit to `.specs/CONSTITUTION.md` under
+  PowerShell and allowed it under bash. bash now lowercases both sides for the protected list, the
+  allow-listed directory prefixes and the cwd-prefix strip. Case-insensitive is the right
+  semantics for a gate, not merely the parity-preserving one: Windows and macOS filesystems are
+  case-insensitive by default, so a case-sensitive rule is bypassable there by retyping the path.
+- The `spec-gate` basename allow-list let source files through under a documentation name (SW-5).
+  Both implementations allow-listed anything called `README*`, so `README.py` bypassed the gate
+  outright, and the two disagreed on multi-dot names - bash's `README.*` glob allowed
+  `README.old.py` while the PowerShell regex's single optional extension did not match it at all.
+  Only EXTENSION-LESS `README`/`CHANGELOG`/`CONTRIBUTING`/`LICENSE`/`NOTICE`/`AUTHORS` are now
+  allow-listed by name; everything with an extension is decided by the extension rules, so
+  `README.md` is still a doc and `README.old.py` is now correctly gated as Python.
 - `spec-gate.sh` applied NO protected paths when `.claude/project-config.json` was absent or
   unparseable (SW-5), while `spec-gate.ps1` applied its built-in defaults - so on a project that
   had not run `/sd:setup` yet, the most common state there is, editing `.specs/constitution.md`

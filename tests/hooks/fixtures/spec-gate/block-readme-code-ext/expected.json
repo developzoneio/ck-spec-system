@@ -1,0 +1,1 @@
+{"exitCode":0,"decision":"block","permissionDecision":"deny","reason":"spec-gate: editing code file 'README.old.py' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable.","stderr":""}
