@@ -173,6 +173,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ConvertTo-RelativePath`'s own fallback branch. Covered by three new conformance fixtures:
   `..` traversing into a protected file, a bare `.` segment, and a benign `..` that resolves to a
   non-protected code file, proving the fix does not over-block.
+- The bash-side `..` traversal fix above was one-sided: `spec-gate.ps1` had the mirror-image
+  weakness, still live, letting the same class of edit through under PowerShell. Its
+  `ConvertTo-RelativePath` called `[System.IO.Path]::GetFullPath($FilePath)` on a RELATIVE
+  `file_path`, which resolves it against this hook PROCESS's own working directory rather than the
+  `cwd` supplied in the hook payload; the result then failed the base-prefix check and fell through
+  to the raw, un-collapsed path, matching nothing in `paths.protected`. A relative
+  `src/../.specs/constitution.md` therefore reached the protected constitution file while
+  PowerShell exited 0 silently and bash (already fixed) correctly blocked it. Separately,
+  `GetFullPath` preserves a trailing path separator, so `<cwd>/.specs/constitution.md/` failed the
+  protected-path equality test outright and, since `GetExtension` also returns `""` for a
+  trailing-separator path, was not even caught by the code-file rule - a second silent bypass.
+  `spec-gate.ps1` now collapses `.`/`..` segments with the same pure string processing as
+  `spec-gate.sh`'s `collapse_dot_segments`/`normalize_rel` (a relative `file_path` is collapsed
+  directly rather than joined onto the process cwd; a trailing separator collapses away as a
+  no-op segment) so the two implementations resolve identically. `prompt-router` and
+  `subagent-retro` were checked for the same pattern and do not have it - neither reads
+  `tool_input.file_path` or compares a user-supplied path against `paths.protected`. Covered by
+  three new conformance fixtures: a relative `..` traversal into the protected constitution file,
+  a trailing separator on the protected constitution file, and a benign relative `..` resolving to
+  a non-protected code file, proving the fix does not over-block.
 
 ## [1.4.0] - 2026-07-05
 

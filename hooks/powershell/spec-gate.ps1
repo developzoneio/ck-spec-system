@@ -73,6 +73,77 @@ function Get-ProjectConfig {
     }
 }
 
+function Test-IsRootedPath {
+    param([string]$Path)
+    # Mirrors spec-gate.sh's rootedness test ("${fp}" != /* && "${fp}" != ?:*),
+    # evaluated on the RAW path (before backslash->slash conversion): a leading
+    # '/' or a drive-letter prefix like 'C:' is rooted, anything else - a plain
+    # relative path such as 'src/../.specs/constitution.md' - is not.
+    if ([string]::IsNullOrEmpty($Path)) { return $false }
+    if ($Path[0] -eq '/') { return $true }
+    if ($Path.Length -ge 2 -and $Path[1] -eq ':') { return $true }
+    return $false
+}
+
+function ConvertTo-CollapsedPath {
+    param([string]$Path)
+    # Pure string-based collapse of '.' and '..' segments on a forward-slash
+    # path - no filesystem access, no .NET path resolution. This mirrors
+    # collapse_dot_segments in spec-gate.sh exactly, including:
+    #   - a rooted path (leading '/' or a drive prefix 'C:/') clamps a '..' at
+    #     its own root instead of walking above it;
+    #   - an unrooted path with nothing to clamp against keeps an unresolved
+    #     leading '..' rather than discarding it;
+    #   - an empty segment (produced by '//' or by a TRAILING separator, e.g.
+    #     ".specs/constitution.md/") is a no-op, same as a '.' segment - this
+    #     is what makes a trailing separator collapse away instead of
+    #     defeating the later exact-match comparison against paths.protected.
+    $rootPrefix = ''
+    $body = $Path
+    $rooted = $false
+    if ($Path.StartsWith('/')) {
+        $rootPrefix = '/'
+        $body = $Path.Substring(1)
+        $rooted = $true
+    } elseif ($Path.Length -ge 2 -and $Path[1] -eq ':') {
+        $rootPrefix = $Path.Substring(0, 2) + '/'
+        $body = $Path.Substring(2)
+        if ($body.StartsWith('/')) { $body = $body.Substring(1) }
+        $rooted = $true
+    }
+
+    $acc = ''
+    foreach ($seg in $body -split '/') {
+        if ($seg -eq '' -or $seg -eq '.') {
+            continue
+        }
+        if ($seg -eq '..') {
+            if ($acc -ne '') {
+                $lastSlash = $acc.LastIndexOf('/')
+                if ($lastSlash -ge 0) { $last = $acc.Substring($lastSlash + 1) } else { $last = $acc }
+                if ($last -eq '..') {
+                    # Already-stacked leading '..' (unrooted overflow) - keep stacking.
+                    $acc = "$acc/.."
+                } elseif ($lastSlash -ge 0) {
+                    $acc = $acc.Substring(0, $lastSlash)
+                } else {
+                    # acc was a single segment with no slash - pop to empty.
+                    $acc = ''
+                }
+            } elseif ($rooted) {
+                # Cannot go above the root - drop it, matching the bash clamp.
+            } else {
+                # No root to clamp against - keep the unresolved '..'.
+                $acc = '..'
+            }
+        } else {
+            if ($acc -eq '') { $acc = $seg } else { $acc = "$acc/$seg" }
+        }
+    }
+
+    return "$rootPrefix$acc"
+}
+
 function ConvertTo-RelativePath {
     param(
         [string]$Cwd,
@@ -80,13 +151,42 @@ function ConvertTo-RelativePath {
     )
     if ([string]::IsNullOrWhiteSpace($FilePath)) { return $null }
     try {
-        $full = [System.IO.Path]::GetFullPath($FilePath)
-        $base = [System.IO.Path]::GetFullPath($Cwd)
-        if ($full.StartsWith($base, [System.StringComparison]::OrdinalIgnoreCase)) {
-            $rel = $full.Substring($base.Length).TrimStart('\','/')
-            return $rel.Replace('\','/')
+        # If FilePath is not rooted (no leading '/' and no drive-letter prefix
+        # such as 'C:'), it is already relative to Cwd by construction, so
+        # collapsing its own dot segments directly yields the correct
+        # relative-to-Cwd path. Joining it onto Cwd and calling
+        # [System.IO.Path]::GetFullPath would resolve against THIS SCRIPT
+        # PROCESS's own working directory instead of the hook payload's Cwd -
+        # that mismatch was the root cause of the
+        # 'src/../.specs/constitution.md' traversal bypass, since the
+        # resulting absolute path never started with $base and fell through
+        # to the raw-path fallback below. This mirrors spec-gate.sh's
+        # normalize_rel first branch exactly.
+        if (-not (Test-IsRootedPath $FilePath)) {
+            return ConvertTo-CollapsedPath -Path ($FilePath.Replace('\','/'))
         }
-        return $FilePath.Replace('\','/')
+
+        # Collapse '.'/'..' BEFORE the prefix strip, so a path that traverses
+        # through a directory and back (e.g. cwd/src/../.specs/x) is compared
+        # against base in its fully-resolved form, not its literal typed form.
+        # A trailing separator collapses away here too (see
+        # ConvertTo-CollapsedPath), which fixes the second bypass: without
+        # this, [System.IO.Path]::GetExtension on a path ending in '/' or '\'
+        # returns "" and the path escapes both the protected-path equality
+        # check and the code-file extension check.
+        $fpRaw = $FilePath.Replace('\','/')
+        $baseNorm = $Cwd.Replace('\','/')
+        $fpNorm = ConvertTo-CollapsedPath -Path $fpRaw
+        $baseCollapsed = ConvertTo-CollapsedPath -Path $baseNorm
+
+        if ($fpNorm.StartsWith($baseCollapsed, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $rel = $fpNorm.Substring($baseCollapsed.Length).TrimStart('/')
+            return $rel
+        }
+        # Resolving FilePath lands outside Cwd entirely (e.g. enough leading
+        # '..' to escape the workspace) - fall back to the raw, un-collapsed
+        # path, same as spec-gate.sh's normalize_rel fallback branch.
+        return $fpRaw
     } catch {
         return $FilePath.Replace('\','/')
     }
