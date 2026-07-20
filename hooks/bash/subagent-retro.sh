@@ -39,7 +39,9 @@ if [[ -f "${config_path}" ]] && jq -e . "${config_path}" >/dev/null 2>&1; then
     config_json="$(cat "${config_path}")"
 fi
 
-enabled="$(printf '%s' "${config_json}" | jq -r '.hooks.subagentRetro.enabled // true' 2>/dev/null)"
+# `//` treats explicit `false` as absent, so compare directly against
+# `false` instead of relying on the alternative operator here.
+enabled="$(printf '%s' "${config_json}" | jq -r 'if .hooks.subagentRetro.enabled == false then "false" else "true" end' 2>/dev/null)"
 if [[ "${enabled}" == "false" ]]; then
     exit 0
 fi
