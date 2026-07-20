@@ -87,6 +87,13 @@ Two constraints on `pattern`: it must be valid in **both** POSIX ERE (bash `[[ =
 `scripts/selftest-docs.{ps1,sh}` proves Check 7 still bites, by corrupting a throwaway copy of the
 repo and asserting the validator catches it. CI runs it on all three OSes.
 
+`tests/hooks/run-conformance.ps1` (single cross-platform pwsh script by design - it must run BOTH
+hook implementations in one process, so a bash twin would itself be a drift risk) pipes every
+golden fixture under `tests/hooks/fixtures/` into the bash and PowerShell implementation of each
+hook and fails if their normalized decisions diverge from each other or from the golden. Add a
+fixture case whenever you add hook behavior; `-SelfTest` proves the harness still detects
+divergence.
+
 Check 7 needs `jq` on Unix and **fails loudly without it**. This is the opposite of the hook rule
 below (hooks exit `0` silently when `jq` is missing so they never block a user on their own bugs) -
 a validator that skipped itself for a missing tool would turn CI green while checking nothing.

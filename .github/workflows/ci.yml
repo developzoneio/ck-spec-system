@@ -53,6 +53,19 @@ jobs:
         shell: pwsh
         run: ./scripts/selftest-docs.ps1
 
+      # --- Cross-impl hook conformance: pipe each golden fixture into BOTH
+      # implementations (bash + pwsh); normalized decisions must match the
+      # golden and each other. Runs under pwsh on every OS: ubuntu/macos get
+      # bash natively + pwsh preinstalled, windows gets pwsh natively + Git
+      # Bash. A divergence in only one impl fails with a three-way diff ----
+      - name: Hook conformance (bash vs PowerShell)
+        shell: pwsh
+        run: ./tests/hooks/run-conformance.ps1
+
+      - name: Hook conformance self-test (divergence detection)
+        shell: pwsh
+        run: ./tests/hooks/run-conformance.ps1 -SelfTest
+
       # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
       - name: Install -> uninstall round-trip (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cross-implementation hook conformance suite (`tests/hooks/`): golden fixtures are piped into
+  both the bash and PowerShell implementation of every hook and the normalized decisions must
+  match; wired into CI on all matrix platforms with a self-test proving divergence detection (E4).
 - Six more seeded lint rules in `examples/spec-lint-fixture/broken/` (SW-4, seam 4), taking
   coverage from 18 of 26 rules to 24: `SL004` (type/prefix mismatch), `SL005` + `SL043` (illegal
   status, which cannot have a legal retro log and so always drags `SL043` with it), `SL021`
@@ -62,6 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- Two bash hook bugs surfaced by the cross-implementation conformance suite (SW-5). `prompt-router`,
+  `spec-gate` and `subagent-retro` all read `enabled` with jq's `//` operator, which treats an
+  explicit JSON `false` as absent - a project that set `enabled: false` in `project-config.json`
+  got a hook that ran anyway; the three scripts now use an `if`/`then`/`else` jq expression that
+  compares directly against `false`. Separately, `spec-gate`'s protected-path loop never blocked a
+  protected path on Windows because Windows `jq.exe` emits CRLF for `join("\n")` output, leaving a
+  trailing `\r` on each path that broke the exact-match comparison; the loop now strips a trailing
+  CR before comparing, mirroring the existing strip in `prompt-router.sh`'s keyword loop.
 - Three spec stubs in `examples/spec-lint-fixture/broken/` (SW-4, seam 4) raised an unlisted
   `SL011` BLOCK: `BUG-BROKEN-001` and `BUG-BROKEN-008` carried none of the bug template's four
   phase-3 tokens and `RCA-BROKEN-005` carried four of the rca template's seven, because each had
