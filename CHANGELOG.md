@@ -65,6 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `subagent-retro`'s debounce state file, an on-disk contract shared between the two
+  implementations, was not written in the same shape by both (SW-5): `subagent-retro.ps1` wrote
+  the round-trip `o` format with 7 fractional digits while `subagent-retro.sh` wrote whole
+  seconds, so only the bash reader ever had to cope with fractions. PowerShell now writes the same
+  whole-second `yyyy-MM-ddTHH:mm:ssZ` stamp. The bash reader's two date fallbacks were also both
+  wrong on BSD/macOS: neither passed `-u`, so a UTC stamp was read as local time and skewed the
+  debounce window by the machine's offset, and the BSD branch handed `date -f` a string with a
+  trailing `Z` it would warn about on stderr - breaking the hook's silence. Both branches now
+  force UTC and the value is trimmed before parsing. The debounce branch had no fixture coverage
+  at all until now; `setup.json` grew a `write` action that plants a file whose content carries a
+  `{{UTCNOW-45M}}`-style token resolved at run time, so a state-file fixture cannot rot.
 - `spec-gate` path matching disagreed on case (SW-5). `spec-gate.ps1` compared with
   `OrdinalIgnoreCase` throughout; `spec-gate.sh` used case-sensitive `==` and `case` globs, so a
   protected entry of `.specs/Constitution.md` blocked an edit to `.specs/CONSTITUTION.md` under

@@ -1,0 +1,1 @@
+{ "write": [ { "path": ".claude/.hookstate/subagent-retro-conformance-fixture.json", "content": "{\"lastReminderUtc\":\"{{UTCNOW-2M}}\"}" } ] }

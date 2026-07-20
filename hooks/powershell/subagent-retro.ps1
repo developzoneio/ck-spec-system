@@ -153,7 +153,13 @@ function Save-State {
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        $obj = [pscustomobject]@{ lastReminderUtc = (Get-Date).ToUniversalTime().ToString('o') }
+        # State-file shape is an ON-DISK CONTRACT shared with subagent-retro.sh:
+        # a session can write it under one implementation and read it under the
+        # other, so the single key and the whole-second UTC format must stay
+        # identical in both. 'o' was writing 7 fractional digits that only the
+        # bash side ever had to cope with.
+        $stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $obj = [pscustomobject]@{ lastReminderUtc = $stamp }
         $obj | ConvertTo-Json -Compress | Set-Content -LiteralPath $StatePath -Encoding UTF8
     } catch { }
 }

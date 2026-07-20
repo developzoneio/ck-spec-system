@@ -167,11 +167,20 @@ debounce_secs=$(( debounce_minutes * 60 ))
 if [[ -f "${state_path}" ]]; then
     last_iso="$(jq -r '.lastReminderUtc // empty' "${state_path}" 2>/dev/null || true)"
     if [[ -n "${last_iso}" ]]; then
+        # Strip the UTC marker and any fractional seconds. BSD date's -f cannot
+        # be given trailing unconverted text (it warns on stderr, which would
+        # break the hook's silence), and a state file written by an older
+        # subagent-retro.ps1 carries 7 fractional digits.
+        iso_trimmed="${last_iso%Z}"
+        iso_trimmed="${iso_trimmed%.*}"
         # Convert ISO8601 to epoch. GNU date supports -d; BSD date needs -j -f.
+        # Both branches must interpret the value as UTC - it is written as UTC
+        # by both implementations, so a local-time reading would skew the
+        # debounce window by the machine's offset.
         last_epoch=""
-        if last_epoch="$(date -d "${last_iso}" +%s 2>/dev/null)"; then
+        if last_epoch="$(date -u -d "${last_iso}" +%s 2>/dev/null)"; then
             :
-        elif last_epoch="$(date -j -f '%Y-%m-%dT%H:%M:%S' "${last_iso%.*}" +%s 2>/dev/null)"; then
+        elif last_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "${iso_trimmed}" +%s 2>/dev/null)"; then
             :
         else
             last_epoch=""
@@ -206,6 +215,9 @@ fi
 
 # --- save state --------------------------------------------------------------
 
+# State-file shape is an ON-DISK CONTRACT shared with subagent-retro.ps1: a
+# session can write it under one implementation and read it under the other, so
+# the single key and the whole-second UTC format must stay identical in both.
 mkdir -p "${state_dir}" 2>/dev/null || true
 iso_now="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u)"
 jq -nc --arg t "${iso_now}" '{lastReminderUtc:$t}' > "${state_path}" 2>/dev/null || true

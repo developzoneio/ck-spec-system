@@ -95,6 +95,25 @@ function New-CaseWorkspace {
                 $item.LastWriteTimeUtc = [System.DateTime]::UtcNow.AddMinutes(-1 * [double]$t.ageMinutes)
             }
         }
+        # `write` plants a file whose CONTENT carries a timestamp - a hook state
+        # file, say. The timestamp is computed at run time from a
+        # {{UTCNOW-90M}} / {{UTCNOW+5M}} token rather than written literally
+        # into the fixture, which would rot the moment the clock moved past it.
+        foreach ($w in @($setup.write)) {
+            if ($null -eq $w) { continue }
+            $content = [string]$w.content
+            $content = [regex]::Replace($content, '\{\{UTCNOW([+-]\d+)M\}\}', {
+                param($m)
+                $offset = [int]$m.Groups[1].Value
+                [System.DateTime]::UtcNow.AddMinutes($offset).ToString('yyyy-MM-ddTHH:mm:ssZ')
+            })
+            $target = Join-Path $ws $w.path
+            $dir = Split-Path -Path $target -Parent
+            if (-not (Test-Path -LiteralPath $dir)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            }
+            Set-Content -LiteralPath $target -Value $content -Encoding ascii -NoNewline
+        }
     }
 
     return $ws
