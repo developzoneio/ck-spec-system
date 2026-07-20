@@ -82,27 +82,111 @@ to_lower() {
     printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# Collapses '.' and '..' segments in a forward-slash path using pure string
+# processing - no filesystem access, no `realpath`/`readlink -f`/`cd`. This
+# mirrors [System.IO.Path]::GetFullPath's string-only resolution in
+# spec-gate.ps1, which is what let a path like "src/../.specs/constitution.md"
+# reach a protected file while presenting a relative form that never matched
+# any entry in paths.protected under the un-collapsed bash comparison.
+#
+# A ROOTED path (Unix leading '/' or a Windows drive prefix like 'C:/') clamps
+# a '..' at its own root instead of walking above it, matching GetFullPath's
+# drive/root clamp. A path with no such root has nothing to clamp against, so
+# an unresolved leading '..' is kept rather than discarded - it must not be
+# allowed to silently walk above its own top.
+collapse_dot_segments() {
+    local path="$1"
+    local root_prefix="" body="${path}"
+    if [[ "${path}" == /* ]]; then
+        root_prefix="/"
+        body="${path#/}"
+    elif [[ "${path}" == ?:* ]]; then
+        root_prefix="${path:0:2}/"
+        body="${path:2}"
+        body="${body#/}"
+    fi
+
+    local rooted=0
+    [[ -n "${root_prefix}" ]] && rooted=1
+
+    local acc="" seg rest="${body}"
+    while [[ -n "${rest}" ]]; do
+        seg="${rest%%/*}"
+        if [[ "${rest}" == */* ]]; then
+            rest="${rest#*/}"
+        else
+            rest=""
+        fi
+        case "${seg}" in
+            ''|'.')
+                continue
+                ;;
+            '..')
+                if [[ -n "${acc}" ]]; then
+                    local last="${acc##*/}"
+                    if [[ "${last}" == '..' ]]; then
+                        # Already-stacked leading '..' (unrooted overflow) - keep stacking.
+                        acc="${acc}/.."
+                    else
+                        local trimmed="${acc%/*}"
+                        if [[ "${trimmed}" == "${acc}" ]]; then
+                            # acc was a single segment with no slash - pop to empty.
+                            acc=""
+                        else
+                            acc="${trimmed}"
+                        fi
+                    fi
+                elif [[ ${rooted} -eq 1 ]]; then
+                    # Cannot go above the root - drop it, matching GetFullPath's clamp.
+                    :
+                else
+                    # No root to clamp against - keep the unresolved '..'.
+                    acc=".."
+                fi
+                ;;
+            *)
+                if [[ -z "${acc}" ]]; then
+                    acc="${seg}"
+                else
+                    acc="${acc}/${seg}"
+                fi
+                ;;
+        esac
+    done
+
+    printf '%s%s' "${root_prefix}" "${acc}"
+}
+
 normalize_rel() {
     local fp="$1" base="$2"
-    # If fp is already relative, just normalize separators.
+    # If fp is already relative, collapse dot segments but there is no known
+    # root to compare against a cwd prefix, so return the collapsed path as-is.
     if [[ "${fp}" != /* && "${fp}" != ?:* ]]; then
-        printf '%s' "${fp//\\//}"
+        printf '%s' "$(collapse_dot_segments "${fp//\\//}")"
         return
     fi
-    # Strip prefix if it begins with base.
-    local fp_norm="${fp//\\//}"
+    # Collapse '.'/'..' BEFORE the prefix strip, so a path that traverses
+    # through a directory and back (e.g. cwd/src/../.specs/x) is compared
+    # against base in its fully-resolved form, not its literal typed form.
+    local fp_raw="${fp//\\//}"
     local base_norm="${base//\\//}"
+    local fp_norm base_collapsed
+    fp_norm="$(collapse_dot_segments "${fp_raw}")"
+    base_collapsed="$(collapse_dot_segments "${base_norm}")"
     local fp_lower base_lower
     fp_lower="$(to_lower "${fp_norm}")"
-    base_lower="$(to_lower "${base_norm}")"
+    base_lower="$(to_lower "${base_collapsed}")"
     if [[ "${fp_lower}" == "${base_lower}"* ]]; then
         # Cut by the base's LENGTH, not by pattern, so the surviving remainder
         # keeps its original case for the user-facing reason string.
-        local rel="${fp_norm:${#base_norm}}"
+        local rel="${fp_norm:${#base_collapsed}}"
         rel="${rel#/}"
         printf '%s' "${rel}"
     else
-        printf '%s' "${fp_norm}"
+        # Resolving fp lands outside base entirely (e.g. enough leading '..' to
+        # escape the workspace) - fall back to the raw, un-collapsed path, same
+        # as spec-gate.ps1's ConvertTo-RelativePath fallback branch.
+        printf '%s' "${fp_raw}"
     fi
 }
 

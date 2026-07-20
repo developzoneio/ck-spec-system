@@ -158,6 +158,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MSSQL-titled section. All now describe the project-provided database MCP, matching
   `agents/debugger.md` and `templates/project-config.template.json`. Addresses `REVIEW-TODO.md`
   item 5's doc half; the `agents/debugger.md` body-vs-allowlist defect it also names remains open.
+- `spec-gate`'s protected-path matching could be bypassed via `..` path traversal under the bash
+  hook: `spec-gate.ps1` normalizes `file_path` with `[System.IO.Path]::GetFullPath`, which resolves
+  `..`/`.` segments before comparing against `paths.protected`, but `spec-gate.sh`'s `normalize_rel`
+  only normalized separators and stripped the cwd prefix - it never collapsed `..`. A path like
+  `<cwd>/src/../.specs/constitution.md` reached the protected constitution file while presenting a
+  relative form (`src/../.specs/constitution.md`) that matched nothing in `paths.protected`, so
+  bash exited 0 and silently allowed editing a protected file that PowerShell correctly blocked.
+  `spec-gate.sh` now collapses `.`/`..` segments with pure string processing (no `realpath`,
+  `readlink -f`, or `cd`, since the file may not exist yet under `Write` and the decision must not
+  depend on filesystem state) before the protected-path and allow-list comparisons, clamping a
+  rooted `..` at its own root the same way `GetFullPath` does, and falling back to the raw,
+  un-collapsed path when resolution would escape the workspace entirely - matching
+  `ConvertTo-RelativePath`'s own fallback branch. Covered by three new conformance fixtures:
+  `..` traversing into a protected file, a bare `.` segment, and a benign `..` that resolves to a
+  non-protected code file, proving the fix does not over-block.
 
 ## [1.4.0] - 2026-07-05
 
