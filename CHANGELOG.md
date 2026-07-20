@@ -65,6 +65,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- Conformance decision objects were too coarse to prove much (SW-5). `spec-gate` decisions kept
+  only `decision`/`permissionDecision` and threw away the human-readable `reason`, which the two
+  implementations hand-duplicate - the reason strings could have drifted completely and all 20
+  cases would still have passed. The decision now carries `reason`, and reports
+  `REASON-MISMATCH-BETWEEN-SCHEMA-HALVES` if the legacy and `hookSpecificOutput` copies of it ever
+  disagree. `subagent-retro` decisions likewise dropped the measured age and the threshold it was
+  compared against, so the two implementations could have disagreed on the arithmetic unnoticed;
+  both are now asserted, and `subagent-retro.sh` rounds the age to the nearest minute instead of
+  truncating it, matching `subagent-retro.ps1`'s `[Math]::Round`. Every decision object now also
+  carries `stderr`, so the repo's "every failure path exits 0 SILENTLY" invariant is actually
+  checked rather than assumed - a hook that regressed into printing a diagnostic on every
+  invocation used to pass.
 - Two bash hook bugs surfaced by the cross-implementation conformance suite (SW-5). `prompt-router`,
   `spec-gate` and `subagent-retro` all read `enabled` with jq's `//` operator, which treats an
   explicit JSON `false` as absent - a project that set `enabled: false` in `project-config.json`

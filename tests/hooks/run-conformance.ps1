@@ -154,6 +154,7 @@ function ConvertTo-SpecGateDecision {
     param($Run)
     $decision = 'allow'
     $permission = $null
+    $reason = $null
     $stdoutTrim = $Run.Stdout.Trim()
     if ($stdoutTrim.Length -gt 0) {
         try {
@@ -162,15 +163,34 @@ function ConvertTo-SpecGateDecision {
             if ($obj.hookSpecificOutput -and $obj.hookSpecificOutput.permissionDecision) {
                 $permission = [string]$obj.hookSpecificOutput.permissionDecision
             }
+            # The human-readable reason is duplicated into both schema halves by
+            # both implementations; if the two copies ever disagree the object
+            # must not silently keep one of them.
+            $topReason = if ($obj.reason) { [string]$obj.reason } else { $null }
+            $nestedReason = if ($obj.hookSpecificOutput -and $obj.hookSpecificOutput.reason) {
+                [string]$obj.hookSpecificOutput.reason
+            } else { $null }
+            if ($topReason -ne $nestedReason) {
+                $reason = 'REASON-MISMATCH-BETWEEN-SCHEMA-HALVES'
+            } else {
+                $reason = $topReason
+            }
         } catch {
             $decision = 'unparseable-stdout'
         }
     } elseif ($Run.Stderr.Contains('[WARN]')) {
         $decision = 'warn'
     }
-    $out = [ordered]@{ exitCode = $Run.ExitCode; decision = $decision }
-    if ($null -ne $permission) { $out.permissionDecision = $permission }
-    return [pscustomobject]$out
+    # stderr is part of the decision: the repo invariant is that a hook stays
+    # SILENT unless it has something to say, so an unexpected diagnostic on
+    # stderr must fail the case rather than pass unnoticed.
+    return [pscustomobject][ordered]@{
+        exitCode           = $Run.ExitCode
+        decision           = $decision
+        permissionDecision = $permission
+        reason             = $reason
+        stderr             = $Run.Stderr.Trim()
+    }
 }
 
 function ConvertTo-PromptRouterDecision {
@@ -210,6 +230,7 @@ function ConvertTo-PromptRouterDecision {
         ticketIds   = @($ticketIds | Sort-Object)
         specFolders = @($specFolders | Sort-Object)
         inProgress  = @($inProgress | Sort-Object)
+        stderr      = $Run.Stderr.Trim()
     }
 }
 
@@ -217,15 +238,25 @@ function ConvertTo-SubagentRetroDecision {
     param($Run)
     $stale = [System.Collections.Generic.List[object]]::new()
     foreach ($line in ($Run.Stdout -split "`n")) {
-        if ($line -match '^\s+-\s+([A-Za-z0-9_\-]+): 05-retro\.md (missing|last touched)') {
-            $reason = if ($Matches[2] -eq 'missing') { 'missing' } else { 'stale' }
-            $stale.Add([pscustomobject][ordered]@{ id = $Matches[1]; reason = $reason })
+        # The measured age and the threshold it was compared against are part of
+        # the decision - dropping them would let the two implementations disagree
+        # on arithmetic (truncate vs round) while still looking identical.
+        if ($line -match '^\s+-\s+([A-Za-z0-9_\-]+): 05-retro\.md missing$') {
+            $stale.Add([pscustomobject][ordered]@{
+                id = $Matches[1]; reason = 'missing'; ageMinutes = $null; thresholdMinutes = $null
+            })
+        } elseif ($line -match '^\s+-\s+([A-Za-z0-9_\-]+): 05-retro\.md last touched (\d+) min ago \(threshold (\d+) min\)$') {
+            $stale.Add([pscustomobject][ordered]@{
+                id = $Matches[1]; reason = 'stale'
+                ageMinutes = [int]$Matches[2]; thresholdMinutes = [int]$Matches[3]
+            })
         }
     }
     return [pscustomobject][ordered]@{
         exitCode = $Run.ExitCode
         emitted  = $Run.Stdout.Contains('<retro-reminder>')
         stale    = @($stale | Sort-Object -Property id)
+        stderr   = $Run.Stderr.Trim()
     }
 }
 

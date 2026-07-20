@@ -147,7 +147,9 @@ for i in "${!specs[@]}"; do
     if (( age >= threshold_secs )); then
         stale_id+=("${sid}")
         stale_reason+=("stale")
-        stale_age+=("$(( age / 60 ))")
+        # Round to the nearest minute rather than truncating, so the reported
+        # age matches subagent-retro.ps1's [Math]::Round on the same mtime.
+        stale_age+=("$(( (age + 30) / 60 ))")
     fi
 done
 
