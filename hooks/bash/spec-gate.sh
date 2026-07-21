@@ -226,16 +226,21 @@ if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; t
     esac
 
     if [[ -n "${fragments}" ]]; then
-        # IDs marked done in the pending edit's new content.
+        # IDs marked done in the pending edit's new content. Extracts only the
+        # FIRST id per line (matches pwsh's `-match` + $Matches[0] semantics) -
+        # a `grep -o` here would emit every id on the line, including one that
+        # is merely mentioned in a title (e.g. "Follow-up to BUG-002"), which
+        # would wrongly fold an unrelated spec into the transition set.
         pending_done="$(printf '%s' "${fragments}" \
             | grep -E '\|[[:space:]]*done[[:space:]]*\|' 2>/dev/null \
-            | grep -o -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' 2>/dev/null \
+            | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
             | tr -d '\r' | LC_ALL=C sort -u)"
         # IDs the on-disk index already records as done (not a transition).
+        # Same first-match-per-line extraction as above.
         already_done=""
         if [[ -f "${index_path}" ]]; then
             already_done="$(grep -E '\|[[:space:]]*done[[:space:]]*\|' "${index_path}" 2>/dev/null \
-                | grep -o -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' 2>/dev/null \
+                | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
                 | tr -d '\r' | LC_ALL=C sort -u)"
         fi
 

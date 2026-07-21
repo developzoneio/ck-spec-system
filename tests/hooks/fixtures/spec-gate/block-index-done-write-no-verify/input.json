@@ -1,0 +1,1 @@
+{"tool_name":"Write","cwd":"{{CWD}}","tool_input":{"file_path":"{{CWD}}/.specs/index.md","content":"| ID | Type | Status | Title |\n|---|---|---|---|\n| FEAT-001 | feature | done | Demo feature |\n"}}

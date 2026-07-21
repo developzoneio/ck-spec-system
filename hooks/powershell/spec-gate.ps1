@@ -376,7 +376,16 @@ if ([string]::IsNullOrWhiteSpace($rel)) { exit 0 }
 # a passing /sd:verify artifact; a verified close-out is allowed through the
 # protected-path rule. Any other direct index edit falls through to Rule 1.
 $verifyGateOn = $true
-try { if ($config.hooks.specGate.verifyGate -eq $false) { $verifyGateOn = $false } } catch { }
+try {
+    # Type-strict: only a literal JSON boolean false disables the gate. Plain
+    # `-eq $false` would also match the JSON STRING "false" (PowerShell coerces
+    # a string to bool via -eq's LHS type), diverging from jq's `== false`
+    # in spec-gate.sh, which is type-strict and leaves the gate ON for a
+    # string value. -is [bool] keeps this branch aligned with jq.
+    if (($config.hooks.specGate.verifyGate -is [bool]) -and (-not $config.hooks.specGate.verifyGate)) {
+        $verifyGateOn = $false
+    }
+} catch { }
 
 $indexRel = '.specs/index.md'
 try { if ($config.spec.indexFile) { $indexRel = ([string]$config.spec.indexFile).Replace('\','/') } } catch { }
