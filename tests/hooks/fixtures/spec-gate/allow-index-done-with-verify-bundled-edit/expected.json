@@ -1,1 +1,1 @@
-{"exitCode":0,"decision":"allow","permissionDecision":null,"reason":null,"stderr":""}
+{"exitCode":0,"decision":"allow","permissionDecision":null,"reason":null,"stderr":"","events":[{"ts":"<TS>","spec_id":"FEAT-001","phase":"done","event":"gate","gate":"verify","decision":"allow"},{"ts":"<TS>","spec_id":"FEAT-001","phase":"done","event":"spec_transition","from":"in-progress","decision":"allow"}]}

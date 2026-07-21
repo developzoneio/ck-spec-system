@@ -53,6 +53,7 @@ function Get-ProjectConfig {
         }
         hooks = [pscustomobject]@{
             specGate = [pscustomobject]@{ enabled = $true; mode = 'warn' }
+            metrics  = [pscustomobject]@{ enabled = $true; path = '.specs/_metrics/events.jsonl' }
         }
     }
 
@@ -313,6 +314,176 @@ function Get-DoneTransitionIds {
     return ,$result
 }
 
+function Get-SpecStatusTransitions {
+    param(
+        [object]$HookInput,
+        [string]$IndexPath
+    )
+    # Read-only, general-purpose lifecycle scan (all 5 prefixes x all 5
+    # statuses) that backs the observational spec_transition metric. This is
+    # DELIBERATELY a separate function from Get-DoneTransitionIds above - that
+    # one is FEAT-/done-only and backs the live Rule 0 gate decision (see its
+    # Rule 0 scope comment). Folding the two together would make a future
+    # edit to either accidentally change the other's behavior.
+    $result = New-Object System.Collections.Generic.List[object]
+    try {
+        $rowPattern = '\|\s*((?:FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|'
+
+        # Statuses recorded on disk BEFORE this pending edit lands - PreToolUse
+        # runs before the write, so the file still reflects the prior state.
+        $oldStatus = @{}
+        if (Test-Path -LiteralPath $IndexPath) {
+            try {
+                foreach ($line in (Get-Content -LiteralPath $IndexPath -Encoding UTF8 -ErrorAction Stop)) {
+                    if ($line -match $rowPattern) { $oldStatus[$Matches[1]] = $Matches[2] }
+                }
+            } catch { }
+        }
+
+        $fragments = New-Object System.Collections.Generic.List[string]
+        $tool = $HookInput.tool_name
+        if ($tool -eq 'Edit') {
+            if ($HookInput.tool_input.new_string) { $fragments.Add([string]$HookInput.tool_input.new_string) | Out-Null }
+        } elseif ($tool -eq 'Write') {
+            if ($HookInput.tool_input.content) { $fragments.Add([string]$HookInput.tool_input.content) | Out-Null }
+        } elseif ($tool -eq 'MultiEdit') {
+            foreach ($e in @($HookInput.tool_input.edits)) {
+                if ($e.new_string) { $fragments.Add([string]$e.new_string) | Out-Null }
+            }
+        }
+
+        $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+        foreach ($frag in $fragments) {
+            foreach ($line in ($frag -split "`n")) {
+                if (-not ($line -match $rowPattern)) { continue }
+                $id = $Matches[1]
+                $newStatus = $Matches[2]
+                if ($seen.Contains($id)) { continue }
+                [void]$seen.Add($id)
+                $from = if ($oldStatus.ContainsKey($id)) { $oldStatus[$id] } else { '-' }
+                if ($from -ne $newStatus) {
+                    $result.Add([pscustomobject]@{ Id = $id; Phase = $newStatus; From = $from }) | Out-Null
+                }
+            }
+        }
+    } catch { }
+    return ,$result
+}
+
+function Test-MetricsPathSafe {
+    param([string]$RelPath)
+    # A metrics path is not an arbitrary-write primitive: reject anything
+    # rooted (absolute, or a drive-letter path) or that escapes Cwd via '..'
+    # rather than ever writing outside the workspace. Reuses the same
+    # rootedness test and dot-segment collapse used for the gate's own path
+    # safety above, so the two safety checks cannot silently diverge.
+    if ([string]::IsNullOrWhiteSpace($RelPath)) { return $false }
+    if (Test-IsRootedPath -Path $RelPath) { return $false }
+    $collapsed = ConvertTo-CollapsedPath -Path ($RelPath.Replace('\','/'))
+    if ($collapsed -eq '..' -or $collapsed.StartsWith('../')) { return $false }
+    return $true
+}
+
+function Write-MetricEvent {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [string]$EventKind,
+        [System.Collections.Specialized.OrderedDictionary]$Fields
+    )
+    # Fully wrapped: a metrics failure must NEVER surface as a hook error or
+    # change a gate decision. Every call site invokes this AFTER the decision
+    # is already computed (and, for a block, already written to stdout) -
+    # never from inside the decision path itself.
+    try {
+        $enabled = $true
+        # Type-strict: only a literal JSON boolean false disables metrics -
+        # copies the verifyGate `-is [bool]` pattern above so a string
+        # "false" in project-config.json leaves metrics on, matching
+        # spec-gate.sh's `== false` jq comparison.
+        if (($Config.hooks.metrics.enabled -is [bool]) -and (-not $Config.hooks.metrics.enabled)) {
+            $enabled = $false
+        }
+        if (-not $enabled) { return }
+
+        $relPath = '.specs/_metrics/events.jsonl'
+        try { if ($Config.hooks.metrics.path) { $relPath = [string]$Config.hooks.metrics.path } } catch { }
+        $relPath = $relPath.Replace('\','/')
+
+        if (-not (Test-MetricsPathSafe -RelPath $relPath)) { return }
+
+        $fullPath = Join-Path $Cwd $relPath
+        $parent = Split-Path -Path $fullPath -Parent
+        if (-not (Test-Path -LiteralPath $parent)) {
+            New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null
+        }
+
+        # [ordered] (not a plain hashtable) so ConvertTo-Json emits keys in
+        # the exact insertion order below - a plain hashtable does not
+        # guarantee enumeration order, which would let the two
+        # implementations drift apart on key order for the same input.
+        $ordered = [ordered]@{}
+        $ordered['ts']      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $ordered['spec_id'] = $SpecId
+        $ordered['phase']   = $Phase
+        $ordered['event']   = $EventKind
+        foreach ($key in $Fields.Keys) { $ordered[$key] = $Fields[$key] }
+
+        $line = ([pscustomobject]$ordered) | ConvertTo-Json -Compress
+
+        # Add-Content opens and closes the file handle per call and is not
+        # safe against the concurrent PreToolUse + SubagentStop appends this
+        # log can see; retry briefly on a transient sharing violation instead
+        # of failing loudly.
+        $attempt = 0
+        while ($attempt -lt 5) {
+            try {
+                # UTF8Encoding($false): NO byte-order-mark. [Encoding]::UTF8
+                # writes a BOM preamble on the FIRST write to a new/empty
+                # file, which spec-gate.sh's plain `>>` append never does -
+                # that would make the two implementations' first line differ
+                # by 3 bytes for the exact same input.
+                [System.IO.File]::AppendAllText($fullPath, "$line`n", (New-Object System.Text.UTF8Encoding($false)))
+                break
+            } catch {
+                $attempt++
+                if ($attempt -ge 5) { break }
+                Start-Sleep -Milliseconds 20
+            }
+        }
+    } catch { }
+}
+
+function Write-GateMetric {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [string]$Gate,
+        [string]$Decision,
+        [string]$Ext = ''
+    )
+    $fields = [ordered]@{ gate = $Gate; decision = $Decision }
+    if ($Ext) { $fields['ext'] = $Ext }
+    Write-MetricEvent -Cwd $Cwd -Config $Config -SpecId $SpecId -Phase $Phase -EventKind 'gate' -Fields $fields
+}
+
+function Write-TransitionMetrics {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [object[]]$Transitions,
+        [string]$Decision
+    )
+    foreach ($t in $Transitions) {
+        $fields = [ordered]@{ from = $t.From; decision = $Decision }
+        Write-MetricEvent -Cwd $Cwd -Config $Config -SpecId $t.Id -Phase $t.Phase -EventKind 'spec_transition' -Fields $fields
+    }
+}
+
 function Test-VerifyArtifactPass {
     param(
         [string]$Cwd,
@@ -408,6 +579,16 @@ try { if ($config.spec.indexFile) { $indexRel = ([string]$config.spec.indexFile)
 $specDir = '.specs'
 try { if ($config.spec.dir) { $specDir = [string]$config.spec.dir } } catch { }
 
+# spec_transition metric: read-only, general lifecycle scan of THIS index.md
+# edit. Computed unconditionally (independent of $verifyGateOn and of which
+# rule ultimately decides the edit) - it never influences the gate decision,
+# only records whatever that decision turns out to be at whichever exit below
+# is actually reached. Empty (a no-op below) whenever $rel is not the index.
+$transitions = @()
+if ([string]::Equals($rel, $indexRel, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $transitions = Get-SpecStatusTransitions -HookInput $hookInput -IndexPath (Join-Path $cwd $indexRel)
+}
+
 if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringComparison]::OrdinalIgnoreCase)) {
     $indexAbs = Join-Path $cwd $indexRel
     $doneIds = Get-DoneTransitionIds -HookInput $hookInput -IndexPath $indexAbs
@@ -426,9 +607,28 @@ if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringCompariso
             [Array]::Sort($missingArr, [System.StringComparer]::Ordinal)
             $ids = $missingArr -join ', '
             Write-BlockDecision "spec-gate: index row(s) [$ids] -> done but no passing /sd:verify artifact. Run /sd:verify <spec-ID>; close-out is allowed only after $specDir/<ID>/06-verify.md records 'result: pass'."
+            # Metrics are emitted AFTER the block decision above is already
+            # written to stdout - never inside the decision path itself.
+            # Ordinal-sort a COPY for the metric loop only, so a bundled
+            # multi-ID edit emits events in the same order as spec-gate.sh's
+            # `LC_ALL=C sort -u` transition_ids - this does not touch
+            # $doneIds itself or Get-DoneTransitionIds' own ordering.
+            $doneIdsForMetrics = @($doneIds)
+            [Array]::Sort($doneIdsForMetrics, [System.StringComparer]::Ordinal)
+            foreach ($id in $doneIdsForMetrics) {
+                $idDecision = if ($missing.Contains($id)) { 'block' } else { 'allow' }
+                Write-GateMetric -Cwd $cwd -Config $config -SpecId $id -Phase 'done' -Gate 'verify' -Decision $idDecision
+            }
+            Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'block'
             exit 0
         }
         # Every transitioning spec has a passing artifact - allow the close-out.
+        $doneIdsForMetrics = @($doneIds)
+        [Array]::Sort($doneIdsForMetrics, [System.StringComparer]::Ordinal)
+        foreach ($id in $doneIdsForMetrics) {
+            Write-GateMetric -Cwd $cwd -Config $config -SpecId $id -Phase 'done' -Gate 'verify' -Decision 'allow'
+        }
+        Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
         exit 0
     }
 }
@@ -438,25 +638,42 @@ $protected = @()
 try { if ($config.paths.protected) { $protected = @($config.paths.protected) } } catch { }
 if (Test-IsProtected -RelPath $rel -Protected $protected) {
     Write-BlockDecision "spec-gate: '$rel' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
+    Write-GateMetric -Cwd $cwd -Config $config -SpecId '-' -Phase '-' -Gate 'protected' -Decision 'block'
+    Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'block'
     exit 0
 }
 
 # Rule 2: allow-listed paths -> always allow
-if (Test-IsAllowListed -RelPath $rel) { exit 0 }
+if (Test-IsAllowListed -RelPath $rel) {
+    Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
+    exit 0
+}
 
 # Rule 3: code file -> require in-progress spec
 if (Test-IsCodeFile -RelPath $rel) {
+    $ext = [System.IO.Path]::GetExtension($rel).ToLowerInvariant()
     $indexFile = if ($config.spec.indexFile) { Join-Path $cwd $config.spec.indexFile } else { Join-Path $cwd '.specs/index.md' }
-    $inProgress = Get-InProgressSpecs -IndexPath $indexFile
+    # @() forces a real array even when exactly one in-progress spec is
+    # found - PowerShell's pipeline otherwise unwraps a single-element
+    # List[string] into a bare string, which would make $inProgress[0]
+    # below silently index a CHARACTER of the id instead of the id itself.
+    $inProgress = @(Get-InProgressSpecs -IndexPath $indexFile)
     if ($inProgress.Count -eq 0) {
         $msg = "spec-gate: editing code file '$rel' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
         if ($mode -eq 'block') {
             Write-BlockDecision $msg
+            Write-GateMetric -Cwd $cwd -Config $config -SpecId '-' -Phase '-' -Gate 'code-edit' -Decision 'block' -Ext $ext
             exit 0
         } else {
             [Console]::Error.WriteLine("[WARN] $msg")
+            Write-GateMetric -Cwd $cwd -Config $config -SpecId '-' -Phase '-' -Gate 'code-edit' -Decision 'warn' -Ext $ext
             exit 0
         }
+    } else {
+        # An in-progress spec exists - the edit is allowed. Recording the
+        # allow (not just the block/warn paths) is the point: the ratio of
+        # allow to warn/block is what the retro loop measures.
+        Write-GateMetric -Cwd $cwd -Config $config -SpecId $inProgress[0] -Phase 'in-progress' -Gate 'code-edit' -Decision 'allow' -Ext $ext
     }
 }
 

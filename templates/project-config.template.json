@@ -132,6 +132,11 @@
       "retroStaleMinutes": 30,
       "debounceMinutes": 10,
       "_use": "Reminder to update stale retros after subagent runs"
+    },
+    "metrics": {
+      "enabled": true,
+      "path": ".specs/_metrics/events.jsonl",
+      "_use": "Append-only, metadata-only event log (no code content, no file paths) consumed by the retro loop. Set enabled=false to opt out entirely."
     }
   }
 }

@@ -62,6 +62,146 @@ index_path="${cwd}/${index_rel}"
 state_dir="${cwd}/.claude/.hookstate"
 state_path="${state_dir}/subagent-retro-${safe_id}.json"
 
+# --- metrics: shared event writer -----------------------------------------
+# Duplicated verbatim from spec-gate.sh (hooks are standalone scripts with no
+# shared library - keeping the two copies textually identical makes any
+# future drift between them greppable). Append-only, metadata-only event log
+# for the retro loop (SW-10). Every failure path here is a silent no-op -
+# metrics must NEVER surface as a hook error. Emitted regardless of debounce;
+# see the emit_subagent_stop_metric call site below.
+
+# A metrics path is not an arbitrary-write primitive: reject anything rooted
+# (leading '/' or a drive-letter prefix) or that escapes cwd via '..' rather
+# than ever writing outside the workspace. Reuses the same rootedness test and
+# dot-segment collapse used for the gate's own path safety above, so the two
+# checks cannot silently diverge. Mirrors Test-MetricsPathSafe in
+# spec-gate.ps1.
+metrics_path_is_safe() {
+    local p="$1"
+    [[ -z "${p}" ]] && return 1
+    if [[ "${p}" == /* || "${p}" == ?:* ]]; then
+        return 1
+    fi
+    local collapsed
+    collapsed="$(collapse_dot_segments "${p//\\//}")"
+    if [[ "${collapsed}" == ".." || "${collapsed}" == "../"* ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# $1 = a complete JSON object literal string containing every field EXCEPT
+# ts, already in fixed key order (spec_id, phase, event, ...). ts is prepended
+# here so each call site only has to build the part specific to its own event
+# kind. jq's object-add operator appends keys from the right operand that are
+# not already present in the left, in their own original order - since ts is
+# never present in the body, this reliably yields ts first followed by the
+# body's keys in the order the caller wrote them.
+write_metric_line() {
+    local body="$1"
+
+    local metrics_enabled
+    # `//` treats an explicit `false` as absent, so compare directly against
+    # `false` (type-strict: only a literal JSON boolean false disables this).
+    metrics_enabled="$(printf '%s' "${config_json}" | jq -r 'if .hooks.metrics.enabled == false then "false" else "true" end' 2>/dev/null)"
+    [[ "${metrics_enabled}" == "false" ]] && return 0
+
+    local metrics_path
+    metrics_path="$(printf '%s' "${config_json}" | jq -r '.hooks.metrics.path // ".specs/_metrics/events.jsonl"' 2>/dev/null)"
+    metrics_path="${metrics_path//\\//}"
+    metrics_path_is_safe "${metrics_path}" || return 0
+
+    local full_path="${cwd}/${metrics_path}"
+    mkdir -p "$(dirname "${full_path}")" 2>/dev/null || return 0
+
+    local ts
+    ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u)"
+
+    local line
+    line="$(printf '%s' "${body}" | jq -c --arg ts "${ts}" '{ts:$ts} + .' 2>/dev/null)"
+    [[ -z "${line}" ]] && return 0
+
+    printf '%s\n' "${line}" >> "${full_path}" 2>/dev/null || true
+    return 0
+}
+
+# Collapses '.' and '..' segments in a forward-slash path using pure string
+# processing - no filesystem access, no `realpath`/`readlink -f`/`cd`. Mirrors
+# collapse_dot_segments in spec-gate.sh exactly (duplicated verbatim - see the
+# metrics writer note above). Only used here by metrics_path_is_safe.
+collapse_dot_segments() {
+    local path="$1"
+    local root_prefix="" body="${path}"
+    if [[ "${path}" == /* ]]; then
+        root_prefix="/"
+        body="${path#/}"
+    elif [[ "${path}" == ?:* ]]; then
+        root_prefix="${path:0:2}/"
+        body="${path:2}"
+        body="${body#/}"
+    fi
+
+    local rooted=0
+    [[ -n "${root_prefix}" ]] && rooted=1
+
+    local acc="" seg rest="${body}"
+    while [[ -n "${rest}" ]]; do
+        seg="${rest%%/*}"
+        if [[ "${rest}" == */* ]]; then
+            rest="${rest#*/}"
+        else
+            rest=""
+        fi
+        case "${seg}" in
+            ''|'.')
+                continue
+                ;;
+            '..')
+                if [[ -n "${acc}" ]]; then
+                    local last="${acc##*/}"
+                    if [[ "${last}" == '..' ]]; then
+                        # Already-stacked leading '..' (unrooted overflow) - keep stacking.
+                        acc="${acc}/.."
+                    else
+                        local trimmed="${acc%/*}"
+                        if [[ "${trimmed}" == "${acc}" ]]; then
+                            # acc was a single segment with no slash - pop to empty.
+                            acc=""
+                        else
+                            acc="${trimmed}"
+                        fi
+                    fi
+                elif [[ ${rooted} -eq 1 ]]; then
+                    # Cannot go above the root - drop it, matching GetFullPath's clamp.
+                    :
+                else
+                    # No root to clamp against - keep the unresolved '..'.
+                    acc=".."
+                fi
+                ;;
+            *)
+                if [[ -z "${acc}" ]]; then
+                    acc="${seg}"
+                else
+                    acc="${acc}/${seg}"
+                fi
+                ;;
+        esac
+    done
+
+    printf '%s%s' "${root_prefix}" "${acc}"
+}
+
+# subagent_stop metric: $1=spec_id $2=phase $3=stale (0 or 1)
+emit_subagent_stop_metric() {
+    local spec_id="$1" phase="$2" stale="$3"
+    local body
+    body="$(jq -nc --arg spec_id "${spec_id}" --arg phase "${phase}" --argjson stale "${stale}" \
+        '{spec_id:$spec_id,phase:$phase,event:"subagent_stop",stale:$stale}' 2>/dev/null)"
+    [[ -z "${body}" ]] && return 0
+    write_metric_line "${body}"
+}
+
 # --- portable mtime helper (Linux: -c %Y; macOS/BSD: -f %m) -------------------
 
 get_mtime() {
@@ -155,6 +295,22 @@ for i in "${!specs[@]}"; do
         # age matches subagent-retro.ps1's [Math]::Round on the same mtime.
         stale_age+=("$(( (age + 30) / 60 ))")
     fi
+done
+
+# Metrics: one subagent_stop event per in-progress spec, emitted regardless
+# of staleness or debounce - debounce below only suppresses the user-facing
+# reminder, never this measurement (SW-10). A spec not in stale_id[]
+# (including every RCA, which the loop above always skips) reports stale=0.
+for i in "${!specs[@]}"; do
+    sid="${specs[$i]}"
+    is_stale=0
+    for s in "${stale_id[@]:-}"; do
+        if [[ "${s}" == "${sid}" ]]; then
+            is_stale=1
+            break
+        fi
+    done
+    emit_subagent_stop_metric "${sid}" "in-progress" "${is_stale}"
 done
 
 if [[ ${#stale_id[@]} -eq 0 ]]; then

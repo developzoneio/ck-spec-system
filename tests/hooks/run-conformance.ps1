@@ -147,6 +147,66 @@ function Invoke-HookProcess {
     }
 }
 
+function Get-MetricsEventsPath {
+    param([string]$Ws)
+    # Mirrors both hook implementations' own fallback: hooks.metrics.path from
+    # the WORKSPACE's own project-config.json (a fresh per-run copy of the
+    # case's workspace/ tree), defaulting to .specs/_metrics/events.jsonl when
+    # the key or the file itself is absent/malformed. This is what lets the
+    # metrics-custom-path case tell the harness where to look.
+    $relPath = '.specs/_metrics/events.jsonl'
+    $cfgPath = Join-Path $Ws '.claude/project-config.json'
+    if (Test-Path -LiteralPath $cfgPath) {
+        try {
+            $cfg = Get-Content -LiteralPath $cfgPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($cfg.hooks.metrics.path) { $relPath = [string]$cfg.hooks.metrics.path }
+        } catch { }
+    }
+    return (Join-Path $Ws ($relPath.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
+}
+
+function Get-CaseEvents {
+    param([string]$Ws)
+    # Read the events file BEFORE the caller deletes the workspace. Each line
+    # is normalized independently: ts is wall-clock and can never match a
+    # golden, so it is replaced with the literal "<TS>" once verified to look
+    # like a real timestamp - a malformed ts becomes "<BAD-TS>" instead of
+    # being silently erased, so a broken timestamp FAILS the case.
+    $events = [System.Collections.Generic.List[object]]::new()
+    $eventsPath = Get-MetricsEventsPath -Ws $Ws
+    if (-not (Test-Path -LiteralPath $eventsPath)) { return , @() }
+    $lines = Get-Content -LiteralPath $eventsPath -ErrorAction SilentlyContinue
+    foreach ($line in @($lines)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        try {
+            $obj = $line | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            continue
+        }
+        # PowerShell 7's ConvertFrom-Json auto-converts an ISO-8601 "...Z"
+        # string to a [datetime] with Kind=Utc (same gotcha documented in
+        # subagent-retro.ps1's Test-DebounceElapsed); PowerShell 5.1 leaves it
+        # as a plain string. Re-render a [datetime] back into the on-disk
+        # format before pattern-matching it, rather than stringifying it
+        # directly, which would use local culture and never match.
+        $rawTs = $obj.ts
+        if ($rawTs -is [datetime]) {
+            $tsVal = $rawTs.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        } elseif ($null -ne $rawTs) {
+            $tsVal = [string]$rawTs
+        } else {
+            $tsVal = ''
+        }
+        if ($tsVal -match '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$') {
+            $obj.ts = '<TS>'
+        } else {
+            $obj.ts = '<BAD-TS>'
+        }
+        $events.Add($obj) | Out-Null
+    }
+    return , @($events)
+}
+
 function Invoke-HookImpl {
     param(
         [string]$Impl,
@@ -159,12 +219,48 @@ function Invoke-HookImpl {
         $inputPath = Join-Path $CaseDir 'input.json'
         $payload = (Get-Content -LiteralPath $inputPath -Raw).Replace('{{CWD}}', $wsForward)
         if ($Impl -eq 'bash') {
-            return Invoke-HookProcess -Exe $script:bashExe -ProcArgs @($HookScript) -Payload $payload
+            $run = Invoke-HookProcess -Exe $script:bashExe -ProcArgs @($HookScript) -Payload $payload
+        } else {
+            $run = Invoke-HookProcess -Exe 'pwsh' -ProcArgs @('-NoProfile', '-File', $HookScript) -Payload $payload
         }
-        return Invoke-HookProcess -Exe 'pwsh' -ProcArgs @('-NoProfile', '-File', $HookScript) -Payload $payload
+        $events = Get-CaseEvents -Ws $ws
+        return [pscustomobject]@{
+            ExitCode  = $run.ExitCode
+            Stdout    = $run.Stdout
+            Stderr    = $run.Stderr
+            Events    = $events
+            Workspace = $ws
+        }
     } finally {
         Remove-Item -LiteralPath $ws -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Test-EventsLeakNoPath {
+    param(
+        [object[]]$Events,
+        [string]$Ws
+    )
+    # Structural guard for the metrics-code-edit-allow fixture (privacy
+    # decision in SW-10-implementation-plan.md section 1: "record the file
+    # extension only, never the path"). Golden-equality alone is not quite
+    # enough here - a leaked absolute path would embed a per-run random temp
+    # directory name and so would merely show up as SOME mismatching value
+    # in the diff, not as an explicit "path leaked" failure. This walks every
+    # field of every event (skipping ts, already normalized to "<TS>"/
+    # "<BAD-TS>") and fails loudly if a value contains a path separator or
+    # the workspace path itself, in either slash direction.
+    $wsForward = $Ws.Replace('\', '/')
+    foreach ($ev in @($Events)) {
+        foreach ($prop in $ev.PSObject.Properties) {
+            if ($prop.Name -eq 'ts') { continue }
+            $val = [string]$prop.Value
+            if ($val.Length -eq 0) { continue }
+            if ($val.Contains('/') -or $val.Contains('\')) { return $false }
+            if ($val.Contains($Ws) -or $val.Contains($wsForward)) { return $false }
+        }
+    }
+    return $true
 }
 
 # ---- normalizers: one per hook, each maps a raw run to a decision object ----
@@ -209,6 +305,7 @@ function ConvertTo-SpecGateDecision {
         permissionDecision = $permission
         reason             = $reason
         stderr             = $Run.Stderr.Trim()
+        events             = @($Run.Events)
     }
 }
 
@@ -250,6 +347,7 @@ function ConvertTo-PromptRouterDecision {
         specFolders = @($specFolders | Sort-Object)
         inProgress  = @($inProgress | Sort-Object)
         stderr      = $Run.Stderr.Trim()
+        events      = @($Run.Events)
     }
 }
 
@@ -276,6 +374,7 @@ function ConvertTo-SubagentRetroDecision {
         emitted  = $Run.Stdout.Contains('<retro-reminder>')
         stale    = @($stale | Sort-Object -Property id)
         stderr   = $Run.Stderr.Trim()
+        events   = @($Run.Events)
     }
 }
 
@@ -288,6 +387,10 @@ $hookNormalizers = @{
 function Get-CanonicalJson {
     param($Obj)
     return ($Obj | ConvertTo-Json -Depth 5 -Compress)
+}
+
+$script:noLeakCases = @{
+    'spec-gate' = @('metrics-code-edit-allow')
 }
 
 function Invoke-ConformanceCase {
@@ -304,12 +407,31 @@ function Invoke-ConformanceCase {
     $bashJson     = Get-CanonicalJson (& $normalizer $bashRun)
     $pwshJson     = Get-CanonicalJson (& $normalizer $pwshRun)
     $expectedJson = Get-CanonicalJson $expected
+    $match = ($bashJson -eq $expectedJson) -and ($pwshJson -eq $expectedJson)
+
+    $caseName = Split-Path -Leaf $CaseDir
+    $leakNote = $null
+    $leakCases = $script:noLeakCases[$HookName]
+    if ($null -ne $leakCases -and $leakCases -contains $caseName) {
+        # Golden-equality alone would only surface a leaked path as an
+        # unexplained mismatch (the leaked value embeds a per-run random temp
+        # directory name, so it can never equal a fixed golden). This makes
+        # the failure mode explicit instead of a generic diff.
+        $bashClean = Test-EventsLeakNoPath -Events $bashRun.Events -Ws $bashRun.Workspace
+        $pwshClean = Test-EventsLeakNoPath -Events $pwshRun.Events -Ws $pwshRun.Workspace
+        if ((-not $bashClean) -or (-not $pwshClean)) {
+            $match = $false
+            $leakNote = "structural no-path-leak check FAILED (bash clean=$bashClean, pwsh clean=$pwshClean)"
+        }
+    }
+
     return [pscustomobject]@{
-        CaseName = Split-Path -Leaf $CaseDir
+        CaseName = $caseName
         Bash     = $bashJson
         Pwsh     = $pwshJson
         Expected = $expectedJson
-        Match    = ($bashJson -eq $expectedJson) -and ($pwshJson -eq $expectedJson)
+        Match    = $match
+        LeakNote = $leakNote
     }
 }
 
@@ -318,6 +440,9 @@ function Write-CaseDiff {
     Write-Host "         expected : $($Result.Expected)"
     Write-Host "         bash     : $($Result.Bash)"
     Write-Host "         pwsh     : $($Result.Pwsh)"
+    if ($Result.LeakNote) {
+        Write-Host "         leak     : $($Result.LeakNote)"
+    }
 }
 
 # ---- preconditions ----------------------------------------------------------

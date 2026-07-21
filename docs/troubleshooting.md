@@ -9,6 +9,7 @@ Common issues and fixes. Skim the table of contents first; the fix you need is u
 - [Workflow issues](#workflow-issues)
 - [Spec issues](#spec-issues)
 - [Spec-gate blocking unexpectedly](#spec-gate-blocking-unexpectedly)
+- [Spec metrics log](#spec-metrics-log)
 - [MCP issues](#mcp-issues)
 - [Resetting](#resetting)
 
@@ -248,6 +249,28 @@ If the index row is missing or has the wrong status, fix it via `/sd:spec status
 ### I want to disable spec-gate temporarily
 
 Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't forget to flip back. A separate setting `hooks.specGate.enabled: false` disables it entirely.
+
+---
+
+## Spec metrics log
+
+### `.specs/_metrics/events.jsonl` keeps growing
+
+**Cause**: this is expected in v1. `spec-gate` and `subagent-retro` each append one line per gate decision, `.specs/index.md` lifecycle transition, or subagent-stop check. There is no rotation or size cap yet - documented as a known limitation. Each line is small (roughly 120 bytes), so even a heavy month of dogfooding stays well under a megabyte, but the file grows without bound over the life of a project.
+
+**Fix**: no action needed unless the file becomes inconvenient. To stop further writes:
+```json
+"hooks": {
+  "metrics": { "enabled": false }
+}
+```
+in `.claude/project-config.json`. Existing lines are left untouched; only future writes stop.
+
+### Is it safe to commit or share `.specs/_metrics/events.jsonl`?
+
+**Yes, by design.** Every line is metadata only: a timestamp, a spec ID, a lifecycle phase, an event kind and decision, and (for code-edit gates) a lowercased file extension. It never contains a file path, a file name, or any code content - see `docs/architecture.md`'s event log schema for the exact field list.
+
+Whether to actually commit it is still your call, not the engine's. If you'd rather keep it purely local, add `.specs/_metrics/` to the project's `.gitignore` yourself - specwright does not add this entry automatically.
 
 ---
 

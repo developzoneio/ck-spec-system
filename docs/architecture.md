@@ -164,9 +164,11 @@ A skill is **not** an agent. It cannot be invoked directly, has no tools of its 
 
 ---
 
-## Hooks as context injection + guardrails
+## Hooks as context injection, guardrails, and recording
 
-Three hooks ship in cross-platform pairs (PowerShell + bash):
+Three hooks ship in cross-platform pairs (PowerShell + bash). Each plays one of three roles:
+`prompt-router` injects context, `spec-gate` guards edits (and records), `subagent-retro`
+reminds about stale retros (and records).
 
 ### `prompt-router` (`UserPromptSubmit`)
 
@@ -185,6 +187,11 @@ Runs before any code-editing tool. Decides:
 - Editing a code file (cs/ts/py/rs/go/etc.) with no in-progress spec? -> block or warn (configurable).
 
 This catches the common failure mode where the user (or Claude) jumps straight to editing code without creating a spec first.
+
+Alongside guarding, `spec-gate` also **records**: every gate decision (verify / protected /
+code-edit) and every `.specs/index.md` lifecycle transition it observes is appended as one JSON
+line to `.specs/_metrics/events.jsonl`. Recording is purely observational - it never alters a
+gate decision, only measures it after the fact. See the event log section below for the schema.
 
 **Block output schema (dual-format).** When `spec-gate` denies a tool call, it emits a single JSON object that carries **both** the new and the legacy schema fields so it works across Claude Code CLI versions:
 
@@ -206,6 +213,44 @@ This catches the common failure mode where the user (or Claude) jumps straight t
 ### `subagent-retro` (`SubagentStop`)
 
 Runs after every subagent invocation. If any in-progress spec has a `05-retro.md` older than `retroStaleMinutes`, emits a `<retro-reminder>` block. Debounced per session via `.claude/.hookstate/`.
+
+`subagent-retro` also **records**: it appends one `subagent_stop` event per in-progress spec to
+`.specs/_metrics/events.jsonl`, carrying the same stale/missing-retro count the reminder is based
+on. Recording happens regardless of debounce - debounce only suppresses the user-facing reminder,
+not the measurement.
+
+### Event log (`.specs/_metrics/events.jsonl`)
+
+`spec-gate` and `subagent-retro` are the two hooks that record. Each appends one JSON object per
+line (append-only, UTF-8, LF-terminated) to `.specs/_metrics/events.jsonl`, in a fixed key order so
+the PowerShell and bash implementations produce byte-comparable lines:
+
+| Field | Present | Values |
+|---|---|---|
+| `ts` | always | `yyyy-MM-ddTHH:mm:ssZ` - whole-second UTC, the same format used by the `subagent-retro` debounce state file |
+| `spec_id` | always | `FEAT-x` / `BUG-x` / ... , or `-` when no spec is in scope |
+| `phase` | always | lifecycle status of `spec_id` (`draft` / `approved` / `in-progress` / `done`), or `-` |
+| `event` | always | `gate` \| `spec_transition` \| `subagent_stop` |
+| `gate` | when `event` is `gate` | `verify` \| `protected` \| `code-edit` |
+| `decision` | when `event` is `gate` or `spec_transition` | `allow` \| `block` \| `warn` - on a transition, whether the index edit was ultimately allowed through. Most direct index edits are blocked by `paths.protected`, so `block` is the common case; a verified `done` close-out is the path that yields `allow`. |
+| `from` | when `event` is `spec_transition` | previous lifecycle status, or `-` if not derivable |
+| `ext` | when `gate` is `code-edit` | lowercased file extension, e.g. `.ps1` - never a path |
+| `stale` | when `event` is `subagent_stop` | count of stale/missing retros observed for that spec |
+
+Example lines:
+
+```json
+{"ts":"2026-07-21T09:14:02Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"spec_transition","from":"approved","decision":"block"}
+{"ts":"2026-07-21T09:31:44Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"gate","gate":"code-edit","decision":"warn","ext":".ps1"}
+{"ts":"2026-07-21T09:40:55Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"subagent_stop","stale":1}
+```
+
+The log is metadata-only by design: no file paths, no code content, no commit messages - only spec
+IDs, lifecycle phases, decisions, and file extensions. Controlled by `hooks.metrics` in
+`.claude/project-config.json` (`enabled`, default `true`; `path`, default
+`.specs/_metrics/events.jsonl`). Set `hooks.metrics.enabled` to `false` to stop writing entirely.
+There is no rotation in v1 - the file grows unbounded (documented as a known limitation; see
+`docs/troubleshooting.md`).
 
 Hooks are **defensive**: any failure path exits `0` silently. They never block the user on their own bugs.
 

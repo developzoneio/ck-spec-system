@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Local, privacy-safe spec metrics (SW-10): `spec-gate` and `subagent-retro` now append one JSON
+  line per gate decision, `index.md` lifecycle transition, and subagent-stop check to
+  `.specs/_metrics/events.jsonl` - metadata only (timestamp, spec ID, lifecycle phase, decision,
+  file extension), never a file path or code content. Controlled by `hooks.metrics.enabled` in
+  `.claude/project-config.json`, which **defaults to `true`** - an existing install starts writing
+  `.specs/_metrics/events.jsonl` on the next hook run after upgrading, with no action required. Set
+  `hooks.metrics.enabled` to `false` to opt out entirely. No log rotation in v1 (documented as a
+  known limitation; ~120 bytes/line). Foundation for the closed retro-learning loop (SW-7).
 - `/sd:verify <spec-ID>` traceability gate: SC-/AC-IDs in the feature template, a `Covers`
   task field, a `06-verify.md` pass artifact, and spec-gate hook enforcement (Rule 0 in
   `spec-gate.{ps1,sh}`, flag `hooks.specGate.verifyGate`) that blocks a feature (FEAT-)

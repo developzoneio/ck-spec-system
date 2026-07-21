@@ -48,7 +48,7 @@ fi
 # /sd:setup has run) must still get the built-in protected paths, so the
 # fallback is a full default document rather than an empty object. This must
 # stay byte-identical in meaning to $defaults in spec-gate.ps1.
-default_config='{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[".specs/constitution.md",".specs/index.md","LICENSE"]},"hooks":{"specGate":{"enabled":true,"mode":"warn"}}}'
+default_config='{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[".specs/constitution.md",".specs/index.md","LICENSE"]},"hooks":{"specGate":{"enabled":true,"mode":"warn"},"metrics":{"enabled":true,"path":".specs/_metrics/events.jsonl"}}}'
 
 config_path="${cwd}/.claude/project-config.json"
 config_json="${default_config}"
@@ -205,6 +205,166 @@ emit_block() {
         '{decision:"block",reason:$r,hookSpecificOutput:{permissionDecision:"deny",reason:$r}}'
 }
 
+# --- metrics: shared event writer ---------------------------------------------
+# Append-only, metadata-only event log for the retro loop (SW-10). Every
+# failure path here is a silent no-op - metrics must NEVER surface as a hook
+# error or change a gate decision. Every call site invokes this AFTER the
+# decision is already computed (and, for a block, already emitted) - never
+# from inside the decision path itself.
+
+# A metrics path is not an arbitrary-write primitive: reject anything rooted
+# (leading '/' or a drive-letter prefix) or that escapes cwd via '..' rather
+# than ever writing outside the workspace. Reuses the same rootedness test and
+# dot-segment collapse used for the gate's own path safety above, so the two
+# checks cannot silently diverge. Mirrors Test-MetricsPathSafe in
+# spec-gate.ps1.
+metrics_path_is_safe() {
+    local p="$1"
+    [[ -z "${p}" ]] && return 1
+    if [[ "${p}" == /* || "${p}" == ?:* ]]; then
+        return 1
+    fi
+    local collapsed
+    collapsed="$(collapse_dot_segments "${p//\\//}")"
+    if [[ "${collapsed}" == ".." || "${collapsed}" == "../"* ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# $1 = a complete JSON object literal string containing every field EXCEPT
+# ts, already in fixed key order (spec_id, phase, event, ...). ts is prepended
+# here so each call site only has to build the part specific to its own event
+# kind. jq's object-add operator appends keys from the right operand that are
+# not already present in the left, in their own original order - since ts is
+# never present in the body, this reliably yields ts first followed by the
+# body's keys in the order the caller wrote them.
+write_metric_line() {
+    local body="$1"
+
+    local metrics_enabled
+    # `//` treats an explicit `false` as absent, so compare directly against
+    # `false` (type-strict: only a literal JSON boolean false disables this).
+    metrics_enabled="$(printf '%s' "${config_json}" | jq -r 'if .hooks.metrics.enabled == false then "false" else "true" end' 2>/dev/null)"
+    [[ "${metrics_enabled}" == "false" ]] && return 0
+
+    local metrics_path
+    metrics_path="$(printf '%s' "${config_json}" | jq -r '.hooks.metrics.path // ".specs/_metrics/events.jsonl"' 2>/dev/null)"
+    metrics_path="${metrics_path//\\//}"
+    metrics_path_is_safe "${metrics_path}" || return 0
+
+    local full_path="${cwd}/${metrics_path}"
+    mkdir -p "$(dirname "${full_path}")" 2>/dev/null || return 0
+
+    local ts
+    ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u)"
+
+    local line
+    line="$(printf '%s' "${body}" | jq -c --arg ts "${ts}" '{ts:$ts} + .' 2>/dev/null)"
+    [[ -z "${line}" ]] && return 0
+
+    printf '%s\n' "${line}" >> "${full_path}" 2>/dev/null || true
+    return 0
+}
+
+# gate metric: $1=spec_id $2=phase $3=gate $4=decision $5=ext (optional)
+emit_gate_metric() {
+    local spec_id="$1" phase="$2" gate="$3" decision="$4" ext="${5:-}"
+    local body
+    if [[ -n "${ext}" ]]; then
+        body="$(jq -nc --arg spec_id "${spec_id}" --arg phase "${phase}" --arg gate "${gate}" --arg decision "${decision}" --arg ext "${ext}" \
+            '{spec_id:$spec_id,phase:$phase,event:"gate",gate:$gate,decision:$decision,ext:$ext}' 2>/dev/null)"
+    else
+        body="$(jq -nc --arg spec_id "${spec_id}" --arg phase "${phase}" --arg gate "${gate}" --arg decision "${decision}" \
+            '{spec_id:$spec_id,phase:$phase,event:"gate",gate:$gate,decision:$decision}' 2>/dev/null)"
+    fi
+    [[ -z "${body}" ]] && return 0
+    write_metric_line "${body}"
+}
+
+# spec_transition metric: $1=spec_id $2=phase $3=from $4=decision
+emit_transition_metric() {
+    local spec_id="$1" phase="$2" from="$3" decision="$4"
+    local body
+    body="$(jq -nc --arg spec_id "${spec_id}" --arg phase "${phase}" --arg from "${from}" --arg decision "${decision}" \
+        '{spec_id:$spec_id,phase:$phase,event:"spec_transition",from:$from,decision:$decision}' 2>/dev/null)"
+    [[ -z "${body}" ]] && return 0
+    write_metric_line "${body}"
+}
+
+# --- spec_transition: general lifecycle scan (read-only, all 5 prefixes x any status) ---
+# Deliberately a SEPARATE scan from the FEAT-/done-only `pending_done`
+# extraction inside Rule 0 below: that one backs a live gate decision (see its
+# Rule 0 scope comment) and must not be refactored into this one, which only
+# feeds the observational spec_transition metric. Row shape is
+# "| ID | Type | Status | Title |" - split on '|' and read columns 2 and 4
+# rather than a loose substring match, so a Title that happens to mention
+# another id/status word cannot be misread as that row's own id or status.
+extract_id_status_pairs() {
+    awk -F'|' '
+        NF >= 5 {
+            id = $2; gsub(/^[ \t]+|[ \t]+$/, "", id)
+            status = $4; gsub(/^[ \t]+|[ \t]+$/, "", status)
+            if (id ~ /^(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+$/ && status ~ /^(draft|approved|in-progress|done|archived)$/) {
+                print id "\t" status
+            }
+        }
+    '
+}
+
+# Populates the parallel arrays transition_id[] / transition_phase[] /
+# transition_from[] for the CURRENT pending edit. No-op (arrays left empty)
+# unless this edit targets index.md - checked by the caller via rel/index_rel
+# before calling, same scoping as Rule 0.
+declare -a transition_id=()
+declare -a transition_phase=()
+declare -a transition_from=()
+
+collect_spec_transitions() {
+    local old_pairs="" new_pairs=""
+    if [[ -f "${index_path}" ]]; then
+        old_pairs="$(extract_id_status_pairs < "${index_path}")"
+    fi
+    case "${tool_name}" in
+        Edit)      new_pairs="$(printf '%s' "${input}" | jq -r '.tool_input.new_string // empty' 2>/dev/null | extract_id_status_pairs)" ;;
+        Write)     new_pairs="$(printf '%s' "${input}" | jq -r '.tool_input.content // empty' 2>/dev/null | extract_id_status_pairs)" ;;
+        MultiEdit) new_pairs="$(printf '%s' "${input}" | jq -r '[.tool_input.edits[]?.new_string // empty] | join("\n")' 2>/dev/null | extract_id_status_pairs)" ;;
+    esac
+    [[ -z "${new_pairs}" ]] && return 0
+
+    local seen="|"
+    while IFS=$'\t' read -r id newstatus; do
+        [[ -z "${id}" ]] && continue
+        case "${seen}" in
+            *"|${id}|"*) continue ;;
+        esac
+        seen="${seen}${id}|"
+
+        local oldstatus="-"
+        if [[ -n "${old_pairs}" ]]; then
+            local found
+            found="$(printf '%s\n' "${old_pairs}" | awk -F'\t' -v want="${id}" '$1==want {print $2; exit}')"
+            [[ -n "${found}" ]] && oldstatus="${found}"
+        fi
+
+        if [[ "${oldstatus}" != "${newstatus}" ]]; then
+            transition_id+=("${id}")
+            transition_phase+=("${newstatus}")
+            transition_from+=("${oldstatus}")
+        fi
+    done <<< "${new_pairs}"
+}
+
+# Emits one spec_transition event per entry in transition_id[] with the given
+# overall decision - the decision is for the WHOLE edit (there is only one per
+# hook invocation), not per-id, so every entry shares it.
+emit_transition_metrics() {
+    local decision="$1"
+    for i in "${!transition_id[@]}"; do
+        emit_transition_metric "${transition_id[$i]}" "${transition_phase[$i]}" "${transition_from[$i]}" "${decision}"
+    done
+}
+
 # --- Rule 0: verify gate on the spec index ------------------------------------
 # A row transitioning to done requires a passing /sd:verify artifact; a
 # verified close-out is allowed through the protected-path rule. Any other
@@ -230,6 +390,14 @@ spec_dir="$(printf '%s' "${config_json}" | jq -r '.spec.dir // ".specs"' 2>/dev/
 rel_lower="$(to_lower "${rel}")"
 index_rel_norm="${index_rel//\\//}"
 index_rel_lower="$(to_lower "${index_rel_norm}")"
+
+# spec_transition metric: read-only, general lifecycle scan of THIS index.md
+# edit. Populated unconditionally of verify_gate (it never influences the
+# gate decision, only records whatever decision is ultimately reached below);
+# left empty whenever this edit is not to the index file.
+if [[ "${rel_lower}" == "${index_rel_lower}" ]]; then
+    collect_spec_transitions
+fi
 
 if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; then
     fragments=""
@@ -286,9 +454,25 @@ if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; t
 
             if [[ -n "${missing}" ]]; then
                 emit_block "spec-gate: index row(s) [${missing}] -> done but no passing /sd:verify artifact. Run /sd:verify <spec-ID>; close-out is allowed only after ${spec_dir}/<ID>/06-verify.md records 'result: pass'."
+                # Metrics are emitted AFTER the block decision above is
+                # already written to stdout - never inside the decision path.
+                while IFS= read -r id; do
+                    [[ -z "${id}" ]] && continue
+                    id_decision="allow"
+                    if printf '%s\n' "${missing}" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -qx "${id}"; then
+                        id_decision="block"
+                    fi
+                    emit_gate_metric "${id}" "done" "verify" "${id_decision}"
+                done <<< "${transition_ids}"
+                emit_transition_metrics "block"
                 exit 0
             fi
             # Every transitioning spec has a passing artifact - allow the close-out.
+            while IFS= read -r id; do
+                [[ -z "${id}" ]] && continue
+                emit_gate_metric "${id}" "done" "verify" "allow"
+            done <<< "${transition_ids}"
+            emit_transition_metrics "allow"
             exit 0
         fi
     fi
@@ -313,6 +497,8 @@ done < <(printf '%s' "${config_json}" | jq -r '.paths.protected // [] | .[]' 2>/
 
 if [[ ${is_protected} -eq 1 ]]; then
     emit_block "spec-gate: '${rel}' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
+    emit_gate_metric "-" "-" "protected" "block"
+    emit_transition_metrics "block"
     exit 0
 fi
 
@@ -350,6 +536,7 @@ if [[ ${is_allowed} -eq 0 ]]; then
 fi
 
 if [[ ${is_allowed} -eq 1 ]]; then
+    emit_transition_metrics "allow"
     exit 0
 fi
 
@@ -370,12 +557,22 @@ if [[ ${is_code} -eq 0 ]]; then
     exit 0
 fi
 
+# Metric ext value MUST include the leading dot (e.g. ".ps1") to match
+# spec-gate.ps1's [System.IO.Path]::GetExtension output - ext_lower above has
+# the dot already stripped for the extension-list case match.
+metric_ext=".${ext_lower}"
+
 # Check for in-progress spec. Both markers must appear on the SAME line
-# (mirrors prompt-router.sh and spec-gate.ps1's same-line semantics).
+# (mirrors prompt-router.sh and spec-gate.ps1's same-line semantics). Also
+# captures the first matching id (same lines, same pattern) for the
+# code-edit allow metric below - this does not change the has_in_progress
+# decision, only records which spec let the edit through.
 has_in_progress=0
+first_in_progress=""
 if [[ -f "${index_path}" ]]; then
-    if grep -E 'in-progress' "${index_path}" 2>/dev/null \
-         | grep -q -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+'; then
+    first_in_progress="$(grep -E 'in-progress' "${index_path}" 2>/dev/null \
+        | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH); exit }')"
+    if [[ -n "${first_in_progress}" ]]; then
         has_in_progress=1
     fi
 fi
@@ -384,11 +581,18 @@ if [[ ${has_in_progress} -eq 0 ]]; then
     msg="spec-gate: editing code file '${rel}' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
     if [[ "${mode}" == "block" ]]; then
         emit_block "${msg}"
+        emit_gate_metric "-" "-" "code-edit" "block" "${metric_ext}"
         exit 0
     else
         echo "[WARN] ${msg}" 1>&2
+        emit_gate_metric "-" "-" "code-edit" "warn" "${metric_ext}"
         exit 0
     fi
+else
+    # An in-progress spec exists - the edit is allowed. Recording the allow
+    # (not just the block/warn paths) is the point: the ratio of allow to
+    # warn/block is what the retro loop measures.
+    emit_gate_metric "${first_in_progress}" "in-progress" "code-edit" "allow" "${metric_ext}"
 fi
 
 exit 0

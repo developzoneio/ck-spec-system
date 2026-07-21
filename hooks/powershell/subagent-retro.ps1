@@ -49,6 +49,7 @@ function Get-ProjectConfig {
                 retroStaleMinutes = 30
                 debounceMinutes   = 10
             }
+            metrics = [pscustomobject]@{ enabled = $true; path = '.specs/_metrics/events.jsonl' }
         }
     }
 
@@ -65,6 +66,175 @@ function Get-ProjectConfig {
     } catch {
         return $defaults
     }
+}
+
+function Test-IsRootedPath {
+    param([string]$Path)
+    # Mirrors spec-gate.sh's rootedness test ("${fp}" != /* && "${fp}" != ?:*),
+    # evaluated on the RAW path (before backslash->slash conversion): a leading
+    # '/' or a drive-letter prefix like 'C:' is rooted, anything else - a plain
+    # relative path such as 'src/../.specs/constitution.md' - is not.
+    if ([string]::IsNullOrEmpty($Path)) { return $false }
+    if ($Path[0] -eq '/') { return $true }
+    if ($Path.Length -ge 2 -and $Path[1] -eq ':') { return $true }
+    return $false
+}
+
+function ConvertTo-CollapsedPath {
+    param([string]$Path)
+    # Pure string-based collapse of '.' and '..' segments on a forward-slash
+    # path - no filesystem access, no .NET path resolution. This mirrors
+    # collapse_dot_segments in spec-gate.sh exactly, including:
+    #   - a rooted path (leading '/' or a drive prefix 'C:/') clamps a '..' at
+    #     its own root instead of walking above it;
+    #   - an unrooted path with nothing to clamp against keeps an unresolved
+    #     leading '..' rather than discarding it;
+    #   - an empty segment (produced by '//' or by a TRAILING separator, e.g.
+    #     ".specs/constitution.md/") is a no-op, same as a '.' segment - this
+    #     is what makes a trailing separator collapse away instead of
+    #     defeating the later exact-match comparison against paths.protected.
+    $rootPrefix = ''
+    $body = $Path
+    $rooted = $false
+    if ($Path.StartsWith('/')) {
+        $rootPrefix = '/'
+        $body = $Path.Substring(1)
+        $rooted = $true
+    } elseif ($Path.Length -ge 2 -and $Path[1] -eq ':') {
+        $rootPrefix = $Path.Substring(0, 2) + '/'
+        $body = $Path.Substring(2)
+        if ($body.StartsWith('/')) { $body = $body.Substring(1) }
+        $rooted = $true
+    }
+
+    $acc = ''
+    foreach ($seg in $body -split '/') {
+        if ($seg -eq '' -or $seg -eq '.') {
+            continue
+        }
+        if ($seg -eq '..') {
+            if ($acc -ne '') {
+                $lastSlash = $acc.LastIndexOf('/')
+                if ($lastSlash -ge 0) { $last = $acc.Substring($lastSlash + 1) } else { $last = $acc }
+                if ($last -eq '..') {
+                    # Already-stacked leading '..' (unrooted overflow) - keep stacking.
+                    $acc = "$acc/.."
+                } elseif ($lastSlash -ge 0) {
+                    $acc = $acc.Substring(0, $lastSlash)
+                } else {
+                    # acc was a single segment with no slash - pop to empty.
+                    $acc = ''
+                }
+            } elseif ($rooted) {
+                # Cannot go above the root - drop it, matching the bash clamp.
+            } else {
+                # No root to clamp against - keep the unresolved '..'.
+                $acc = '..'
+            }
+        } else {
+            if ($acc -eq '') { $acc = $seg } else { $acc = "$acc/$seg" }
+        }
+    }
+
+    return "$rootPrefix$acc"
+}
+
+function Test-MetricsPathSafe {
+    param([string]$RelPath)
+    # A metrics path is not an arbitrary-write primitive: reject anything
+    # rooted (absolute, or a drive-letter path) or that escapes Cwd via '..'
+    # rather than ever writing outside the workspace. Reuses the same
+    # rootedness test and dot-segment collapse used for the gate's own path
+    # safety above, so the two safety checks cannot silently diverge.
+    if ([string]::IsNullOrWhiteSpace($RelPath)) { return $false }
+    if (Test-IsRootedPath -Path $RelPath) { return $false }
+    $collapsed = ConvertTo-CollapsedPath -Path ($RelPath.Replace('\','/'))
+    if ($collapsed -eq '..' -or $collapsed.StartsWith('../')) { return $false }
+    return $true
+}
+
+function Write-MetricEvent {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [string]$EventKind,
+        [System.Collections.Specialized.OrderedDictionary]$Fields
+    )
+    # Fully wrapped: a metrics failure must NEVER surface as a hook error or
+    # change a gate decision. Every call site invokes this AFTER the decision
+    # is already computed (and, for a block, already written to stdout) -
+    # never from inside the decision path itself.
+    try {
+        $enabled = $true
+        # Type-strict: only a literal JSON boolean false disables metrics -
+        # copies the verifyGate `-is [bool]` pattern above so a string
+        # "false" in project-config.json leaves metrics on, matching
+        # spec-gate.sh's `== false` jq comparison.
+        if (($Config.hooks.metrics.enabled -is [bool]) -and (-not $Config.hooks.metrics.enabled)) {
+            $enabled = $false
+        }
+        if (-not $enabled) { return }
+
+        $relPath = '.specs/_metrics/events.jsonl'
+        try { if ($Config.hooks.metrics.path) { $relPath = [string]$Config.hooks.metrics.path } } catch { }
+        $relPath = $relPath.Replace('\','/')
+
+        if (-not (Test-MetricsPathSafe -RelPath $relPath)) { return }
+
+        $fullPath = Join-Path $Cwd $relPath
+        $parent = Split-Path -Path $fullPath -Parent
+        if (-not (Test-Path -LiteralPath $parent)) {
+            New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null
+        }
+
+        # [ordered] (not a plain hashtable) so ConvertTo-Json emits keys in
+        # the exact insertion order below - a plain hashtable does not
+        # guarantee enumeration order, which would let the two
+        # implementations drift apart on key order for the same input.
+        $ordered = [ordered]@{}
+        $ordered['ts']      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $ordered['spec_id'] = $SpecId
+        $ordered['phase']   = $Phase
+        $ordered['event']   = $EventKind
+        foreach ($key in $Fields.Keys) { $ordered[$key] = $Fields[$key] }
+
+        $line = ([pscustomobject]$ordered) | ConvertTo-Json -Compress
+
+        # Add-Content opens and closes the file handle per call and is not
+        # safe against the concurrent PreToolUse + SubagentStop appends this
+        # log can see; retry briefly on a transient sharing violation instead
+        # of failing loudly.
+        $attempt = 0
+        while ($attempt -lt 5) {
+            try {
+                # UTF8Encoding($false): NO byte-order-mark. [Encoding]::UTF8
+                # writes a BOM preamble on the FIRST write to a new/empty
+                # file, which subagent-retro.sh's plain `>>` append never
+                # does - that would make the two implementations' first line
+                # differ by 3 bytes for the exact same input.
+                [System.IO.File]::AppendAllText($fullPath, "$line`n", (New-Object System.Text.UTF8Encoding($false)))
+                break
+            } catch {
+                $attempt++
+                if ($attempt -ge 5) { break }
+                Start-Sleep -Milliseconds 20
+            }
+        }
+    } catch { }
+}
+
+function Write-SubagentStopMetric {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [int]$Stale
+    )
+    $fields = [ordered]@{ stale = $Stale }
+    Write-MetricEvent -Cwd $Cwd -Config $Config -SpecId $SpecId -Phase $Phase -EventKind 'subagent_stop' -Fields $fields
 }
 
 function Get-IndexSpecs {
@@ -214,6 +384,18 @@ $specs = Get-IndexSpecs -IndexPath $indexFile
 if ($specs.Count -eq 0) { exit 0 }
 
 $stale = Get-StaleRetros -SpecDir $specDir -Specs $specs -StaleMinutes $staleMinutes
+
+# Metrics: one subagent_stop event per in-progress spec, emitted regardless
+# of staleness or debounce - debounce below only suppresses the user-facing
+# reminder, never this measurement (SW-10). A spec not in $stale (including
+# every RCA, which Get-StaleRetros always skips) reports stale=0.
+$staleIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+foreach ($s in $stale) { [void]$staleIds.Add($s.Id) }
+foreach ($spec in $specs) {
+    $staleCount = if ($staleIds.Contains($spec.Id)) { 1 } else { 0 }
+    Write-SubagentStopMetric -Cwd $cwd -Config $config -SpecId $spec.Id -Phase 'in-progress' -Stale $staleCount
+}
+
 if ($stale.Count -eq 0) { exit 0 }
 
 if (-not (Test-DebounceElapsed -StatePath $statePath -DebounceMinutes $debounceMinutes)) { exit 0 }
