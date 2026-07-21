@@ -23,3 +23,11 @@ failures: 0
 ## Findings
 
 none
+
+<!-- This artifact is a format illustration, not the output of a real /sd:verify run: no
+     02-tasks.md exists in this folder to back the T01/T02 citations above, and the AC
+     checkboxes in 00-spec.md are intentionally left unchecked (the spec is still `draft`). A
+     literal /sd:verify FEAT-CLEAN-001 would STOP at VF002 (02-tasks.md missing) and, absent
+     that, would fail VF030 (unchecked success-criteria boxes) rather than produce this
+     result: pass artifact. -->
+
