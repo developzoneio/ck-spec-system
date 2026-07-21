@@ -63,6 +63,9 @@ Checklist (in addition to per-task items applied across the union of changes):
 - [ ] Test coverage did not decrease (compare to Phase 3 measurement in spec).
 - [ ] No new constitution exceptions across the union.
 - [ ] New files follow the precedents cited in their tasks' `Pattern refs`; no new utility duplicates an existing one (cite both `file:line`).
+- [ ] Scenario/criterion coverage: every SC-<n> and AC-<n> ID in `00-spec.md` appears in at
+  least one task's `Covers` field in `02-tasks.md`, and each covering task's `Test` exists.
+  Report an uncovered ID as a 🔴 BLOCK finding citing the spec line.
 
 This is broader scope - look for emergent issues that per-task review missed.
 

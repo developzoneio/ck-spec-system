@@ -5,7 +5,7 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 
 ---
 
-## Task block (9 required fields + Pattern refs)
+## Task block (10 required fields + Pattern refs)
 
 ```markdown
 ### T<NN> - <imperative title>
@@ -15,6 +15,7 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 - **Step type**: <foundation | behavior | wiring | polish | test>
 - **Test**: <which test file(s) cover this task>
 - **Acceptance**: <observable criterion>
+- **Covers**: <SC-/AC-ID list, e.g. SC-1, AC-2 | none>
 - **Depends on**: <T## | none>
 - **Conflicts with**: <T## list | none>
 - **Estimated complexity**: <S | M | L>
@@ -22,7 +23,7 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 - **Pattern refs**: <1-3 file:line precedent citations + what to mirror | none>
 ```
 
-The first 9 fields are **required**, not optional. A task block missing any of them is malformed.
+The first 10 fields are **required**, not optional. A task block missing any of them is malformed.
 `Pattern refs` is **required when the task creates a new file or a new public symbol**, and
 recommended otherwise. A block without the field is treated as `Pattern refs: none` (backward
 compatible with existing `.specs/` folders).
@@ -60,6 +61,15 @@ Must come from the constitution's declared layers. Do not invent layer names. If
 
 ### Acceptance
 Must be **observable**: a passing test, a 201 response, a method called exactly once. "Feels right" or "code is cleaner" are not acceptable. Every acceptance criterion must be verifiable without running the full app (unit/integration test preferred).
+
+### Covers
+
+Comma-separated scenario (SC-<n>) and success-criterion (AC-<n>) IDs from `00-spec.md` that
+this task implements or proves. `none` is allowed only for pure wiring/polish tasks that
+advance no criterion directly. Every ID referenced must exist in the spec; every SC and AC in
+the spec must be covered by at least one task - `/sd:verify` fails the spec otherwise. Specs
+authored before this field existed (no SC/AC IDs) are handled by `/sd:verify`'s generic
+checks; treat a missing field as `Covers: none` when reading legacy `02-tasks.md` files.
 
 ### Estimated complexity
 | Value | Guideline |

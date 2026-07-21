@@ -19,21 +19,24 @@ linked_specs: []
 
 ## What
 
-<!-- Behavior described as Given/When/Then. List ALL relevant scenarios, including failure modes. -->
+<!-- Behavior described as Given/When/Then. List ALL relevant scenarios, including failure
+     modes. Scenario IDs (SC-1, SC-2, ...) are stable handles: tasks reference them in their
+     `Covers` field and /sd:verify checks the coverage. Number sequentially; never reuse an ID
+     after deleting a scenario. -->
 
-### Scenario 1: <<happy path name>>
-
-- **Given** <<initial state>>
-- **When** <<action>>
-- **Then** <<observable outcome>>
-
-### Scenario 2: <<edge case name>>
+### SC-1: <<happy path name>>
 
 - **Given** <<initial state>>
 - **When** <<action>>
 - **Then** <<observable outcome>>
 
-### Scenario 3: <<failure mode>>
+### SC-2: <<edge case name>>
+
+- **Given** <<initial state>>
+- **When** <<action>>
+- **Then** <<observable outcome>>
+
+### SC-3: <<failure mode>>
 
 - **Given** <<initial state>>
 - **When** <<action that should fail>>
@@ -41,14 +44,15 @@ linked_specs: []
 
 ## Success criteria
 
-<!-- Concrete, checkable. NOT "works well" - measurable. -->
+<!-- Concrete, checkable. NOT "works well" - measurable. Criterion IDs (AC-1, AC-2, ...) are
+     stable handles referenced by task `Covers` fields and checked by /sd:verify. -->
 
-- [ ] <<criterion 1, e.g. POST /api/notifications/subscribe returns 201 with subscription ID>>
-- [ ] <<criterion 2, e.g. Webhook fires within 5s of inventory drop below threshold>>
-- [ ] <<criterion 3, e.g. Failed webhook retries 3x with exponential backoff>>
-- [ ] <<criterion 4, e.g. p95 latency on subscribe endpoint < 100ms>>
-- [ ] Unit + integration tests cover all scenarios above
-- [ ] No new constitution exceptions
+- [ ] AC-1: <<criterion 1, e.g. POST /api/notifications/subscribe returns 201 with subscription ID>>
+- [ ] AC-2: <<criterion 2, e.g. Webhook fires within 5s of inventory drop below threshold>>
+- [ ] AC-3: <<criterion 3, e.g. Failed webhook retries 3x with exponential backoff>>
+- [ ] AC-4: <<criterion 4, e.g. p95 latency on subscribe endpoint < 100ms>>
+- [ ] AC-5: Unit + integration tests cover all scenarios above
+- [ ] AC-6: No new constitution exceptions
 
 ## Out of scope
 

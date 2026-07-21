@@ -43,6 +43,13 @@ Fill:
 - **Out of scope** — explicit list; prevents scope creep disputes.
 - **Open questions** — real ambiguities only; don't pad.
 
+- Scenario headings use stable IDs: `### SC-<n>: <name>`. IDs are sequential from SC-1 and are
+  never renumbered or reused after a scenario is deleted - downstream `Covers` fields and
+  `/sd:verify` reports reference them.
+- Success criteria use stable IDs: `- [ ] AC-<n>: <criterion>`. Same stability rule as SC IDs.
+- Every SC and AC ID must be covered by at least one task's `Covers` field in `02-tasks.md`
+  before `/sd:verify` can pass (see sd-atomic-task-format).
+
 Constitution check: list applicable `§N.M` references. Flag any potential violation as an Open question.
 
 ---
