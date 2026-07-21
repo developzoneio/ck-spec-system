@@ -63,7 +63,7 @@
         "commands/perf.md"
       ],
       "installTo": "commands/sd/",
-      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 5 of the 11'; the validators also assert each file exists."
+      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr, verify). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 5 of the 12'; the validators also assert each file exists."
     }
   },
 
@@ -87,7 +87,8 @@
     "_bmad-output/",
     "design-artifacts/",
     "node_modules/",
-    ".claude/"
+    ".claude/",
+    ".superpowers/"
   ],
 
   "$exclusionsComment": [

@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `/sd:verify <spec-ID>` traceability gate: SC-/AC-IDs in the feature template, a `Covers`
+  task field, a `06-verify.md` pass artifact, and spec-gate hook enforcement that blocks an
+  `index.md` row transitioning to `done` without a passing artifact
+  (`hooks.specGate.verifyGate`). (SW-6)
 - Cross-implementation hook conformance suite (`tests/hooks/`): golden fixtures are piped into
   both the bash and PowerShell implementation of every hook and the normalized decisions must
   match; wired into CI on all matrix platforms with a self-test proving divergence detection (E4).

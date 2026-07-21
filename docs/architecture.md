@@ -10,7 +10,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    11 workflow definitions                         |
+|    commands/sd/    12 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
@@ -117,13 +117,15 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:spec      -> (none - pure file ops on .specs/)
 /sd:setup     -> (none - scaffolds CLAUDE.md / .specs/ / .claude/)
 /sd:release   -> (none - pure file ops; mirrors /sd:spec)
+/sd:verify    -> (none - pure file ops; traceability check + gate artifact)
 ```
 
-Three commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`) - they are deterministic
-file operations the main thread performs directly. The rest share one backbone: the architect frames the
-spec, an investigator (explorer or debugger) gathers evidence, the implementer makes the change one atomic
-task at a time, and the reviewer gates the result. The reviewer has no write tools, so the loop cannot
-auto-fix - findings always route back through a fresh implementer call.
+Four commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify`) -
+they are deterministic file operations the main thread performs directly. The rest share one
+backbone: the architect frames the spec, an investigator (explorer or debugger) gathers evidence,
+the implementer makes the change one atomic task at a time, and the reviewer gates the result. The
+reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
+fresh implementer call.
 
 ---
 
@@ -322,7 +324,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 11 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 12 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---

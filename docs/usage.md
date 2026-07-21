@@ -289,6 +289,20 @@ Examples:
 
 ---
 
+### /sd:verify
+
+Proves criterion -> task -> test traceability for one spec and writes
+`.specs/<ID>/06-verify.md` with `result: pass|fail`. The spec-gate hook blocks the spec's
+`index.md` row from transitioning to `done` without a passing artifact
+(`hooks.specGate.verifyGate`, default on).
+
+    /sd:verify FEAT-1042
+
+Run it at close-out (Phase 6 of /sd:feature runs it for you) or any time earlier as a
+progress check. A FAIL lists VF0xx findings with file:line citations.
+
+---
+
 ## Common patterns
 
 ### Picking the right workflow
@@ -304,6 +318,7 @@ Examples:
 | "Review this change for compliance" | `/sd:review` |
 | "Manage / browse the spec registry" | `/sd:spec` |
 | "Cut a release / generate release notes from completed work" | `/sd:release` |
+| "Prove a spec is really done (criteria covered, tests pass)" | `/sd:verify` |
 
 ### Resuming a workflow
 
