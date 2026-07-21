@@ -30,7 +30,7 @@ compatible with existing `.specs/` folders).
 
 ### Refactor mode adds one field
 
-`/sd:refactor` tasks append a 10th field after `Pattern refs`:
+`/sd:refactor` tasks append one more field after `Pattern refs`:
 
 ```markdown
 - **Parallel batch**: <batch number | "solo">

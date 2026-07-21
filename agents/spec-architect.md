@@ -62,7 +62,7 @@ Outputs:
 
 ### `02-tasks.md` task format (MANDATORY)
 
-Apply the **sd-atomic-task-format** skill: task block (10 required fields + `Pattern refs`), field-by-field rules (Files, Layer, Step type, Acceptance, Covers, complexity, reversibility, Depends on / Conflicts with, Pattern refs), atomicity rules, and anti-patterns.
+Apply the **sd-atomic-task-format** skill: task block (10 required fields + `Pattern refs`), field-by-field rules (Files, Layer, Step type, Test, Acceptance, Covers, complexity, reversibility, Depends on / Conflicts with, Pattern refs), atomicity rules, and anti-patterns.
 
 - Fill `Covers` on every task: list the SC-/AC-IDs from `00-spec.md` the task implements or
   proves. Before finishing, cross-check that every SC and AC ID in the spec appears in at
