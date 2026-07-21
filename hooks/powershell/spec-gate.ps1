@@ -261,6 +261,72 @@ function Get-InProgressSpecs {
     return $result
 }
 
+function Get-DoneTransitionIds {
+    param(
+        [object]$HookInput,
+        [string]$IndexPath
+    )
+    # IDs that the pending edit marks as done but that the on-disk index does
+    # not yet record as done. Fragments are the tool-specific NEW content.
+    $fragments = New-Object System.Collections.Generic.List[string]
+    try {
+        $tool = $HookInput.tool_name
+        if ($tool -eq 'Edit') {
+            if ($HookInput.tool_input.new_string) {
+                $fragments.Add([string]$HookInput.tool_input.new_string) | Out-Null
+            }
+        } elseif ($tool -eq 'Write') {
+            if ($HookInput.tool_input.content) {
+                $fragments.Add([string]$HookInput.tool_input.content) | Out-Null
+            }
+        } elseif ($tool -eq 'MultiEdit') {
+            foreach ($e in @($HookInput.tool_input.edits)) {
+                if ($e.new_string) { $fragments.Add([string]$e.new_string) | Out-Null }
+            }
+        }
+    } catch { }
+
+    $alreadyDone = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    if (Test-Path -LiteralPath $IndexPath) {
+        try {
+            foreach ($line in (Get-Content -LiteralPath $IndexPath -Encoding UTF8 -ErrorAction Stop)) {
+                if ($line -match '\|\s*done\s*\|' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+                    [void]$alreadyDone.Add($Matches[0])
+                }
+            }
+        } catch { }
+    }
+
+    $result = New-Object System.Collections.Generic.List[string]
+    foreach ($frag in $fragments) {
+        foreach ($line in ($frag -split "`n")) {
+            if ($line -match '\|\s*done\s*\|' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+                $id = $Matches[0]
+                if (-not $alreadyDone.Contains($id) -and -not $result.Contains($id)) {
+                    $result.Add($id) | Out-Null
+                }
+            }
+        }
+    }
+    return ,$result
+}
+
+function Test-VerifyArtifactPass {
+    param(
+        [string]$Cwd,
+        [string]$SpecDir,
+        [string]$SpecId
+    )
+    $artifact = Join-Path $Cwd (Join-Path $SpecDir (Join-Path $SpecId '06-verify.md'))
+    if (-not (Test-Path -LiteralPath $artifact)) { return $false }
+    try {
+        $content = Get-Content -LiteralPath $artifact -Raw -Encoding UTF8 -ErrorAction Stop
+    } catch {
+        return $false
+    }
+    return ($content -match '(?im)^result:\s*pass\s*$')
+}
+
 function Write-BlockDecision {
     param([string]$Reason)
     # Dual-format: new hookSpecificOutput schema + legacy decision field.
@@ -305,6 +371,37 @@ if ([string]::IsNullOrWhiteSpace($filePath)) { exit 0 }
 
 $rel = ConvertTo-RelativePath -Cwd $cwd -FilePath $filePath
 if ([string]::IsNullOrWhiteSpace($rel)) { exit 0 }
+
+# Rule 0: verify gate on the spec index. A row transitioning to done requires
+# a passing /sd:verify artifact; a verified close-out is allowed through the
+# protected-path rule. Any other direct index edit falls through to Rule 1.
+$verifyGateOn = $true
+try { if ($config.hooks.specGate.verifyGate -eq $false) { $verifyGateOn = $false } } catch { }
+
+$indexRel = '.specs/index.md'
+try { if ($config.spec.indexFile) { $indexRel = ([string]$config.spec.indexFile).Replace('\','/') } } catch { }
+$specDir = '.specs'
+try { if ($config.spec.dir) { $specDir = [string]$config.spec.dir } } catch { }
+
+if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $indexAbs = Join-Path $cwd $indexRel
+    $doneIds = Get-DoneTransitionIds -HookInput $hookInput -IndexPath $indexAbs
+    if ($doneIds.Count -gt 0) {
+        $missing = New-Object System.Collections.Generic.List[string]
+        foreach ($id in $doneIds) {
+            if (-not (Test-VerifyArtifactPass -Cwd $cwd -SpecDir $specDir -SpecId $id)) {
+                $missing.Add($id) | Out-Null
+            }
+        }
+        if ($missing.Count -gt 0) {
+            $ids = (@($missing) | Sort-Object) -join ', '
+            Write-BlockDecision "spec-gate: index row(s) [$ids] -> done but no passing /sd:verify artifact. Run /sd:verify <spec-ID>; close-out is allowed only after $specDir/<ID>/06-verify.md records 'result: pass'."
+            exit 0
+        }
+        # Every transitioning spec has a passing artifact - allow the close-out.
+        exit 0
+    }
+}
 
 # Rule 1: protected paths -> always block
 $protected = @()

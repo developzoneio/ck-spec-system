@@ -123,7 +123,9 @@
       "enabled": true,
       "mode": "warn",
       "_modes": "block = refuse Edit/Write on code without in-progress spec; warn = log to stderr only; off = skip",
-      "_use": "Guard rail blocking code edits when no spec is in-progress"
+      "_use": "Guard rail blocking code edits when no spec is in-progress",
+      "verifyGate": true,
+      "_verifyGate_use": "true: an index.md row may transition to done only when <spec.dir>/<ID>/06-verify.md records 'result: pass' (written by /sd:verify). false: index.md stays fully protected as before SW-6."
     },
     "subagentRetro": {
       "enabled": true,

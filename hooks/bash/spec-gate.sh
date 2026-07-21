@@ -205,6 +205,74 @@ emit_block() {
         '{decision:"block",reason:$r,hookSpecificOutput:{permissionDecision:"deny",reason:$r}}'
 }
 
+# --- Rule 0: verify gate on the spec index ------------------------------------
+# A row transitioning to done requires a passing /sd:verify artifact; a
+# verified close-out is allowed through the protected-path rule. Any other
+# direct index edit falls through to Rule 1. Mirrors spec-gate.ps1 Rule 0.
+
+verify_gate="$(printf '%s' "${config_json}" | jq -r 'if .hooks.specGate.verifyGate == false then "false" else "true" end' 2>/dev/null)"
+spec_dir="$(printf '%s' "${config_json}" | jq -r '.spec.dir // ".specs"' 2>/dev/null)"
+
+rel_lower="$(to_lower "${rel}")"
+index_rel_norm="${index_rel//\\//}"
+index_rel_lower="$(to_lower "${index_rel_norm}")"
+
+if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; then
+    fragments=""
+    case "${tool_name}" in
+        Edit)      fragments="$(printf '%s' "${input}" | jq -r '.tool_input.new_string // empty' 2>/dev/null)" ;;
+        Write)     fragments="$(printf '%s' "${input}" | jq -r '.tool_input.content // empty' 2>/dev/null)" ;;
+        MultiEdit) fragments="$(printf '%s' "${input}" | jq -r '[.tool_input.edits[]?.new_string // empty] | join("\n")' 2>/dev/null)" ;;
+    esac
+
+    if [[ -n "${fragments}" ]]; then
+        # IDs marked done in the pending edit's new content.
+        pending_done="$(printf '%s' "${fragments}" \
+            | grep -E '\|[[:space:]]*done[[:space:]]*\|' 2>/dev/null \
+            | grep -o -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' 2>/dev/null \
+            | tr -d '\r' | LC_ALL=C sort -u)"
+        # IDs the on-disk index already records as done (not a transition).
+        already_done=""
+        if [[ -f "${index_path}" ]]; then
+            already_done="$(grep -E '\|[[:space:]]*done[[:space:]]*\|' "${index_path}" 2>/dev/null \
+                | grep -o -E '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' 2>/dev/null \
+                | tr -d '\r' | LC_ALL=C sort -u)"
+        fi
+
+        transition_ids=""
+        while IFS= read -r id; do
+            [[ -z "${id}" ]] && continue
+            if [[ -n "${already_done}" ]] && printf '%s\n' "${already_done}" | grep -qx "${id}"; then
+                continue
+            fi
+            transition_ids="${transition_ids}${id}"$'\n'
+        done <<< "${pending_done}"
+
+        if [[ -n "${transition_ids}" ]]; then
+            missing=""
+            while IFS= read -r id; do
+                [[ -z "${id}" ]] && continue
+                artifact="${cwd}/${spec_dir}/${id}/06-verify.md"
+                if [[ ! -f "${artifact}" ]] \
+                   || ! grep -q -i -E '^result:[[:space:]]*pass[[:space:]]*$' "${artifact}" 2>/dev/null; then
+                    if [[ -z "${missing}" ]]; then
+                        missing="${id}"
+                    else
+                        missing="${missing}, ${id}"
+                    fi
+                fi
+            done <<< "${transition_ids}"
+
+            if [[ -n "${missing}" ]]; then
+                emit_block "spec-gate: index row(s) [${missing}] -> done but no passing /sd:verify artifact. Run /sd:verify <spec-ID>; close-out is allowed only after ${spec_dir}/<ID>/06-verify.md records 'result: pass'."
+                exit 0
+            fi
+            # Every transitioning spec has a passing artifact - allow the close-out.
+            exit 0
+        fi
+    fi
+fi
+
 # --- Rule 1: protected paths -> block ----------------------------------------
 
 is_protected=0
