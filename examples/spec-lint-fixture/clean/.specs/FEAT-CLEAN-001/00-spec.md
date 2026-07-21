@@ -16,7 +16,7 @@ Webhook deliveries that fail transiently are dropped, so operators miss low-stoc
 
 ## What
 
-### Scenario 1: Transient failure retries
+### SC-1: Transient failure retries
 
 - **Given** a subscribed webhook endpoint returning 503
 - **When** a low-stock event fires
@@ -24,8 +24,8 @@ Webhook deliveries that fail transiently are dropped, so operators miss low-stoc
 
 ## Success criteria
 
-- [ ] Failed webhook retries 3x with exponential backoff
-- [ ] Unit + integration tests cover all scenarios above
+- [ ] AC-1: Failed webhook retries 3x with exponential backoff
+- [ ] AC-2: Unit + integration tests cover all scenarios above
 
 ## Out of scope
 
