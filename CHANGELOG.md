@@ -11,9 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `/sd:verify <spec-ID>` traceability gate: SC-/AC-IDs in the feature template, a `Covers`
-  task field, a `06-verify.md` pass artifact, and spec-gate hook enforcement that blocks an
-  `index.md` row transitioning to `done` without a passing artifact
-  (`hooks.specGate.verifyGate`). (SW-6)
+  task field, a `06-verify.md` pass artifact, and spec-gate hook enforcement (Rule 0 in
+  `spec-gate.{ps1,sh}`, flag `hooks.specGate.verifyGate`) that blocks a feature (FEAT-)
+  `index.md` row transitioning to `done` without a passing artifact. The gate is deliberately
+  scoped to feature specs - bug/refactor/perf/rca workflows produce no `02-tasks.md`, so
+  non-FEAT rows fall through to the unconditional protected-path block exactly as before,
+  pending a follow-up spec that integrates verify into those workflows. `/sd:spec status`
+  pre-checks the artifact before mutating any file on a FEAT `in-progress -> done` transition
+  (prevents an `SL030` frontmatter/index strand), and `/sd:feature` Phase 6 requires an
+  evidence citation before ticking an `AC-<n>` checkbox. 11 new conformance fixtures pin the
+  gate, including the FEAT-only scoping (`block-index-done-bug-row-protected`) and the
+  documented bundled-edit limitation (`allow-index-done-with-verify-bundled-edit`). (SW-6)
 - Cross-implementation hook conformance suite (`tests/hooks/`): golden fixtures are piped into
   both the bash and PowerShell implementation of every hook and the normalized decisions must
   match; wired into CI on all matrix platforms with a self-test proving divergence detection (E4).
@@ -69,20 +77,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
-- Scoped the SW-6 verify gate (Rule 0 in `spec-gate.{ps1,sh}`) to FEAT- (feature-spec) index rows
-  only: bug/refactor/perf/rca workflows never produce `02-tasks.md`, so gating their `done`
-  transition on a `/sd:verify` artifact dead-ended them at VF002 with no way through. Non-FEAT
-  rows now fall through to the unconditional protected-path block, restoring exactly
-  pre-SW-6 behavior. Added a matching conformance fixture
-  (`block-index-done-bug-row-protected`) and one pinning the bundled-edit limitation
-  (`allow-index-done-with-verify-bundled-edit`), plus a PS-5.1-safe ordinal sort for the
-  Rule 0 missing-ID list to match bash's `LC_ALL=C sort -u`. `/sd:spec status`'s `in-progress ->
-  done` transition for a FEAT spec now checks `06-verify.md` for `result: pass` before mutating
-  any file, so a spec-gate block on the `index.md` edit alone can no longer strand the
-  frontmatter and index in disagreement (`SL030`). `/sd:feature` Phase 6 now requires an
-  evidence citation before ticking an `AC-<n>` checkbox. Doc alignment in `docs/usage.md`,
-  `templates/project-config.template.json`, `commands/spec.md`, `commands/verify.md`, and
-  `skills/sd-atomic-task-format/SKILL.md`.
 - `subagent-retro`'s debounce state file, an on-disk contract shared between the two
   implementations, was not written in the same shape by both (SW-5): `subagent-retro.ps1` wrote
   the round-trip `o` format with 7 fractional digits while `subagent-retro.sh` wrote whole
