@@ -63,6 +63,29 @@ jobs:
           ./scripts/validate-lessons.ps1 tests/lessons/fixtures/leaky-lessons.md
           if ($LASTEXITCODE -eq 0) { throw "leaky fixture passed the validator - checks are not firing" }
 
+      # --- Lesson aggregator: pin the rendered output against a committed
+      # expected file, then assert idempotence via --check. Both implementations
+      # must land on the SAME bytes; the expected file is what makes a
+      # culture-aware sort or a CRLF write fail loudly instead of drifting -----
+      - name: Lesson aggregator (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash scripts/aggregate-lessons.sh \
+            --spec-dir tests/lessons/fixtures/corpus \
+            --out tests/lessons/fixtures/expected-lessons.md --check
+          bash scripts/validate-lessons.sh tests/lessons/fixtures/expected-lessons.md
+
+      - name: Lesson aggregator (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/aggregate-lessons.ps1 -SpecDir tests/lessons/fixtures/corpus `
+            -Out tests/lessons/fixtures/expected-lessons.md -Check
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell aggregator output differs from the expected fixture" }
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/expected-lessons.md
+          if ($LASTEXITCODE -ne 0) { throw "generated lessons file failed the privacy validator" }
+
       # --- Docs-consistency self-test: the validator above proves the docs are
       # right; this proves the validator would NOTICE if they were wrong. Without
       # it, a Check 7 that rotted into a no-op would still report green ---------

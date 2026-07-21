@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Lesson aggregator, part 2 of the closed learning loop (SW-18, under epic SW-7):
+  `scripts/aggregate-lessons.{ps1,sh}` collect tagged lesson lines from every
+  `<spec-dir>/*/05-retro.md`, dedupe them, and render `<spec-dir>/_lessons/lessons.md`.
+  `--check` / `-Check` writes nothing and exits non-zero on drift, which is how idempotence is
+  asserted in CI. Two decisions differ from the SW-18 description and are recorded here: (1) the
+  **retros** are append-only and `lessons.md` is a derived file regenerated on every run - the
+  ticket called `lessons.md` itself append-only, but dedupe-with-a-count requires rewriting the
+  line, so append-only and idempotent are mutually exclusive; (2) abstraction stays in the
+  `sd-retro-lessons` skill, so the aggregator makes no judgement calls and its output is
+  reproducible. Deduplication is on (tag, scope, case- and whitespace-normalised rule);
+  a repeat adds a count and **never** raises severity, and the surviving wording is resolved
+  independently of severity (byte-smallest) so a sloppier phrasing cannot win just by carrying a
+  lower one. All ordering is byte-wise - `LC_ALL=C` in bash, `[string]::CompareOrdinal` plus an
+  ordinal dictionary comparer in PowerShell, whose culture-aware defaults would otherwise
+  diverge - and PowerShell writes UTF-8 without BOM and LF endings rather than going through
+  `Set-Content`. A committed corpus fixture and expected output pin both implementations to the
+  same bytes in CI; the corpus deliberately includes retros containing only `/sd:spec status`
+  transition lines (which must contribute zero lessons) and an out-of-enum tag (which must be
+  skipped). No hook is modified; surfacing (SW-19) follows.
 - Structured retro lessons, part 1 of the closed learning loop (SW-17, under epic SW-7): new
   `sd-retro-lessons` skill defining a 10-tag enum, the one-line lesson record
   (`- [tag] severity/scope: Rule sentence.`), and the abstraction discipline that turns a
