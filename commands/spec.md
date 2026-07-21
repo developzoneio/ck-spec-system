@@ -68,11 +68,9 @@ Behavior:
 2. Read `00-spec.md`. Display:
    - Frontmatter (id, type, status, created, jira/severity if present).
    - First H2 (title or "Why").
-   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md`, `06-verify.md` exist.
+   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md`, `06-verify.md` (written by `/sd:verify`; gates the `done` transition) exist.
 3. If `02-tasks.md` exists, show task completion count `N/M`.
 4. Print folder URL: `file://<absolute path>`.
-
-`06-verify.md` - verification report written by `/sd:verify`; gates the `done` transition.
 
 ---
 
@@ -94,9 +92,11 @@ done -> archived
 archived -> in-progress (only via 'revive', with reason)
 ```
 
-The `in-progress -> done` transition is hook-enforced: spec-gate blocks the `index.md` edit
-unless `<spec.dir>/<ID>/06-verify.md` exists and records `result: pass`. Run `/sd:verify <ID>`
-first. Disable only via `hooks.specGate.verifyGate: false` in project-config.
+The `in-progress -> done` transition of a feature (FEAT) spec is hook-enforced: spec-gate
+blocks the `index.md` edit unless `<spec.dir>/<ID>/06-verify.md` exists and records
+`result: pass`. Run `/sd:verify <ID>` first. Disable only via `hooks.specGate.verifyGate: false`
+in project-config. Other spec types (bug, refactor, perf, rca) close out as before - the hook
+does not gate their `index.md` row.
 
 3. Illegal transitions are REFUSED. Do NOT mutate any file. Print a refusal that names the current
    state, the requested state, the valid next state(s) for the current state (from the machine above),
@@ -116,6 +116,21 @@ Valid next state(s) from 'draft': approved.
 To reach 'done', follow: draft -> approved -> in-progress -> done.
 ```
 4. On valid transition:
+   - If this is an `in-progress -> done` transition of a feature (FEAT) spec: BEFORE mutating
+     any file, check `<spec.dir>/<ID>/06-verify.md` exists and records `result: pass`. If not,
+     REFUSE the transition with no file mutated:
+
+```
+Refused: <ID> cannot move from 'in-progress' to 'done' - no passing /sd:verify artifact.
+Run /sd:verify <ID> first; close-out is allowed only after <spec.dir>/<ID>/06-verify.md records
+'result: pass'.
+```
+
+     This check exists because the frontmatter, index, and retro log are mutated one file at a
+     time below; without it, a spec-gate block on the `index.md` edit alone would strand the
+     frontmatter already updated to `done` while the index still says `in-progress` - an
+     `SL030` disagreement. Checking first keeps the transition atomic: either nothing moves, or
+     all three files do.
    - Update frontmatter `status:` field in `00-spec.md`.
    - Update the row in `.specs/index.md`.
    - Append a log entry to `.specs/<ID>/05-retro.md`:

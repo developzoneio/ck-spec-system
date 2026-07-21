@@ -176,19 +176,26 @@ Treat findings:
 
 ## Phase 6 - Close-out
 
-1. Run `/sd:verify FEAT-<arg>`. It must report `result: pass`.
+1. Review each `AC-<n>` checkbox in `00-spec.md` against evidence (a passing test, a measured
+   value, a reviewer verdict) and check it only with a `file:line` or test citation logged to
+   `.specs/FEAT-<arg>/05-retro.md`. Never tick a box just to make VF030 pass - an unearned
+   checkbox is a fabricated result, not a shortcut.
+2. Run `/sd:verify FEAT-<arg>`. It must report `result: pass`.
    - On FAIL: address the findings (uncovered criterion -> back to Phase 3 to add tasks;
-     failing tests -> back to Phase 4). Re-run until it passes. Do NOT proceed on fail - the
-     spec-gate hook will block step 4 without a passing `06-verify.md`.
-2. Append to `.specs/FEAT-<arg>/05-retro.md`:
+     failing tests -> back to Phase 4; unchecked `AC-<n>` criterion with real evidence already
+     in hand -> gather the citation and check the box per step 1; unchecked criterion with no
+     evidence yet -> route back to the phase that produces it, e.g. Phase 4 for an untested
+     behavior). Re-run until it passes. Do NOT proceed on fail - the spec-gate hook will block
+     step 5 without a passing `06-verify.md`.
+3. Append to `.specs/FEAT-<arg>/05-retro.md`:
    - Tasks completed (count + IDs).
    - Surprises encountered.
    - Deferred follow-ups (with reserved spec IDs, if any).
    - Constitution exceptions taken (should be none).
    - Cost rough estimate if available.
-3. Set frontmatter status=`done` in `00-spec.md`.
-4. Update `.specs/index.md`: state -> `done`, completion date.
-5. Print a 5-line summary to the user.
+4. Set frontmatter status=`done` in `00-spec.md`.
+5. Update `.specs/index.md`: state -> `done`, completion date.
+6. Print a 5-line summary to the user.
 
 ---
 

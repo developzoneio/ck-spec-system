@@ -268,6 +268,8 @@ function Get-DoneTransitionIds {
     )
     # IDs that the pending edit marks as done but that the on-disk index does
     # not yet record as done. Fragments are the tool-specific NEW content.
+    # FEAT- only (see Rule 0 comment below): the id extraction here is
+    # DELIBERATELY narrower than Rule 3's in-progress scan.
     $fragments = New-Object System.Collections.Generic.List[string]
     try {
         $tool = $HookInput.tool_name
@@ -290,7 +292,7 @@ function Get-DoneTransitionIds {
     if (Test-Path -LiteralPath $IndexPath) {
         try {
             foreach ($line in (Get-Content -LiteralPath $IndexPath -Encoding UTF8 -ErrorAction Stop)) {
-                if ($line -match '\|\s*done\s*\|' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+                if ($line -match '\|\s*done\s*\|' -and $line -match 'FEAT-[A-Za-z0-9_\-]+') {
                     [void]$alreadyDone.Add($Matches[0])
                 }
             }
@@ -300,7 +302,7 @@ function Get-DoneTransitionIds {
     $result = New-Object System.Collections.Generic.List[string]
     foreach ($frag in $fragments) {
         foreach ($line in ($frag -split "`n")) {
-            if ($line -match '\|\s*done\s*\|' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+            if ($line -match '\|\s*done\s*\|' -and $line -match 'FEAT-[A-Za-z0-9_\-]+') {
                 $id = $Matches[0]
                 if (-not $alreadyDone.Contains($id) -and -not $result.Contains($id)) {
                     $result.Add($id) | Out-Null
@@ -375,6 +377,20 @@ if ([string]::IsNullOrWhiteSpace($rel)) { exit 0 }
 # Rule 0: verify gate on the spec index. A row transitioning to done requires
 # a passing /sd:verify artifact; a verified close-out is allowed through the
 # protected-path rule. Any other direct index edit falls through to Rule 1.
+#
+# Scope: FEAT- rows only. Bug/refactor/perf/rca workflows do not produce
+# 02-tasks.md and never run /sd:verify, so gating them here would hard-STOP
+# their close-out at VF002 with no way through. Non-FEAT rows fall through to
+# the unconditional Rule 1 protected-path block, exactly as before this
+# gate existed - until their workflows integrate /sd:verify (follow-up spec).
+#
+# Bundled-edit limitation: when every newly-done FEAT row in the pending edit
+# has a passing artifact, the WHOLE edit is allowed - including any unrelated
+# row changes bundled into the same Write/Edit/MultiEdit. This hook inspects
+# only the done-transition lines, not a full diff, so a bundled edit could in
+# principle piggyback an unrelated change. Accepted limitation (hook-scale
+# diff inspection is out of scope); the /sd:spec registry commands are the
+# semantic guard for anything this coarse check cannot see.
 $verifyGateOn = $true
 try {
     # Type-strict: only a literal JSON boolean false disables the gate. Plain
@@ -403,7 +419,12 @@ if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringCompariso
             }
         }
         if ($missing.Count -gt 0) {
-            $ids = (@($missing) | Sort-Object) -join ', '
+            # Ordinal sort (PS 5.1-safe), not culture-aware Sort-Object - matches
+            # `LC_ALL=C sort -u` in spec-gate.sh so both implementations order
+            # a multi-ID missing list identically regardless of host locale.
+            $missingArr = @($missing)
+            [Array]::Sort($missingArr, [System.StringComparer]::Ordinal)
+            $ids = $missingArr -join ', '
             Write-BlockDecision "spec-gate: index row(s) [$ids] -> done but no passing /sd:verify artifact. Run /sd:verify <spec-ID>; close-out is allowed only after $specDir/<ID>/06-verify.md records 'result: pass'."
             exit 0
         }

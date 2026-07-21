@@ -71,7 +71,10 @@ rule: never hardcode `dotnet test`, `npm test`, etc.).
 
 ## Artifact
 
-ALWAYS write `<spec.dir>/<ID>/06-verify.md` (overwrite an existing one) - on pass AND on fail:
+ALWAYS write `<spec.dir>/<ID>/06-verify.md` (overwrite an existing one) - on pass AND on fail -
+once the spec reaches the `verifiable` state. The `not-found` (VF001) and `not-planned` (VF002)
+STOP states above are reached BEFORE that point and write no artifact at all: there is no spec
+folder, or no `02-tasks.md` to check traceability against, so there is nothing yet to record.
 
 ```markdown
 ---

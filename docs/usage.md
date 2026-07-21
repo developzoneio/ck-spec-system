@@ -292,9 +292,10 @@ Examples:
 ### /sd:verify
 
 Proves criterion -> task -> test traceability for one spec and writes
-`.specs/<ID>/06-verify.md` with `result: pass|fail`. The spec-gate hook blocks the spec's
-`index.md` row from transitioning to `done` without a passing artifact
-(`hooks.specGate.verifyGate`, default on).
+`.specs/<ID>/06-verify.md` with `result: pass|fail`. The spec-gate hook blocks a FEAT
+(feature-spec) `index.md` row from transitioning to `done` without a passing artifact
+(`hooks.specGate.verifyGate`, default on). Other spec types (bug, refactor, perf, rca) close
+out through the unconditional protected-path rule, same as before this gate existed.
 
     /sd:verify FEAT-1042
 

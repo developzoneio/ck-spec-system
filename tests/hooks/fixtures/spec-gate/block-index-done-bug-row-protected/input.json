@@ -1,0 +1,1 @@
+{"tool_name":"Edit","cwd":"{{CWD}}","tool_input":{"file_path":"{{CWD}}/.specs/index.md","old_string":"| BUG-002 | bug | in-progress | Demo bug |","new_string":"| BUG-002 | bug | done | Demo bug |"}}

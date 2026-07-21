@@ -70,6 +70,9 @@ advance no criterion directly. Every ID referenced must exist in the spec; every
 the spec must be covered by at least one task - `/sd:verify` fails the spec otherwise. Specs
 authored before this field existed (no SC/AC IDs) are handled by `/sd:verify`'s generic
 checks; treat a missing field as `Covers: none` when reading legacy `02-tasks.md` files.
+Spec types whose templates carry no SC-/AC-IDs (refactor, bug, perf, rca) use `Covers: none`
+for every task - the coverage requirement (VF010/VF011) applies only to specs whose
+`00-spec.md` declares SC-/AC-IDs, currently feature specs.
 
 ### Estimated complexity
 | Value | Guideline |

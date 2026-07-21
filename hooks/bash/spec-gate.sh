@@ -209,6 +209,20 @@ emit_block() {
 # A row transitioning to done requires a passing /sd:verify artifact; a
 # verified close-out is allowed through the protected-path rule. Any other
 # direct index edit falls through to Rule 1. Mirrors spec-gate.ps1 Rule 0.
+#
+# Scope: FEAT- rows only. Bug/refactor/perf/rca workflows do not produce
+# 02-tasks.md and never run /sd:verify, so gating them here would hard-STOP
+# their close-out at VF002 with no way through. Non-FEAT rows fall through to
+# the unconditional Rule 1 protected-path block, exactly as before this gate
+# existed - until their workflows integrate /sd:verify (follow-up spec).
+#
+# Bundled-edit limitation: when every newly-done FEAT row in the pending edit
+# has a passing artifact, the WHOLE edit is allowed - including any unrelated
+# row changes bundled into the same Write/Edit/MultiEdit. This hook inspects
+# only the done-transition lines, not a full diff, so a bundled edit could in
+# principle piggyback an unrelated change. Accepted limitation (hook-scale
+# diff inspection is out of scope); the /sd:spec registry commands are the
+# semantic guard for anything this coarse check cannot see.
 
 verify_gate="$(printf '%s' "${config_json}" | jq -r 'if .hooks.specGate.verifyGate == false then "false" else "true" end' 2>/dev/null)"
 spec_dir="$(printf '%s' "${config_json}" | jq -r '.spec.dir // ".specs"' 2>/dev/null)"
@@ -231,16 +245,18 @@ if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; t
         # a `grep -o` here would emit every id on the line, including one that
         # is merely mentioned in a title (e.g. "Follow-up to BUG-002"), which
         # would wrongly fold an unrelated spec into the transition set.
+        # FEAT- only (see Rule 0 scope comment above): DELIBERATELY narrower
+        # than Rule 3's in-progress scan below.
         pending_done="$(printf '%s' "${fragments}" \
             | grep -E '\|[[:space:]]*done[[:space:]]*\|' 2>/dev/null \
-            | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
+            | awk 'match($0, /FEAT-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
             | tr -d '\r' | LC_ALL=C sort -u)"
         # IDs the on-disk index already records as done (not a transition).
         # Same first-match-per-line extraction as above.
         already_done=""
         if [[ -f "${index_path}" ]]; then
             already_done="$(grep -E '\|[[:space:]]*done[[:space:]]*\|' "${index_path}" 2>/dev/null \
-                | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
+                | awk 'match($0, /FEAT-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH) }' \
                 | tr -d '\r' | LC_ALL=C sort -u)"
         fi
 
