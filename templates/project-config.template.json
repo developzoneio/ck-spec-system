@@ -131,7 +131,11 @@
       "enabled": true,
       "retroStaleMinutes": 30,
       "debounceMinutes": 10,
-      "_use": "Reminder to update stale retros after subagent runs"
+      "_use": "Reminder to update stale retros after subagent runs",
+      "injectLessons": true,
+      "maxLessons": 3,
+      "_injectLessons_use": "Surface lessons from <spec.dir>/_lessons/lessons.md when a subagent finishes work on an in-progress spec. Selection is by workflow type - a FEAT- spec pulls feature-scoped lessons - so there is no ranking. Emitted regardless of retro staleness and of debounceMinutes, which gate only the stale-retro reminder.",
+      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder."
     },
     "metrics": {
       "enabled": true,

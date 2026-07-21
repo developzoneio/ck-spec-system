@@ -288,24 +288,50 @@ function Get-StaleRetros {
     return $stale
 }
 
-function Test-DebounceElapsed {
-    param(
-        [string]$StatePath,
-        [int]$DebounceMinutes
-    )
-    if (-not (Test-Path -LiteralPath $StatePath)) { return $true }
+# Read once, written once - mirrors the single state read in subagent-retro.sh.
+# The state file is an ON-DISK CONTRACT shared with that twin and carries two
+# keys: lastReminderUtc (debounce stamp) and shownLessons (lesson lines already
+# surfaced in THIS session). Both writers must preserve the key they are not
+# updating, or a reminder would wipe the session's lesson history and every
+# lesson would repeat.
+function Read-State {
+    param([string]$StatePath)
+
+    $result = [pscustomobject]@{
+        LastIso = ''
+        Shown   = (New-Object 'System.Collections.Generic.List[string]')
+    }
+    if (-not (Test-Path -LiteralPath $StatePath)) { return $result }
     try {
         $st = Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 | ConvertFrom-Json
         # PowerShell 7's ConvertFrom-Json auto-converts an ISO-8601 "...Z" string to a
         # [datetime] with Kind=Utc; PowerShell 5.1 leaves it as a plain string. Re-Parse-ing
         # an already-converted [datetime] stringifies it with the local culture (dropping the
-        # UTC marker), so [datetimeoffset]::Parse silently re-interprets it as local time -
-        # skewing $age by the machine's UTC offset. Only Parse when it is still a string.
-        if ($st.lastReminderUtc -is [datetime]) {
-            $last = $st.lastReminderUtc.ToUniversalTime()
-        } else {
-            $last = [datetimeoffset]::Parse([string]$st.lastReminderUtc).UtcDateTime
+        # UTC marker), so a later Parse silently re-interprets it as local time - skewing the
+        # debounce by the machine's UTC offset. Normalise back to the on-disk format here so
+        # everything downstream sees the same plain string the bash twin sees.
+        if ($null -ne $st.lastReminderUtc) {
+            if ($st.lastReminderUtc -is [datetime]) {
+                $result.LastIso = $st.lastReminderUtc.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            } else {
+                $result.LastIso = [string]$st.lastReminderUtc
+            }
         }
+        if ($null -ne $st.shownLessons) {
+            foreach ($s in $st.shownLessons) { [void]$result.Shown.Add([string]$s) }
+        }
+    } catch { }
+    return $result
+}
+
+function Test-DebounceElapsed {
+    param(
+        [string]$LastIso,
+        [int]$DebounceMinutes
+    )
+    if ([string]::IsNullOrWhiteSpace($LastIso)) { return $true }
+    try {
+        $last = [datetimeoffset]::Parse($LastIso).UtcDateTime
         $age = (Get-Date).ToUniversalTime() - $last
         return ($age.TotalMinutes -ge $DebounceMinutes)
     } catch {
@@ -314,7 +340,11 @@ function Test-DebounceElapsed {
 }
 
 function Save-State {
-    param([string]$StatePath)
+    param(
+        [string]$StatePath,
+        [string]$LastIso,
+        $Shown
+    )
     try {
         # -Path, not -LiteralPath: some PowerShell builds reject -LiteralPath combined
         # with -Parent as an unresolvable parameter set. -Parent does no filesystem
@@ -323,15 +353,67 @@ function Save-State {
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        # State-file shape is an ON-DISK CONTRACT shared with subagent-retro.sh:
-        # a session can write it under one implementation and read it under the
-        # other, so the single key and the whole-second UTC format must stay
-        # identical in both. 'o' was writing 7 fractional digits that only the
-        # bash side ever had to cope with.
-        $stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-        $obj = [pscustomobject]@{ lastReminderUtc = $stamp }
-        $obj | ConvertTo-Json -Compress | Set-Content -LiteralPath $StatePath -Encoding UTF8
+        # Key order matches the jq object written by subagent-retro.sh. The
+        # whole-second UTC format must stay identical in both - 'o' was writing
+        # 7 fractional digits that only the bash side ever had to cope with.
+        $arr = @()
+        if ($null -ne $Shown) { $arr = @($Shown) }
+        if ([string]::IsNullOrEmpty($LastIso)) {
+            $obj = [pscustomobject]@{ shownLessons = $arr }
+        } else {
+            $obj = [pscustomobject]@{ lastReminderUtc = $LastIso; shownLessons = $arr }
+        }
+        $obj | ConvertTo-Json -Compress -Depth 3 | Set-Content -LiteralPath $StatePath -Encoding UTF8
     } catch { }
+}
+
+# Lesson selection (SW-19). Returns the lines to surface, in file order.
+#
+# lessons.md is rendered in a total, deterministic order by aggregate-lessons.*,
+# so "the first N that match" is itself deterministic - no sorting is done or
+# needed here, and there is no tie-break that could diverge from the bash twin.
+# All comparisons are ORDINAL: PowerShell's default -eq is case-insensitive and
+# would drop a lesson the bash twin keeps.
+function Select-Lessons {
+    param(
+        [string]$LessonsPath,
+        $Specs,
+        [int]$MaxLessons,
+        $Shown
+    )
+    $picked = New-Object 'System.Collections.Generic.List[string]'
+    if ($MaxLessons -le 0) { return $picked }
+    if (-not (Test-Path -LiteralPath $LessonsPath -PathType Leaf)) { return $picked }
+
+    # Scope selector: the workflow types currently in flight, plus 'all'.
+    $wanted = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    [void]$wanted.Add('all')
+    foreach ($spec in $Specs) {
+        switch ($spec.Type) {
+            'FEAT' { [void]$wanted.Add('feature') }
+            'BUG'  { [void]$wanted.Add('bug') }
+            'REF'  { [void]$wanted.Add('refactor') }
+            'PERF' { [void]$wanted.Add('perf') }
+            'RCA'  { [void]$wanted.Add('rca') }
+        }
+    }
+
+    $shownSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    if ($null -ne $Shown) { foreach ($s in $Shown) { [void]$shownSet.Add([string]$s) } }
+
+    $lessonRe = '^- \[([a-z-]+)\] ([a-z]+)/([a-z]+): (.+)$'
+    try {
+        foreach ($line in (Get-Content -LiteralPath $LessonsPath)) {
+            if (-not $line.StartsWith('- [')) { continue }
+            if ($line -cnotmatch $lessonRe) { continue }
+            if (-not $wanted.Contains($Matches[3])) { continue }
+            if ($shownSet.Contains($line)) { continue }
+
+            [void]$picked.Add($line)
+            if ($picked.Count -ge $MaxLessons) { break }
+        }
+    } catch { }
+    return $picked
 }
 
 function Remove-StaleStateFiles {
@@ -372,13 +454,33 @@ $debounceMinutes = 10
 try { if ($config.hooks.subagentRetro.retroStaleMinutes) { $staleMinutes = [int]$config.hooks.subagentRetro.retroStaleMinutes } } catch { }
 try { if ($config.hooks.subagentRetro.debounceMinutes)   { $debounceMinutes = [int]$config.hooks.subagentRetro.debounceMinutes } } catch { }
 
+# Lesson injection (SW-19). Same explicit-false handling as the enabled flag:
+# an absent key means on, only a literal false turns it off.
+$injectLessons = $true
+$maxLessons    = 3
+try { if ($null -ne $config.hooks.subagentRetro.injectLessons -and -not $config.hooks.subagentRetro.injectLessons) { $injectLessons = $false } } catch { }
+# `$null -ne`, NOT a truthiness test: PowerShell treats 0 as falsy, so
+# `if ($config...maxLessons)` would silently ignore an explicit 0 and keep the
+# default of 3 while the bash twin's `// 3` accepts 0 and goes quiet. A
+# non-numeric or negative value falls back to 3 in both, matching the bash
+# `^[0-9]+$` guard.
+try {
+    if ($null -ne $config.hooks.subagentRetro.maxLessons) {
+        $maxLessons = [int]$config.hooks.subagentRetro.maxLessons
+    }
+} catch { $maxLessons = 3 }
+if ($maxLessons -lt 0) { $maxLessons = 3 }
+
 $specDir   = if ($config.spec.dir)       { Join-Path $cwd $config.spec.dir }       else { Join-Path $cwd '.specs' }
 $indexFile = if ($config.spec.indexFile) { Join-Path $cwd $config.spec.indexFile } else { Join-Path $cwd '.specs/index.md' }
-$stateDir  = Join-Path $cwd '.claude/.hookstate'
-$safeId    = ($sessionId -replace '[^A-Za-z0-9_\-]','_')
-$statePath = Join-Path $stateDir ("subagent-retro-$safeId.json")
+$stateDir    = Join-Path $cwd '.claude/.hookstate'
+$safeId      = ($sessionId -replace '[^A-Za-z0-9_\-]','_')
+$statePath   = Join-Path $stateDir ("subagent-retro-$safeId.json")
+$lessonsPath = Join-Path $specDir (Join-Path '_lessons' 'lessons.md')
 
 Remove-StaleStateFiles -StateDir $stateDir
+
+$state = Read-State -StatePath $statePath
 
 $specs = Get-IndexSpecs -IndexPath $indexFile
 if ($specs.Count -eq 0) { exit 0 }
@@ -396,9 +498,49 @@ foreach ($spec in $specs) {
     Write-SubagentStopMetric -Cwd $cwd -Config $config -SpecId $spec.Id -Phase 'in-progress' -Stale $staleCount
 }
 
+# --- lesson injection (SW-19) ---
+#
+# PLACEMENT IS LOAD-BEARING. This sits beside the metrics emit above, BEFORE the
+# staleness early-exit and BEFORE the debounce window - deliberately, and for the
+# same reason the metrics call site does. Moved down to the reminder block, it
+# would only ever surface lessons to users who are already behind on their
+# retros, which is exactly the population that needs them least.
+#
+# The one gate it keeps is the in-progress-spec check above: no spec in flight,
+# no output. That gate IS the relevance filter - the workflow type of the
+# in-progress spec selects which lessons apply.
+#
+# Repetition is bounded per SESSION, not by a clock. shownLessons records what
+# has already been surfaced, so maxLessons caps how many NEW lessons appear at
+# one stop and a session converges to silence once it has said everything
+# relevant. A time debounce was rejected: it would suppress a lesson the user
+# has never seen purely because a different one was shown recently.
+if ($injectLessons) {
+    $picked = Select-Lessons -LessonsPath $lessonsPath -Specs $specs -MaxLessons $maxLessons -Shown $state.Shown
+    if ($picked.Count -gt 0) {
+        $lessonLines = New-Object System.Collections.Generic.List[string]
+        $lessonLines.Add('<retro-lessons>') | Out-Null
+        $lessonLines.Add('Lessons recorded in earlier retros of this project, matching the workflow') | Out-Null
+        $lessonLines.Add('type of the spec(s) currently in progress:') | Out-Null
+        foreach ($p in $picked) { $lessonLines.Add("  $p") | Out-Null }
+        $lessonLines.Add('') | Out-Null
+        $lessonLines.Add('These are not shown again this session.') | Out-Null
+        $lessonLines.Add('</retro-lessons>') | Out-Null
+
+        # Write, not WriteLine: WriteLine appends [Environment]::NewLine, which is
+        # CRLF on Windows, so the final line would differ from the bash twin by
+        # exactly one byte and fail the conformance comparison. The body is
+        # already LF-joined; terminate it the same way.
+        [Console]::Out.Write(($lessonLines -join "`n") + "`n")
+
+        foreach ($p in $picked) { [void]$state.Shown.Add($p) }
+        Save-State -StatePath $statePath -LastIso $state.LastIso -Shown $state.Shown
+    }
+}
+
 if ($stale.Count -eq 0) { exit 0 }
 
-if (-not (Test-DebounceElapsed -StatePath $statePath -DebounceMinutes $debounceMinutes)) { exit 0 }
+if (-not (Test-DebounceElapsed -LastIso $state.LastIso -DebounceMinutes $debounceMinutes)) { exit 0 }
 
 # Emit reminder
 $lines = New-Object System.Collections.Generic.List[string]
@@ -415,6 +557,12 @@ $lines.Add('') | Out-Null
 $lines.Add('Consider appending: decisions made, surprises encountered, follow-ups identified.') | Out-Null
 $lines.Add('</retro-reminder>') | Out-Null
 
-[Console]::Out.WriteLine($lines -join "`n")
-Save-State -StatePath $statePath
+# Write, not WriteLine - see the note on the lesson block above. This block had
+# the same one-byte CRLF divergence from the bash twin before SW-19.
+[Console]::Out.Write(($lines -join "`n") + "`n")
+
+# Re-emits shownLessons alongside the new stamp - dropping it here would clear
+# the session's lesson history and make every lesson repeat.
+$stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+Save-State -StatePath $statePath -LastIso $stamp -Shown $state.Shown
 exit 0

@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Lesson surfacing, part 3 and the close of the learning loop (SW-19, under epic SW-7):
+  `subagent-retro.{ps1,sh}` now emit a `<retro-lessons>` block when a subagent finishes work on an
+  in-progress spec, gated by `hooks.subagentRetro.injectLessons` (default `true`) and
+  `maxLessons` (default `3`). **Placement is load-bearing:** the emit sits beside the existing
+  metrics call site, *before* the staleness early-exit and *before* the debounce window - moved
+  down to the reminder block it would have surfaced lessons only to users already behind on their
+  retros, the population that needs them least. The one gate it keeps is the in-progress-spec
+  check, and that gate *is* the relevance filter: the workflow type of the in-progress spec selects
+  the scope (`FEAT-` pulls `feature`, `REF-` pulls `refactor`, and `all`-scoped lessons always
+  apply), so there is no ranking, no scoring, and no tie-break that could diverge between
+  implementations. This replaces the `prompt-router` placement and the
+  `hooks.promptRouter.injectLessons` key named in the SW-7 epic; the epic records why.
+  Repetition is bounded per **session** rather than by a clock - a new `shownLessons` key in the
+  hook state file records what has already been surfaced, so `maxLessons` caps how many *new*
+  lessons appear at one stop and a session converges to silence once it has said everything
+  relevant. A time debounce was rejected because it would suppress a lesson the user has never
+  seen purely because a different one was shown recently. Four cross-implementation conformance
+  fixtures cover surfacing, scope filtering, already-shown state and the disabled flag, and the
+  conformance decision object now captures emitted lessons in emission order (sorting them would
+  hide exactly the selection-order divergence the fixtures exist to catch).
 - Lesson aggregator, part 2 of the closed learning loop (SW-18, under epic SW-7):
   `scripts/aggregate-lessons.{ps1,sh}` collect tagged lesson lines from every
   `<spec-dir>/*/05-retro.md`, dedupe them, and render `<spec-dir>/_lessons/lessons.md`.
@@ -121,6 +141,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `subagent-retro.ps1` terminated its emitted block with `[Console]::Out.WriteLine`, which appends
+  `[Environment]::NewLine` - CRLF on Windows - so its output differed from `subagent-retro.sh` by
+  exactly one byte on the final line. Both the `<retro-reminder>` and the new `<retro-lessons>`
+  block now `Write` an explicitly LF-terminated string. Pre-existing; surfaced by SW-19's
+  byte-comparison requirement.
 - `selftest-docs.{sh,ps1}` scenarios 2 and 3 had silently stopped testing anything (SW-20). Both
   planted their corruption by string-replacing the literal `**11 slash commands**`; the repo now
   ships 12, so the pattern matched nothing, the sandbox copy was never corrupted, the validator

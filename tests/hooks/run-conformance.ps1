@@ -369,10 +369,25 @@ function ConvertTo-SubagentRetroDecision {
             })
         }
     }
+    # Lesson injection (SW-19). Captured verbatim and in EMISSION ORDER, not
+    # sorted: which lessons are selected and the order they appear in is the
+    # behaviour under test, and lessons.md is rendered in a total order upstream
+    # precisely so that order is deterministic. Sorting here would hide a
+    # divergence in selection order - the exact failure this fixture set exists
+    # to catch.
+    $lessons = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in ($Run.Stdout -split "`n")) {
+        $trimmed = $line.TrimEnd("`r")
+        if ($trimmed -cmatch '^  (- \[[a-z-]+\] [a-z]+/[a-z]+: .+)$') {
+            $lessons.Add($Matches[1])
+        }
+    }
+
     return [pscustomobject][ordered]@{
         exitCode = $Run.ExitCode
         emitted  = $Run.Stdout.Contains('<retro-reminder>')
         stale    = @($stale | Sort-Object -Property id)
+        lessons  = @($lessons)
         stderr   = $Run.Stderr.Trim()
         events   = @($Run.Events)
     }

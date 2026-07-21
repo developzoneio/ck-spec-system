@@ -53,6 +53,14 @@ fi
 stale_minutes="$(printf '%s' "${config_json}"    | jq -r '.hooks.subagentRetro.retroStaleMinutes // 30' 2>/dev/null)"
 debounce_minutes="$(printf '%s' "${config_json}" | jq -r '.hooks.subagentRetro.debounceMinutes // 10'   2>/dev/null)"
 
+# Lesson injection (SW-19). Same `== false` comparison as the enabled flag above:
+# the jq alternative operator treats an explicit `false` as absent.
+inject_lessons="$(printf '%s' "${config_json}" | jq -r 'if .hooks.subagentRetro.injectLessons == false then "false" else "true" end' 2>/dev/null)"
+max_lessons="$(printf '%s' "${config_json}"    | jq -r '.hooks.subagentRetro.maxLessons // 3' 2>/dev/null)"
+if [[ ! "${max_lessons}" =~ ^[0-9]+$ ]]; then
+    max_lessons=3
+fi
+
 spec_dir_rel="$(printf '%s' "${config_json}" | jq -r '.spec.dir       // ".specs"'         2>/dev/null)"
 index_rel="$(printf '%s' "${config_json}"    | jq -r '.spec.indexFile // ".specs/index.md"' 2>/dev/null)"
 
@@ -61,6 +69,44 @@ index_path="${cwd}/${index_rel}"
 
 state_dir="${cwd}/.claude/.hookstate"
 state_path="${state_dir}/subagent-retro-${safe_id}.json"
+lessons_path="${spec_dir}/_lessons/lessons.md"
+
+# --- session state ------------------------------------------------------------
+#
+# Read once, written once. The state file is an ON-DISK CONTRACT shared with
+# subagent-retro.ps1 (see write_state below) and now carries two keys:
+#   lastReminderUtc - debounce stamp for the stale-retro reminder.
+#   shownLessons    - lesson lines already surfaced in THIS session.
+# Both writers must preserve the key they are not updating, or a reminder would
+# wipe the session's lesson history and every lesson would repeat.
+
+state_last_iso=""
+declare -a shown_lessons=()
+if [[ -f "${state_path}" ]]; then
+    # Windows jq.exe emits CRLF, so every value read here can carry a trailing
+    # CR. On a lesson line that CR makes the already-shown comparison below fail
+    # against the identical line read from lessons.md, and every lesson repeats
+    # forever; on the timestamp it corrupts the date parse. Same hazard the
+    # prompt-router already documents for join("\n") output - strip it at the
+    # boundary, once, rather than at each use.
+    state_last_iso="$(jq -r '.lastReminderUtc // empty' "${state_path}" 2>/dev/null || true)"
+    state_last_iso="${state_last_iso%$'\r'}"
+    while IFS= read -r shown_line; do
+        shown_line="${shown_line%$'\r'}"
+        [[ -n "${shown_line}" ]] && shown_lessons+=("${shown_line}")
+    done < <(jq -r '.shownLessons[]? // empty' "${state_path}" 2>/dev/null || true)
+fi
+
+write_state() {
+    mkdir -p "${state_dir}" 2>/dev/null || true
+    local shown_json
+    shown_json="$(printf '%s\n' "${shown_lessons[@]:-}" \
+        | jq -R . 2>/dev/null | jq -sc 'map(select(length > 0))' 2>/dev/null)" || shown_json=''
+    [[ -z "${shown_json}" ]] && shown_json='[]'
+    jq -nc --arg t "${state_last_iso}" --argjson s "${shown_json}" \
+        'if $t == "" then {shownLessons:$s} else {lastReminderUtc:$t, shownLessons:$s} end' \
+        > "${state_path}" 2>/dev/null || true
+}
 
 # --- metrics: shared event writer -----------------------------------------
 # Duplicated verbatim from spec-gate.sh (hooks are standalone scripts with no
@@ -313,6 +359,93 @@ for i in "${!specs[@]}"; do
     emit_subagent_stop_metric "${sid}" "in-progress" "${is_stale}"
 done
 
+# --- lesson injection (SW-19) -------------------------------------------------
+#
+# PLACEMENT IS LOAD-BEARING. This sits beside the metrics emit above, BEFORE the
+# staleness early-exit and BEFORE the debounce window - deliberately, and for the
+# same reason the metrics call site does. Moved down to the reminder block, it
+# would only ever surface lessons to users who are already behind on their
+# retros, which is exactly the population that needs them least.
+#
+# The one gate it does keep is the in-progress-spec check further up: no spec in
+# flight, no output. That gate IS the relevance filter - the workflow type of the
+# in-progress spec selects which lessons apply, so there is no ranking, no
+# scoring, and therefore no tie-break that could diverge from the PowerShell
+# twin.
+#
+# Repetition is bounded per SESSION, not by a clock. shownLessons in the state
+# file records what has already been surfaced, so maxLessons caps how many NEW
+# lessons appear at one stop and a session converges to silence once it has said
+# everything relevant. A time debounce was rejected: it would suppress a lesson
+# the user has never seen purely because a different one was shown recently.
+
+emit_lessons() {
+    [[ "${inject_lessons}" == "false" ]] && return 0
+    [[ "${max_lessons}" -gt 0 ]] || return 0
+    [[ -f "${lessons_path}" ]] || return 0
+
+    # Scope selector: the workflow types currently in flight, plus 'all'.
+    local wanted=" all "
+    local sid stype
+    for sid in "${specs[@]}"; do
+        stype="${sid%%-*}"
+        case "${stype}" in
+            FEAT) wanted="${wanted}feature " ;;
+            BUG)  wanted="${wanted}bug " ;;
+            REF)  wanted="${wanted}refactor " ;;
+            PERF) wanted="${wanted}perf " ;;
+            RCA)  wanted="${wanted}rca " ;;
+        esac
+    done
+
+    local lesson_re='^- \[([a-z-]+)\] ([a-z]+)/([a-z]+): (.+)$'
+    local -a picked=()
+    local line scope already prev
+
+    # File order is the selection order. lessons.md is rendered in a total,
+    # deterministic order by aggregate-lessons.*, so "the first N that match" is
+    # itself deterministic - no sorting is done or needed here.
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        line="${line%$'\r'}"
+        [[ "${line}" == "- ["* ]] || continue
+        [[ "${line}" =~ ${lesson_re} ]] || continue
+
+        scope="${BASH_REMATCH[3]}"
+        [[ "${wanted}" == *" ${scope} "* ]] || continue
+
+        already=0
+        for prev in "${shown_lessons[@]:-}"; do
+            if [[ "${prev}" == "${line}" ]]; then already=1; break; fi
+        done
+        [[ ${already} -eq 1 ]] && continue
+
+        picked+=("${line}")
+        [[ ${#picked[@]} -ge ${max_lessons} ]] && break
+    done < "${lessons_path}"
+
+    [[ ${#picked[@]} -gt 0 ]] || return 0
+
+    {
+        echo '<retro-lessons>'
+        echo 'Lessons recorded in earlier retros of this project, matching the workflow'
+        echo 'type of the spec(s) currently in progress:'
+        for line in "${picked[@]}"; do
+            echo "  ${line}"
+        done
+        echo ''
+        echo 'These are not shown again this session.'
+        echo '</retro-lessons>'
+    }
+
+    for line in "${picked[@]}"; do
+        shown_lessons+=("${line}")
+    done
+    write_state
+    return 0
+}
+
+emit_lessons
+
 if [[ ${#stale_id[@]} -eq 0 ]]; then
     exit 0
 fi
@@ -320,31 +453,32 @@ fi
 # --- debounce -----------------------------------------------------------------
 
 debounce_secs=$(( debounce_minutes * 60 ))
-if [[ -f "${state_path}" ]]; then
-    last_iso="$(jq -r '.lastReminderUtc // empty' "${state_path}" 2>/dev/null || true)"
-    if [[ -n "${last_iso}" ]]; then
-        # Strip the UTC marker and any fractional seconds. BSD date's -f cannot
-        # be given trailing unconverted text (it warns on stderr, which would
-        # break the hook's silence), and a state file written by an older
-        # subagent-retro.ps1 carries 7 fractional digits.
-        iso_trimmed="${last_iso%Z}"
-        iso_trimmed="${iso_trimmed%.*}"
-        # Convert ISO8601 to epoch. GNU date supports -d; BSD date needs -j -f.
-        # Both branches must interpret the value as UTC - it is written as UTC
-        # by both implementations, so a local-time reading would skew the
-        # debounce window by the machine's offset.
+# Reads the stamp captured in the single state read near the top rather than
+# re-reading the file: emit_lessons may have rewritten it a moment ago, and that
+# write never touches lastReminderUtc.
+last_iso="${state_last_iso}"
+if [[ -n "${last_iso}" ]]; then
+    # Strip the UTC marker and any fractional seconds. BSD date's -f cannot
+    # be given trailing unconverted text (it warns on stderr, which would
+    # break the hook's silence), and a state file written by an older
+    # subagent-retro.ps1 carries 7 fractional digits.
+    iso_trimmed="${last_iso%Z}"
+    iso_trimmed="${iso_trimmed%.*}"
+    # Convert ISO8601 to epoch. GNU date supports -d; BSD date needs -j -f.
+    # Both branches must interpret the value as UTC - it is written as UTC
+    # by both implementations, so a local-time reading would skew the
+    # debounce window by the machine's offset.
+    last_epoch=""
+    if last_epoch="$(date -u -d "${last_iso}" +%s 2>/dev/null)"; then
+        :
+    elif last_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "${iso_trimmed}" +%s 2>/dev/null)"; then
+        :
+    else
         last_epoch=""
-        if last_epoch="$(date -u -d "${last_iso}" +%s 2>/dev/null)"; then
-            :
-        elif last_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "${iso_trimmed}" +%s 2>/dev/null)"; then
-            :
-        else
-            last_epoch=""
-        fi
-        if [[ -n "${last_epoch}" && "${last_epoch}" =~ ^[0-9]+$ ]]; then
-            if (( now_epoch - last_epoch < debounce_secs )); then
-                exit 0
-            fi
+    fi
+    if [[ -n "${last_epoch}" && "${last_epoch}" =~ ^[0-9]+$ ]]; then
+        if (( now_epoch - last_epoch < debounce_secs )); then
+            exit 0
         fi
     fi
 fi
@@ -373,9 +507,10 @@ fi
 
 # State-file shape is an ON-DISK CONTRACT shared with subagent-retro.ps1: a
 # session can write it under one implementation and read it under the other, so
-# the single key and the whole-second UTC format must stay identical in both.
-mkdir -p "${state_dir}" 2>/dev/null || true
-iso_now="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u)"
-jq -nc --arg t "${iso_now}" '{lastReminderUtc:$t}' > "${state_path}" 2>/dev/null || true
+# both keys and the whole-second UTC format must stay identical in both.
+# write_state re-emits shownLessons alongside the new stamp - dropping it here
+# would clear the session's lesson history and make every lesson repeat.
+state_last_iso="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u)"
+write_state
 
 exit 0
