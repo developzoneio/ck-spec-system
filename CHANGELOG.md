@@ -102,6 +102,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
 
 ### Fixed
+- `selftest-docs.{sh,ps1}` scenarios 2 and 3 had silently stopped testing anything (SW-20). Both
+  planted their corruption by string-replacing the literal `**11 slash commands**`; the repo now
+  ships 12, so the pattern matched nothing, the sandbox copy was never corrupted, the validator
+  correctly passed, and the scenario reported `THE CHECK DID NOT BITE`. Scenario 2's setup guard
+  could not catch this because it only checked that the *planted* text was present - and the
+  planted value (12) had since become the **true** value already in `README.md`, so the guard
+  found the real line and passed vacuously. Scenario 3 had no guard at all. Both counts are now
+  derived from disk (plant `true + 1`, which can never collide), and both scenarios assert the
+  *transition* rather than the destination, reporting a `fixture setup` failure when the pattern
+  does not match. Check 7 itself was never broken - only the proof that it still bites, which had
+  been absent since the 12th command landed on an unpushed branch CI never ran. A hardcoded count
+  in the selftest was the last instance in the repo of the exact anti-pattern
+  `specwright.manifest.json` exists to abolish.
 - `subagent-retro`'s debounce state file, an on-disk contract shared between the two
   implementations, was not written in the same shape by both (SW-5): `subagent-retro.ps1` wrote
   the round-trip `o` format with 7 fractional digits while `subagent-retro.sh` wrote whole

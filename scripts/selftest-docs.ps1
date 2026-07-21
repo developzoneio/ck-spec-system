@@ -54,12 +54,37 @@ function New-RepoCopy {
     }
 }
 
+# The count this test corrupts is DERIVED from disk, never written down. A literal here
+# would rot the moment a command is added: the pattern would stop matching, the sandbox
+# copy would never be corrupted, and the scenario would report the validator as passing
+# when in truth nothing was ever tested. That is exactly what happened when the 12th
+# command landed against a hardcoded '11' (SW-20), and it is the same anti-pattern
+# specwright.manifest.json exists to abolish.
+$TrueCommands  = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'commands') -Filter '*.md' -File).Count
+$WrongCommands = $TrueCommands + 1
+
 function Edit-File {
     param([string]$Path, [string]$From, [string]$To)
     $text = Get-Content -LiteralPath $Path -Raw
     $updated = $text -replace $From, $To
     Set-Content -LiteralPath $Path -Value $updated -NoNewline
     return ($updated -ne $text)
+}
+
+# Asserts the transition, not just the destination: Edit-File reports whether the file
+# actually changed. Checking only that the planted text is present is what defeated the
+# original scenario-2 guard - it planted the then-current count, which by then was also
+# the TRUE value already in README.md, so the check found the real line and passed
+# vacuously. Returns $true when the corruption applied.
+function Assert-Corruption {
+    param([string]$Name, [string]$Path, [string]$From, [string]$To)
+
+    if (Edit-File -Path $Path -From $From -To $To) {
+        return $true
+    }
+    Write-FailMsg "$Name : fixture setup - pattern did not match, nothing was corrupted"
+    $script:Failures++
+    return $false
 }
 
 # Run the validator inside a copy and assert exit status + expected message.
@@ -120,22 +145,24 @@ try {
     Write-Section 'Scenario 2/4: wrong README number fails'
     $wrong = Join-Path $workRoot 'wrong-number'
     New-RepoCopy -Dest $wrong
-    $planted = Edit-File -Path (Join-Path $wrong 'README.md') `
-        -From '\*\*11 slash commands\*\*' -To '**12 slash commands**'
-    if (-not $planted) {
-        Write-FailMsg 'fixture setup: could not plant the wrong number in README.md'
-        $script:Failures++
+    $planted = Assert-Corruption -Name 'wrong-number' -Path (Join-Path $wrong 'README.md') `
+        -From "\*\*$TrueCommands slash commands\*\*" -To "**$WrongCommands slash commands**"
+    if ($planted) {
+        Invoke-Case -Name 'wrong-number' -ExpectPass $false `
+            -Needle "says $WrongCommands, disk has $TrueCommands" -Dir $wrong
     }
-    Invoke-Case -Name 'wrong-number' -ExpectPass $false -Needle 'says 12, disk has 11' -Dir $wrong
 
     # ---- Scenario 3: a reworded claim fails as vacuous ----------------------
 
     Write-Section 'Scenario 3/4: reworded claim fails as vacuous'
     $reworded = Join-Path $workRoot 'reworded'
     New-RepoCopy -Dest $reworded
-    $null = Edit-File -Path (Join-Path $reworded 'README.md') `
-        -From '\*\*11 slash commands\*\*' -To '**11 slash cmds**'
-    Invoke-Case -Name 'reworded' -ExpectPass $false -Needle 'pattern matched no lines' -Dir $reworded
+    $planted = Assert-Corruption -Name 'reworded' -Path (Join-Path $reworded 'README.md') `
+        -From "\*\*$TrueCommands slash commands\*\*" -To "**$TrueCommands slash cmds**"
+    if ($planted) {
+        Invoke-Case -Name 'reworded' -ExpectPass $false `
+            -Needle 'pattern matched no lines' -Dir $reworded
+    }
 
     # ---- Scenario 4: an undeclared claim fails ------------------------------
 

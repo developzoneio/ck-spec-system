@@ -55,10 +55,39 @@ make_copy() {
     done
 }
 
+# The count this test corrupts is DERIVED from disk, never written down. A literal here
+# would rot the moment a command is added: the pattern would stop matching, the sandbox
+# copy would never be corrupted, and the scenario would report the validator as passing
+# when in truth nothing was ever tested. That is exactly what happened when the 12th
+# command landed against a hardcoded '11' (SW-20), and it is the same anti-pattern
+# specwright.manifest.json exists to abolish.
+TRUE_COMMANDS="$(find "$repo_root/commands" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+WRONG_COMMANDS=$((TRUE_COMMANDS + 1))
+
 # Replace first match of a regex in a file, portably (macOS sed -i differs from GNU).
+# Returns non-zero when the file did not change, so a corruption that silently failed to
+# apply is reported as a fixture-setup error rather than sailing on as a passing validator.
 replace_in() {
     local file="$1" from="$2" to="$3"
+    local before after
+    before="$(cat "$file")"
     sed "s|$from|$to|" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+    after="$(cat "$file")"
+    [[ "$before" != "$after" ]]
+}
+
+# Asserts the transition, not just the destination: the original text must be GONE and the
+# planted text present. Checking only for the planted text is what defeated the original
+# scenario-2 guard - it planted the then-current count, which by then was also the TRUE
+# value already in README.md, so the grep found the real line and passed vacuously.
+corrupt_or_fail() {
+    local name="$1" file="$2" from="$3" to="$4"
+    if replace_in "$file" "$from" "$to"; then
+        return 0
+    fi
+    fail "$name : fixture setup - pattern did not match, nothing was corrupted"
+    failures=$((failures + 1))
+    return 1
 }
 
 # Run the validator inside a copy and assert exit status + expected message.
@@ -110,20 +139,20 @@ run_case "clean" 1 "" "$clean"
 section "Scenario 2/4: wrong README number fails"
 wrong="$work_root/wrong-number"
 make_copy "$wrong"
-replace_in "$wrong/README.md" '\*\*11 slash commands\*\*' '**12 slash commands**'
-if ! grep -qF '**12 slash commands**' "$wrong/README.md"; then
-    fail "fixture setup: could not plant the wrong number in README.md"
-    failures=$((failures + 1))
+if corrupt_or_fail "wrong-number" "$wrong/README.md" \
+    "\*\*${TRUE_COMMANDS} slash commands\*\*" "**${WRONG_COMMANDS} slash commands**"; then
+    run_case "wrong-number" 0 "says ${WRONG_COMMANDS}, disk has ${TRUE_COMMANDS}" "$wrong"
 fi
-run_case "wrong-number" 0 "says 12, disk has 11" "$wrong"
 
 # ---- Scenario 3: a reworded claim fails as vacuous --------------------------
 
 section "Scenario 3/4: reworded claim fails as vacuous"
 reworded="$work_root/reworded"
 make_copy "$reworded"
-replace_in "$reworded/README.md" '\*\*11 slash commands\*\*' '**11 slash cmds**'
-run_case "reworded" 0 "pattern matched no lines" "$reworded"
+if corrupt_or_fail "reworded" "$reworded/README.md" \
+    "\*\*${TRUE_COMMANDS} slash commands\*\*" "**${TRUE_COMMANDS} slash cmds**"; then
+    run_case "reworded" 0 "pattern matched no lines" "$reworded"
+fi
 
 # ---- Scenario 4: an undeclared claim fails ---------------------------------
 
