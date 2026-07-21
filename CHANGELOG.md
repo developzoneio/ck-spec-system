@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Structured retro lessons, part 1 of the closed learning loop (SW-17, under epic SW-7): new
+  `sd-retro-lessons` skill defining a 10-tag enum, the one-line lesson record
+  (`- [tag] severity/scope: Rule sentence.`), and the abstraction discipline that turns a
+  retro note into a rule portable to another codebase. The tag enum is **derived from a mined
+  corpus of real retros**, not authored up front - two of the three tags originally proposed
+  in SW-7 were confirmed by that data and one (`pattern-violation`) was retired as overlapping
+  `sibling-repo-assumption` and `precedent-conflict`. New standalone validators
+  `scripts/validate-lessons.ps1` / `.sh` enforce grammar, the closed tag/severity/scope sets, a
+  120-character ceiling, and the privacy contract (no paths, extensions, backticks, line
+  citations, or Pascal/camel/snake_case identifiers), so `.specs/_lessons/lessons.md` is
+  shareable outside the org as-is. They are **separate from `scripts/validate.*` on purpose**:
+  that validator checks this repo's own invariants, and specwright has no `.specs/` tree - these
+  take a file argument and default to `.specs/_lessons/lessons.md` in the current directory, so
+  a consumer repo can run them directly. Paired fixtures under `tests/lessons/fixtures/` assert
+  both directions in CI (clean must pass, leaky must fail) - a validator that rots into a no-op
+  would otherwise report green forever. No hook is modified by this change; aggregation (SW-18)
+  and surfacing (SW-19) follow.
 - Local, privacy-safe spec metrics (SW-10): `spec-gate` and `subagent-retro` now append one JSON
   line per gate decision, `index.md` lifecycle transition, and subagent-stop check to
   `.specs/_metrics/events.jsonl` - metadata only (timestamp, spec ID, lifecycle phase, decision,

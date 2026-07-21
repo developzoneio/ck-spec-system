@@ -14,7 +14,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
-|    skills/sd/      6 reusable rule packs (referenced by agents)    |
+|    skills/sd/      7 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |

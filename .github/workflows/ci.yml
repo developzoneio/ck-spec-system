@@ -40,6 +40,29 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke-hooks.ps1
 
+      # --- Lesson privacy validator, both directions. The clean fixture passing
+      # proves the grammar is accepted; the leaky fixture FAILING is what proves
+      # the checks still fire. Only the second one catches a validator that has
+      # rotted into a no-op ---------------------------------------------------
+      - name: Lesson validator (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash scripts/validate-lessons.sh tests/lessons/fixtures/clean-lessons.md
+          if bash scripts/validate-lessons.sh tests/lessons/fixtures/leaky-lessons.md; then
+            echo "::error::leaky fixture passed the validator - checks are not firing"
+            exit 1
+          fi
+
+      - name: Lesson validator (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/clean-lessons.md
+          if ($LASTEXITCODE -ne 0) { throw "clean fixture failed the validator" }
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/leaky-lessons.md
+          if ($LASTEXITCODE -eq 0) { throw "leaky fixture passed the validator - checks are not firing" }
+
       # --- Docs-consistency self-test: the validator above proves the docs are
       # right; this proves the validator would NOTICE if they were wrong. Without
       # it, a Check 7 that rotted into a no-op would still report green ---------
