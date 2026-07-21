@@ -68,9 +68,11 @@ Behavior:
 2. Read `00-spec.md`. Display:
    - Frontmatter (id, type, status, created, jira/severity if present).
    - First H2 (title or "Why").
-   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md` exist.
+   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md`, `06-verify.md` exist.
 3. If `02-tasks.md` exists, show task completion count `N/M`.
 4. Print folder URL: `file://<absolute path>`.
+
+`06-verify.md` - verification report written by `/sd:verify`; gates the `done` transition.
 
 ---
 
@@ -91,6 +93,10 @@ in-progress -> done
 done -> archived
 archived -> in-progress (only via 'revive', with reason)
 ```
+
+The `in-progress -> done` transition is hook-enforced: spec-gate blocks the `index.md` edit
+unless `<spec.dir>/<ID>/06-verify.md` exists and records `result: pass`. Run `/sd:verify <ID>`
+first. Disable only via `hooks.specGate.verifyGate: false` in project-config.
 
 3. Illegal transitions are REFUSED. Do NOT mutate any file. Print a refusal that names the current
    state, the requested state, the valid next state(s) for the current state (from the machine above),
@@ -271,6 +277,7 @@ BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who ha
 | `SL052` | Self-link | 🔴 BLOCK |
 | `SL053` | Stored relation is `blocked-by` - an input alias, so the field was hand-edited | 🟠 WARN |
 | `SL054` | Duplicate entry in `linked_specs` | 🟠 WARN |
+| `SL055` | Spec status `done` but `06-verify.md` is missing or records `result: fail` | 🟠 WARN |
 
 Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
 so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**

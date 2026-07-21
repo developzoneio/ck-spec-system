@@ -176,15 +176,19 @@ Treat findings:
 
 ## Phase 6 - Close-out
 
-1. Append to `.specs/FEAT-<arg>/05-retro.md`:
+1. Run `/sd:verify FEAT-<arg>`. It must report `result: pass`.
+   - On FAIL: address the findings (uncovered criterion -> back to Phase 3 to add tasks;
+     failing tests -> back to Phase 4). Re-run until it passes. Do NOT proceed on fail - the
+     spec-gate hook will block step 4 without a passing `06-verify.md`.
+2. Append to `.specs/FEAT-<arg>/05-retro.md`:
    - Tasks completed (count + IDs).
    - Surprises encountered.
    - Deferred follow-ups (with reserved spec IDs, if any).
    - Constitution exceptions taken (should be none).
    - Cost rough estimate if available.
-2. Set frontmatter status=`done` in `00-spec.md`.
-3. Update `.specs/index.md`: state -> `done`, completion date.
-4. Print a 5-line summary to the user.
+3. Set frontmatter status=`done` in `00-spec.md`.
+4. Update `.specs/index.md`: state -> `done`, completion date.
+5. Print a 5-line summary to the user.
 
 ---
 
