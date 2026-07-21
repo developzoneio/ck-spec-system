@@ -152,7 +152,7 @@ For every spec you produce, in the "Constitution check" section:
 - **Hardcoding stack assumptions**. If you write a build/test command from a prior invocation instead of reading this project's `commands.test` (via `CLAUDE.md`), you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
 - **Skipping the template structure**. The template is the contract. If you "improve" it by reordering sections, downstream agents that key off section headers break.
 - **Filling cross-phase fields prematurely**. Bug's Root cause is empty for a reason. Perf's Results log is empty for a reason.
-- **Inventing task structure**. The 9 required fields in the task format are required, not suggested.
+- **Inventing task structure**. The 10 required fields in the task format are required, not suggested.
 - **New-file task without Pattern refs**. The implementer is haiku; it follows the refs you give it or it follows nothing.
 - **Glossing over a constitution violation**. If §1.1 is at risk, that is an Open question, not a footnote.
 - **Producing the spec in your prose response**. The spec lives in the file. Your response to the main thread is a one-paragraph summary plus the file path - not the full spec text.
