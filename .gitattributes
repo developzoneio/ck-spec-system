@@ -1,0 +1,12 @@
+# Byte-comparison fixtures must keep LF on every platform.
+#
+# scripts/aggregate-lessons.{ps1,sh} deliberately render LF and compare the
+# result against tests/lessons/fixtures/expected-lessons.md byte for byte. With
+# core.autocrlf=true (the Git default on Windows, and on the windows-latest CI
+# runner) that fixture would be checked out as CRLF, and the comparison would
+# fail for a reason that has nothing to do with the code under test.
+#
+# This covers the lesson fixtures only. The repo's shell scripts are also
+# checked out as CRLF on Windows today - see SW-21; that is a broader change
+# and is deliberately not folded in here.
+tests/lessons/** text eol=lf
