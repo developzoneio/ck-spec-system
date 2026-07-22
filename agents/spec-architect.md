@@ -43,6 +43,12 @@ Output: `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
 
 Per-template authoring rules (what to fill, what to leave TBD, required frontmatter fields) are in the **sd-spec-templates** skill. Read the section matching the spec type being authored.
 
+For a **feature** spec, that includes the `complexity` frontmatter field: your whole-spec size
+estimate (`S` | `M` | `L`) plus a one-line rationale, per the "Complexity estimate" rubric in
+**sd-spec-templates**. Estimate it honestly from Why / What / SC / AC / Open questions - it is not
+always `M`, and a create-time `L` estimate escalates the impact and planning models downstream. It
+is a spec-level estimate, distinct from a task's `Estimated complexity`.
+
 ---
 
 ## Mode 2: `TASK = plan`
@@ -80,6 +86,37 @@ For every task that creates a new file or introduces a new public symbol:
 5. If a task's `Acceptance` depends on an unfamiliar library API, verify current syntax via
    `mcp__context7__resolve-library-id` + `mcp__context7__query-docs` before writing the criterion -
    stale training data on library APIs is a real failure mode (same rule the implementer follows).
+
+### Complexity self-assessment (feature plan only)
+
+After writing `01-plan.md` and `02-tasks.md`, measure the plan you just wrote against the decompose
+thresholds in the **sd-spec-templates** skill ("Complexity estimate"). A plan is **over-threshold**
+when **any** hold: tasks **> 8**, spans **> 2** production layers/subsystems (distinct `Layer`
+values, **excluding `Tests` and `Config`**, which cross-cut every change), impact surface **> 8**
+files (from `IMPACT`), or **any** unresolved Open question remains. Count tasks with the tolerant
+heading grammar (`sd-atomic-task-format`) - never a naive `^### T<NN>` regex, which undercounts
+drifted real specs.
+
+Then, in your return to the main thread:
+
+1. **Under threshold** - report normally: the plan path, task count, and measured complexity. No
+   friction, no decompose talk. This is the common case; do not manufacture concern.
+2. **Over threshold, decomposable** - do NOT present the oversized plan as final. Return
+   `STATUS = needs-input` with a **decompose proposal**: 2+ child specs, each a medium slice, that
+   together cover every SC/AC of the parent. For each child give a title, the SC/AC IDs it owns
+   (partition the parent's - no SC/AC covered twice, none dropped), and a proposed
+   `FEAT-<parent-arg>-<child-slug>` ID. State the dependency order between children as
+   `depends-on` edges. The main thread runs the Gate Complexity approval and creates the children;
+   you only propose. Do not write the child specs yourself in this return.
+3. **Over threshold but legitimately atomic (no clean split)** - some work is simply large and
+   cohesive; a forced split would produce worse specs than one honest plan (a real case: a
+   hand-decomposed corpus child still ran 12 tasks). Return `STATUS = needs-input` flagging
+   **no-split**: name why the work does not partition, and recommend the sanctioned model
+   escalation (main thread bumps you to `opus`, explorer to `sonnet` - aliases only). The user
+   decides at the gate.
+
+You never change your own model and you never create child specs - both are main-thread actions in
+`commands/feature.md`. You measure, and you propose.
 
 ---
 

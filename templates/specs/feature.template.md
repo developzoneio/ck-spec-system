@@ -4,8 +4,18 @@ type: feature
 status: draft
 jira: <<TICKET-ID-or-none>>
 created: <<YYYY-MM-DD>>
+complexity: <<S|M|L>>  # <<one-line rationale, e.g. spans 3 layers, ~14 tasks estimated>>
 linked_specs: []
 ---
+
+<!-- `complexity` is the WHOLE-SPEC size estimate the architect writes at create time (S | M | L),
+     with a one-line rationale in the trailing comment. It is distinct from a task's
+     `Estimated complexity` field in 02-tasks.md (which sizes one line item). It is an estimate,
+     not a measurement: Phase 3 measures the real plan against the complexity thresholds at the
+     Gate 2 / Gate Complexity checkpoint. A create-time estimate of `L` also escalates the impact
+     and planning models (see /sd:feature). Leave the `<<S|M|L>>` and rationale tokens for the
+     architect to fill; both must be gone before `approved`. -->
+
 
 # <<Short imperative title - what this feature does>>
 

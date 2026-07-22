@@ -52,7 +52,7 @@ Spec-driven feature workflow.
 | 0 - Bootstrap | main thread | - |
 | 1 - Spec | `sd-spec-architect` | ⛔ Gate 1 (spec approval) |
 | 2 - Impact | `sd-code-explorer` | - |
-| 3 - Plan + tasks | `sd-spec-architect` | ⛔ Gate 2 (plan approval) |
+| 3 - Plan + tasks | `sd-spec-architect` | ⛔ Gate 2 (plan approval; complexity triage) |
 | 4 - Execute | `sd-implementer` per task + main thread self-check | - |
 | 5 - Integration + batch review | main thread + `sd-reviewer` (holistic, once) | ⛔ Gate 3 (integration + review) |
 | 6 - Close-out | main thread | - |
@@ -60,6 +60,8 @@ Spec-driven feature workflow.
 **Spec ID**: `FEAT-<arg>`. State machine on re-invocation: detected state -> resume at next phase.
 
 Phase 2 records the codebase's precedents and conventions (nearest similar implementations, naming patterns, existing utilities) alongside the impact map. Phase 3 tasks then carry `Pattern refs` - `file:line` citations of precedent code the implementer must read before writing, so new code mirrors the existing structure.
+
+The architect writes a spec-level `complexity` estimate (`S` | `M` | `L`) at Phase 1. Gate 2 then measures the actual plan: under the decompose thresholds (> 8 tasks, > 2 production layers excluding Tests/Config, > 8 impacted files, or an unresolved Open question) it is the normal plan approval with **zero added friction**; over them it becomes a HARD **Gate Complexity** that refuses one oversized plan and forces a split into medium child specs (`FEAT-<arg>-<slug>`, linked to the parent umbrella). A create-time `L` estimate also escalates the impact and planning models a tier (aliases only). Still 3 hard gates - complexity triage is a second face of Gate 2, not a fourth gate.
 
 Example:
 ```

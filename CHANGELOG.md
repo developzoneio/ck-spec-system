@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Complexity triage + forced decomposition in `/sd:feature` (SW-13). The architect writes a
+  spec-level `complexity` frontmatter field (`S` | `M` | `L`, distinct from a task's
+  `Estimated complexity`) with a one-line rationale at create time. Gate 2 then measures the actual
+  plan against decompose thresholds - **> 8 tasks, > 2 production layers (Tests/Config excluded),
+  > 8 impacted files, or an unresolved Open question** (the `> 8` line set from the corpus canyon
+  between 3-4-task and 10-12-task specs; the Tests/Config exclusion keeps ordinary 2-layer mediums
+  under threshold).
+  Over threshold, Gate 2 becomes a HARD **Gate Complexity** that refuses one oversized plan and
+  forces a split into medium child specs (`FEAT-<parent-arg>-<child-slug>`, linked via existing
+  `/sd:spec link spawns` / `depends-on`; the parent becomes an immutable `archived` umbrella). Under
+  threshold it stays the normal plan approval with **zero added friction** - still 3 hard gates, not
+  4. A create-time `complexity: L` also escalates models a tier (explorer -> `sonnet`, architect ->
+  `opus`, aliases only, per-invocation), deepening the impact map and plan for genuinely large work.
+  Task counts use the tolerant `sd-atomic-task-format` heading grammar, not a naive `### T<NN>`
+  regex. See `docs/adr/0002-complexity-triage-decomposition.md`. Linting of the field + split
+  integrity is deferred to SW-4 (`/sd:spec validate`).
 - Field label grammar in `sd-atomic-task-format` (SW-11). Task-block labels are now matched
   case-insensitively, with `**` optional and the colon permitted inside or outside the emphasis -
   all three forms found in live specs (`- **Files**:`, `- Files:`, `- **Files:**`) parse

@@ -22,7 +22,7 @@ Each template has a dedicated section below. Read only the section matching the 
 | Type | Fields |
 |---|---|
 | All | `id`, `type`, `status: draft`, `created`, `linked_specs` |
-| Feature | `jira` (or `none`) |
+| Feature | `jira` (or `none`), `complexity` (`S` \| `M` \| `L`) |
 | Bug | `severity` (P0–P3), `jira` |
 | Refactor | `smell` |
 | Perf | `target_metric` |
@@ -42,6 +42,8 @@ Fill:
 - **Success criteria** — concrete and checkable (observable test outcome, not "works correctly").
 - **Out of scope** — explicit list; prevents scope creep disputes.
 - **Open questions** — real ambiguities only; don't pad.
+- **`complexity` frontmatter** — the whole-spec size estimate, `S` | `M` | `L`, with a one-line
+  rationale in the trailing comment. See "Complexity estimate" below.
 
 - Scenario headings use stable IDs: `### SC-<n>: <name>`. IDs are sequential from SC-1 and are
   never renumbered or reused after a scenario is deleted - downstream `Covers` fields and
@@ -51,6 +53,59 @@ Fill:
   before `/sd:verify` can pass (see sd-atomic-task-format).
 
 Constitution check: list applicable `§N.M` references. Flag any potential violation as an Open question.
+
+### Complexity estimate (feature only)
+
+The `complexity` frontmatter field is the architect's whole-spec size estimate. It exists to route
+oversized work into the regime the engine handles well: at Gate 2, `/sd:feature` measures the real
+plan against the thresholds below and, if the plan exceeds them, refuses a single oversized plan and
+forces a decompose into medium child specs (see `commands/feature.md`, Gate Complexity).
+
+**`complexity` is a spec-level field. It is NOT the same as a task's `Estimated complexity`
+field in `02-tasks.md`.** The task field sizes one line item; this field sizes the whole feature.
+They share the `S` | `M` | `L` vocabulary on purpose (one house currency) but answer different
+questions. Never conflate them.
+
+**Estimate at create, measure at plan.** At `create` the architect has only Why / What / SC / AC /
+Open questions — no plan yet — so `complexity` is an honest *estimate*, written with a one-line
+rationale. It is not a measured field, so it is a plain author-fill token, not a `<<PHASE-N: ...>>`
+token, and it is filled at create time. Phase 3 is where the plan is *measured* against the
+thresholds; the create-time estimate does not have to be re-derived, but it must be a genuine
+judgement, not always `M`.
+
+Rubric for the estimate:
+
+| Value | Guideline (estimate) |
+|---|---|
+| `S` | One layer, a handful of tasks (≈1-4), single subsystem, no unresolved Open questions. |
+| `M` | Up to 2 layers, ≈5-8 tasks, one boundary crossing. The regime the engine plans well. |
+| `L` | Spans > 2 production layers/subsystems, likely > 8 tasks, or carries unresolved Open questions at plan time. Candidate for decomposition. |
+
+**Decompose thresholds (measured at Gate 2).** A plan is over-threshold when **any** of these hold:
+
+- estimated/authored tasks **> 8**
+- spans **> 2** production layers/subsystems — count the distinct `Layer` values across tasks, but
+  **exclude `Tests` and `Config`**: they cross-cut nearly every change, so counting them would make
+  an ordinary 2-layer feature (e.g. `Application` + `Domain` + `Tests`) read as 3 and over-fire
+- impact surface **> 8** files (from `03-decisions.md`)
+- **any** unresolved Open question remains at plan time
+
+The `> 8` task line is set from the only live corpus (`asian-sportsbook-v2`): real feature specs
+cluster at 3-4 tasks (medium) and 10-12 tasks (the two specs a human had already hand-split into a
+parent + child), with nothing in between — `> 8` sits in that canyon, so mediums pass untouched and
+the genuinely large trip the gate. The Tests/Config exclusion is set from the same corpus: the
+3-4-task mediums touch `Application` + `Domain` + `Tests`, so a naive layer count would have tripped
+the gate on exactly the specs that must pass with zero friction.
+
+**Count tasks with the tolerant grammar, never a naive regex.** When measuring the task count, use
+the **Field label / heading grammar** the way `sd-atomic-task-format` describes — live specs write
+task headings as `### T01`, `### ✅ T01`, and other drifted forms. A counter that matches only
+`^### T<NN>` undercounts real specs and the gate silently never fires. Match tolerantly: a task
+heading is an H3 (or deeper) whose text contains a `T<digits>` token.
+
+**A create-time estimate of `L` also escalates models** (aliases only) — `/sd:feature` bumps the
+impact explorer and the planning architect a tier. That is a workflow action, documented in
+`commands/feature.md`; the architect only writes the estimate.
 
 ---
 
