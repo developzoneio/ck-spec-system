@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Thirteen slash commands, six specialized subagents, three guard-rail hooks, nine templates, eight reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> 13 slash commands, 6 specialized subagents, 3 guard-rail hooks, 9 templates, 8 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)

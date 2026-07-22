@@ -121,8 +121,8 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:status    -> (none - pure file ops; read-only report over events.jsonl + index.md)
 ```
 
-Five commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify`,
-`/sd:status`) - they are deterministic file operations the main thread performs directly. The rest share one
+Some commands invoke no subagent at all - `/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify` and
+`/sd:status` are deterministic file operations the main thread performs directly. The rest share one
 backbone: the architect frames the spec, an investigator (explorer or debugger) gathers evidence,
 the implementer makes the change one atomic task at a time, and the reviewer gates the result. The
 reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
@@ -168,7 +168,7 @@ A skill is **not** an agent. It cannot be invoked directly, has no tools of its 
 
 ## Hooks as context injection, guardrails, and recording
 
-Three hooks ship in cross-platform pairs (PowerShell + bash). Each plays one of three roles:
+3 hooks ship in cross-platform pairs (PowerShell + bash). Each plays one of three roles:
 `prompt-router` injects context, `spec-gate` guards edits (and records), `subagent-retro`
 reminds about stale retros (and records).
 
@@ -223,7 +223,7 @@ not the measurement.
 
 ### Event log (`.specs/_metrics/events.jsonl`)
 
-`spec-gate` and `subagent-retro` are the two hooks that record. Each appends one JSON object per
+`spec-gate` and `subagent-retro` are the hooks that record. Each appends one JSON object per
 line (append-only, UTF-8, LF-terminated) to `.specs/_metrics/events.jsonl`, in a fixed key order so
 the PowerShell and bash implementations produce byte-comparable lines:
 

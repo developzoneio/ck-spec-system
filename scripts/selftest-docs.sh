@@ -5,15 +5,21 @@
 #
 # Check 7 only earns its place in CI if it FAILS when the docs lie. A check that
 # silently degrades into a no-op still reports success, so this test corrupts a
-# throwaway copy of the repo in three ways and asserts the validator catches each:
+# throwaway copy of the repo in several ways and asserts the validator catches each:
 #
-#   1. Clean copy                -> passes.
-#   2. A wrong published number  -> fails, naming the number and the truth.
-#   3. A reworded claim          -> fails as vacuous (pattern matched no lines).
-#   4. An undeclared new claim   -> fails as undeclared.
+#   1. Clean copy                  -> passes.
+#   2. A wrong published number    -> fails, naming the number and the truth.
+#   3. A reworded claim            -> fails as vacuous (pattern matched no lines).
+#   4. An undeclared new claim     -> fails as undeclared.
+#   5. A spelled-out CAPITALISED   -> fails as undeclared.  (SW-24)
+#   6. A bare-noun claim           -> fails as undeclared.  (SW-24)
 #
 # Scenarios 3 and 4 are what stop the check rotting: without them someone could
-# reword or add docs and quietly leave Check 7 guarding nothing.
+# reword or add docs and quietly leave Check 7 guarding nothing. Scenarios 5 and 6
+# cover the two escapes SW-24 found, both of which had let a real wrong claim sit in
+# a tracked doc through many green runs. They are deliberately separate: a fix that
+# only adds a lowercase word alternation passes 4 and fails 5, and a fix that only
+# handles decorated nouns passes 5 and fails 6.
 #
 # Exit 0 = the check behaves correctly; 1 = the check is broken.
 
@@ -129,14 +135,14 @@ echo "  Sandbox:   $work_root"
 
 # ---- Scenario 1: clean copy passes -----------------------------------------
 
-section "Scenario 1/4: clean copy passes"
+section "Scenario 1/6: clean copy passes"
 clean="$work_root/clean"
 make_copy "$clean"
 run_case "clean" 1 "" "$clean"
 
 # ---- Scenario 2: a wrong published number fails ----------------------------
 
-section "Scenario 2/4: wrong README number fails"
+section "Scenario 2/6: wrong README number fails"
 wrong="$work_root/wrong-number"
 make_copy "$wrong"
 if corrupt_or_fail "wrong-number" "$wrong/README.md" \
@@ -146,7 +152,7 @@ fi
 
 # ---- Scenario 3: a reworded claim fails as vacuous --------------------------
 
-section "Scenario 3/4: reworded claim fails as vacuous"
+section "Scenario 3/6: reworded claim fails as vacuous"
 reworded="$work_root/reworded"
 make_copy "$reworded"
 if corrupt_or_fail "reworded" "$reworded/README.md" \
@@ -156,17 +162,41 @@ fi
 
 # ---- Scenario 4: an undeclared claim fails ---------------------------------
 
-section "Scenario 4/4: undeclared claim in a new doc fails"
+section "Scenario 4/6: undeclared claim in a new doc fails"
 undeclared="$work_root/undeclared"
 make_copy "$undeclared"
 printf '\nThe engine ships 99 reusable skills.\n' >> "$undeclared/docs/usage.md"
 run_case "undeclared" 0 "undeclared inventory claim" "$undeclared"
 
+# ---- Scenario 5: a spelled-out, CAPITALISED claim fails (SW-24) -------------
+
+# A spelled-out number can never be validated against disk - the comparison is against an
+# integer - so the only correct outcome is rejection as undeclared. Capitalised on purpose:
+# a spelled-out count in prose is usually sentence-initial, which is exactly the form a
+# lowercase-only word alternation misses. A lowercase-only fix passes scenario 4 and fails
+# here, which is the whole reason this scenario is separate.
+section "Scenario 5/6: spelled-out capitalised claim fails"
+spelled="$work_root/spelled-out"
+make_copy "$spelled"
+printf '\nSeven reusable skills ship with the engine.\n' >> "$spelled/docs/usage.md"
+run_case "spelled-out" 0 "undeclared inventory claim" "$spelled"
+
+# ---- Scenario 6: a bare-noun claim fails (SW-24) ---------------------------
+
+# Before SW-24 the vocabulary only listed decorated forms ('slash commands', 'workflow
+# commands'), so an undecorated 'N commands' matched nothing at all. That is how
+# 'Five commands invoke no subagent' sat in docs/architecture.md unseen.
+section "Scenario 6/6: bare-noun claim fails"
+barenoun="$work_root/bare-noun"
+make_copy "$barenoun"
+printf '\nThe engine ships 99 commands.\n' >> "$barenoun/docs/usage.md"
+run_case "bare-noun" 0 "undeclared inventory claim" "$barenoun"
+
 # ---- summary ---------------------------------------------------------------
 
 section "Summary"
 if [[ $failures -eq 0 ]]; then
-    ok "Check 7 bites on all 4 scenarios."
+    ok "Check 7 bites on all 6 scenarios."
     exit 0
 else
     fail "$failures scenario(s) behaved wrong - Check 7 is not trustworthy."

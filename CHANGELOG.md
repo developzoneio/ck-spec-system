@@ -264,10 +264,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counting `1`s over time, never by reading a single value as a quantity. Found while building the
   first reader of the log (SW-16); the field had no consumer until now, so nothing had contradicted
   the prose.
-- `README.md` claimed "seven reusable skills" in its intro line; the repo ships eight. Spelled-out
-  numbers escape the `claimPhrases` vocabulary in `specwright.manifest.json` (all patterns are
-  `[0-9]+`-anchored), so Check 7 could not see the drift. Pre-existing, unrelated to SW-16; the
-  blind spot itself is filed separately.
+- Check 7 could not see three whole classes of inventory claim, and each class had let a real,
+  wrong number sit in a tracked doc through many green runs (SW-24). The `claimPhrases` vocabulary
+  in `specwright.manifest.json` now closes all three:
+  (1) **Spelled-out numbers.** Every pattern was anchored on `[0-9]+`, so `README.md`'s intro line
+  saying "seven reusable skills" was invisible from the moment an eighth skill shipped in SW-17.
+  (2) **Capitalisation.** Adding a lowercase word alternation is *not* enough - a spelled-out count
+  in prose is usually sentence-initial, which is exactly where it is capitalised. `Three hooks ship
+  in cross-platform pairs` in `docs/architecture.md` escaped a lowercase-only fix. POSIX ERE (bash
+  `[[ =~ ]]`) has no inline case flag, so each word carries an explicit `[Tt]`-style class rather
+  than a flag only one of the two engines supports.
+  (3) **Bare nouns.** Only decorated forms were listed (`slash commands`, `workflow commands`), so
+  `Five commands invoke no subagent` matched nothing at all - a line added by SW-16 itself, one
+  commit before this one. Bare `commands` and `agents` are now in the vocabulary.
+  Measured across the whole tracked tree: 4 real claims surfaced, 0 false positives.
+  The four offending lines are resolved under a policy now recorded in the manifest
+  (`$claimPolicyComment`): **if a number is derivable from an area, write it in digits and declare
+  it; if it is not derivable, publish no number and let the names carry the meaning.** So
+  `README.md`'s intro became digits with five new `docClaims` entries, `Three hooks ship ...`
+  became `3 hooks ship ...` with a `docClaims` entry against `hooksPowerShell`, and the two counts
+  that no area derives (`Five commands invoke no subagent ...`, `the two hooks that record`) had
+  the number removed - both already listed every item by name.
+  `selftest-docs.{sh,ps1}` grow from 4 scenarios to 6, one per new escape, and they are kept
+  separate on purpose: a fix that only adds a lowercase alternation passes scenario 4 and fails 5,
+  and a fix that only handles decorated nouns passes 5 and fails 6. Both were verified by
+  sabotage - reverting the vocabulary to digit-only makes scenario 5 report `THE CHECK DID NOT
+  BITE` while 6 stays green, and removing the bare-noun entries produces the mirror image.
+  Check 7 now validates 52 published claims, up from 46.
 - `subagent-retro.ps1` terminated its emitted block with `[Console]::Out.WriteLine`, which appends
   `[Environment]::NewLine` - CRLF on Windows - so its output differed from `subagent-retro.sh` by
   exactly one byte on the final line. Both the `<retro-reminder>` and the new `<retro-lessons>`
