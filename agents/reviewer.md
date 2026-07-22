@@ -32,7 +32,7 @@ Key reminders:
 - Every BLOCK / WARN cites `§N.M` or a spec acceptance criterion — no anchor = no BLOCK/WARN.
 - Every finding cites `file:line` (see **sd-evidence-citation** skill).
 - If a section has zero findings, write `_No findings._` — never omit the section.
-- Pattern findings (see **sd-pattern-discipline** skill): deviation from an explicit `Pattern refs` entry is WARN, anchored to the task block. Convention drift with no Pattern ref and no constitution anchor is SUGGEST. Never BLOCK solely because a task lacks a `Pattern refs` field.
+- Pattern findings (see **sd-pattern-discipline** skill): deviation from an explicit `Pattern refs` entry is WARN, anchored to the task block. Convention drift with no Pattern ref and no constitution anchor is SUGGEST. Never BLOCK solely because a task lacks a `Pattern refs` field — the field is required on every task, but a missing one is a spec-authoring defect that `/sd:spec validate` reports as `SL060` (WARN), not a defect in the code you are reviewing.
 
 ---
 

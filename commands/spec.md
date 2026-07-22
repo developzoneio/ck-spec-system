@@ -254,6 +254,8 @@ Behavior:
    - Index row matches frontmatter status.
    - Transition history is legal (see "Transition replay" below).
    - Links resolve and are symmetric (see "Link integrity" below).
+   - Task-block content, when `02-tasks.md` exists (see "Task-block checks" below). This is the
+     only check that reads inside an artifact rather than around it.
 2. Tree-wide checks (run once, only when the target is `--all`):
    - Index <-> folder symmetry (see below).
 3. Report every finding using the severity taxonomy (see "Output" below). Do not stop at the
@@ -293,12 +295,37 @@ BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who ha
 | `SL053` | Stored relation is `blocked-by` - an input alias, so the field was hand-edited | 🟠 WARN |
 | `SL054` | Duplicate entry in `linked_specs` | 🟠 WARN |
 | `SL055` | Spec status `done` but `06-verify.md` is missing or records `result: fail` | 🟠 WARN |
+| `SL060` | Task block in `02-tasks.md` has no `Pattern refs` field | 🟠 WARN |
+
+`SL061`-`SL069` are **reserved** for further task-block content rules. Claim from this band rather
+than extending another one - `SL05x` is link integrity and has nothing to do with task content.
 
 Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
 so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
 (`SL011` - a measured field filled from memory). WARN is for a real problem that leaves the
 registry still truthful and is recoverable by re-running a command. There is no SUGGEST rule
 today; the section is still printed, per the taxonomy.
+
+`SL060` is WARN by that same test: a task with no `Pattern refs` leaves the registry truthful and
+is fixed by re-planning the spec. It is deliberately **not** BLOCK - in the only corpus measured,
+every task authored after the field shipped already carried it (22 of 22), while the two specs
+without it predate the field entirely. Blocking would fail old specs for a rule they could not
+have followed, and would gain nothing on new ones.
+
+### Task-block checks
+
+Run only when `02-tasks.md` exists. Parse it per the **Field label grammar** in the
+`sd-atomic-task-format` skill - label matching is case-insensitive, `**` around the label is
+optional, and the colon may sit inside or outside the emphasis. All three forms occur in live
+specs; a reader that accepts only the canonical `- **Label**:` form reports false `SL060`s against
+correctly authored tasks, which is worse than not running the check at all.
+
+A field's value runs to the next field label, not to the next newline - `Acceptance` and
+`Pattern refs` are routinely multi-line with nested bullets.
+
+Report one `SL060` per offending task block, citing the task heading (e.g. `02-tasks.md` `T01`).
+A block that writes `Pattern refs: none` is **compliant** - the explicit `none` is the assertion
+the rule is asking for. Only an absent field is a finding.
 
 ### Output
 

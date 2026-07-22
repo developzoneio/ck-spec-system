@@ -5,7 +5,7 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 
 ---
 
-## Task block (10 required fields + Pattern refs)
+## Task block (11 required fields)
 
 ```markdown
 ### T<NN> - <imperative title>
@@ -23,10 +23,18 @@ Used by `sd-spec-architect` when authoring `02-tasks.md` and by `sd-implementer`
 - **Pattern refs**: <1-3 file:line precedent citations + what to mirror | none>
 ```
 
-The first 10 fields are **required**, not optional. A task block missing any of them is malformed.
-`Pattern refs` is **required when the task creates a new file or a new public symbol**, and
-recommended otherwise. A block without the field is treated as `Pattern refs: none` (backward
-compatible with existing `.specs/` folders).
+All 11 fields are **required**, not optional. A task block missing any of them is malformed.
+
+`Pattern refs` is required on **every** task - the old "only when the task creates a new file or a
+new public symbol" condition is gone. A task with no precedent worth citing writes
+`Pattern refs: none` **explicitly**. The point of the field is the assertion: `none` says the
+architect looked and found nothing, while an absent field says nothing at all, and the two are not
+the same claim.
+
+Reading legacy specs stays lenient. A block authored before this rule, with the field absent, is
+read as `Pattern refs: none` so existing `.specs/` folders keep working. `/sd:spec validate`
+reports the omission as `SL060` (WARN) - it does not block, and nothing downstream refuses the
+task.
 
 ### Refactor mode adds one field
 
@@ -39,6 +47,47 @@ compatible with existing `.specs/` folders).
 Tasks sharing a batch number have disjoint file sets and no `Depends on` / `Conflicts with`
 relationship between them - they are safe to execute in parallel. `solo` means the task cannot
 be batched with any other. Other workflow types (feature, bug, perf) do not use this field.
+
+---
+
+## Field label grammar
+
+The block above shows the **canonical form to author**. It is an example, not the parsing rule -
+real specs have drifted, and a reader that accepts only the canonical form rejects valid work.
+
+**When authoring**, always emit the canonical form:
+
+```markdown
+- **Files**: <value>
+```
+
+**When reading**, match tolerantly. A field label matches when all of the following hold:
+
+| Aspect | Rule |
+|---|---|
+| Bullet marker | `-` or `*`, any leading indentation |
+| Emphasis | `**` around the label is optional |
+| Colon | may sit inside the emphasis (`**Files:**`) or outside it (`**Files**:`) |
+| Case | label match is case-insensitive |
+| Whitespace | any amount around the marker, label, colon, and value |
+
+All three of these are the same field and must parse identically:
+
+```markdown
+- **Files**: src/Foo.cs
+- Files: src/Foo.cs
+- **Files:** src/Foo.cs
+```
+
+**Value extent.** A field's value runs from after the colon to the start of the next field label
+or the end of the block - it is **not** limited to one line. Indented continuation lines and
+nested sub-bullets belong to the field above them. `Acceptance` and `Pattern refs` are routinely
+authored as multi-line values with nested bullets; a line-oriented reader that stops at the first
+newline truncates them.
+
+This grammar applies to **every** field in the block, not only to the field a given check cares
+about. Anything that reads `02-tasks.md` - `/sd:spec validate`, `/sd:verify`, `sd-implementer` -
+uses this one rule. Do not write a per-field matcher.
 
 ---
 
@@ -92,7 +141,7 @@ for every task - the coverage requirement (VF010/VF011) applies only to specs wh
 Drive sequencing and batch planning. Tasks that **conflict** cannot run in the same parallel batch. Tasks that **depend on** a prior task cannot start until that task's acceptance criterion is met.
 
 ### Pattern refs
-1-3 `file:line` citations of precedent code the implementer reads BEFORE writing, each with a one-line instruction of what to mirror (e.g. "mirror handler structure and registration", "reuse this helper - do not duplicate"). Required for tasks that create a new file or a new public symbol; `none` only for tasks that exclusively edit existing files. Verify each cited file exists before writing the ref. Discovery and adherence rules live in the **sd-pattern-discipline** skill.
+1-3 `file:line` citations of precedent code the implementer reads BEFORE writing, each with a one-line instruction of what to mirror (e.g. "mirror handler structure and registration", "reuse this helper - do not duplicate"). Required on every task; write `none` explicitly when there is genuinely no precedent to cite, which should be rare outside pure polish work. Verify each cited file exists before writing the ref. Discovery and adherence rules live in the **sd-pattern-discipline** skill.
 
 ---
 
@@ -113,3 +162,6 @@ Drive sequencing and batch planning. Tasks that **conflict** cannot run in the s
 - Leaving `Depends on` / `Conflicts with` empty when sequential or conflicting relationships exist.
 - Authoring a new-file task with `Pattern refs: none` - the implementer has no precedent to mirror.
 - Citing Pattern refs you did not verify exist.
+- Omitting `Pattern refs` instead of writing `none`. Silence is not an assertion; `SL060` flags it.
+- Burying a precedent in prose beside the block instead of putting it in the field. `sd-implementer`
+  reads `TASK_DETAILS`, not the surrounding narrative - a ref outside the field does not reach it.

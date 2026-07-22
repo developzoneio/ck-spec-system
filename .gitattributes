@@ -6,7 +6,13 @@
 # runner) that fixture would be checked out as CRLF, and the comparison would
 # fail for a reason that has nothing to do with the code under test.
 #
-# This covers the lesson fixtures only. The repo's shell scripts are also
+# This covers the fixture trees only. The repo's shell scripts are also
 # checked out as CRLF on Windows today - see SW-21; that is a broader change
 # and is deliberately not folded in here.
 tests/lessons/** text eol=lf
+
+# tests/task-format/** are field-grammar fixtures (SW-11). They assert how a
+# reader splits a task block into fields; a CRLF checkout on Windows would make
+# any byte-level or line-ending-sensitive reader disagree with the same file on
+# Linux. Pinned for the same reason as the lesson fixtures above.
+tests/task-format/** text eol=lf

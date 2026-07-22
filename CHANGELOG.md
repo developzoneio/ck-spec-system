@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Field label grammar in `sd-atomic-task-format` (SW-11). Task-block labels are now matched
+  case-insensitively, with `**` optional and the colon permitted inside or outside the emphasis -
+  all three forms found in live specs (`- **Files**:`, `- Files:`, `- **Files:**`) parse
+  identically. A field's value runs to the next field label, not the next newline, so multi-line
+  `Acceptance` and `Pattern refs` values are no longer truncated. The grammar is defined once and
+  applies to every field and every reader; per-field matchers are forbidden.
+- `SL060` (WARN) in `/sd:spec validate`: a task block in `02-tasks.md` with no `Pattern refs`
+  field. `SL061`-`SL069` reserved for further task-block content rules. This is the first rule
+  that reads *inside* a spec artifact rather than around it - see
+  `docs/adr/0001-validate-parses-task-content.md`.
+- `docs/adr/` for specwright's own engine-level decision records, numbered the same way `/sd:adr`
+  numbers them (`^[0-9]{4}-<slug>.md`). Deliberately **not** `.specs/_adr/`: `.specs/` is Layer 2
+  (target-project context), and this repo has none.
+- Conformance fixtures at `tests/task-format/fixtures/` covering the three label forms plus a
+  negative case, pinned to LF via `.gitattributes`. They state the contract; they have no runner
+  (documented, not silently skipped).
+
 - Lesson surfacing, part 3 and the close of the learning loop (SW-19, under epic SW-7):
   `subagent-retro.{ps1,sh}` now emit a `<retro-lessons>` block when a subagent finishes work on an
   in-progress spec, gated by `hooks.subagentRetro.injectLessons` (default `true`) and
@@ -139,6 +156,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docClaims` entry covers). Closes the gap that let SW-1's drift reach `main` with CI green.
 - `scripts/selftest-docs.{ps1,sh}`: negative self-test proving Check 7 still bites, by corrupting a
   throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
+
+### Changed
+- `Pattern refs` is required on **every** atomic task (SW-11), not only on tasks that create a new
+  file or public symbol. A task with no precedent writes `Pattern refs: none` explicitly - `none`
+  asserts the architect looked, an absent field asserts nothing. Legacy blocks with the field
+  missing are still read as `none`, so existing `.specs/` folders keep working; the omission is a
+  WARN, never a block. Task-block field count is now 11 across all docs (README,
+  `docs/architecture.md`, `commands/feature.md`, `commands/refactor.md`,
+  `agents/spec-architect.md`, `agents/implementer.md`), correcting a pre-existing drift where six
+  of those sites still said 9 after SW-6 bumped the skill to 10.
+- SW-11 explicitly did **not** add the `Context refs` field its ticket asked for. `Pattern refs`
+  already covers the need with 22-of-22 adoption in the live corpus; renaming would touch 37 sites
+  across 10 files for no measurable gain. Recorded in the ADR and on the ticket.
 
 ### Fixed
 - `subagent-retro.ps1` terminated its emitted block with `[Console]::Out.WriteLine`, which appends

@@ -126,7 +126,7 @@ Skills are shared markdown rules that agents reference via frontmatter. They liv
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | BLOCK / WARN / SUGGEST / PASS severity rules and the mandatory review output format. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate-and-verify protocol with the 5 mental models, score formula, and proximate-vs-root "why" ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The atomic task block (9 required fields + `Pattern refs`), canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The atomic task block (11 required fields, including `Pattern refs`), canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |

@@ -143,7 +143,7 @@ The split exists for three reasons:
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | Severity levels + per-severity rules + mandatory output markdown. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate / verify protocol, the 5 mental models, score formula `(L × I) / C`, proximate-vs-root ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (9 required fields + `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (11 required fields, including `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
@@ -264,7 +264,7 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 .specs/FEAT-INV-2501/
 ├── 00-spec.md        Why / What / Success criteria / Constitution check
 ├── 01-plan.md        Phased implementation plan
-├── 02-tasks.md       Atomic tasks (9 required fields + Pattern refs)
+├── 02-tasks.md       Atomic tasks (11 required fields, incl. Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
 ├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups

@@ -62,7 +62,7 @@ Outputs:
 
 ### `02-tasks.md` task format (MANDATORY)
 
-Apply the **sd-atomic-task-format** skill: task block (10 required fields + `Pattern refs`), field-by-field rules (Files, Layer, Step type, Test, Acceptance, Covers, complexity, reversibility, Depends on / Conflicts with, Pattern refs), atomicity rules, and anti-patterns.
+Apply the **sd-atomic-task-format** skill: task block (11 required fields, including `Pattern refs`), field-by-field rules (Files, Layer, Step type, Test, Acceptance, Covers, complexity, reversibility, Depends on / Conflicts with, Pattern refs), atomicity rules, and anti-patterns.
 
 - Fill `Covers` on every task: list the SC-/AC-IDs from `00-spec.md` the task implements or
   proves. Before finishing, cross-check that every SC and AC ID in the spec appears in at
@@ -152,7 +152,7 @@ For every spec you produce, in the "Constitution check" section:
 - **Hardcoding stack assumptions**. If you write a build/test command from a prior invocation instead of reading this project's `commands.test` (via `CLAUDE.md`), you have failed. Read CLAUDE.md every invocation - your prior knowledge of the project is stale by default.
 - **Skipping the template structure**. The template is the contract. If you "improve" it by reordering sections, downstream agents that key off section headers break.
 - **Filling cross-phase fields prematurely**. Bug's Root cause is empty for a reason. Perf's Results log is empty for a reason.
-- **Inventing task structure**. The 10 required fields in the task format are required, not suggested.
+- **Inventing task structure**. The 11 required fields in the task format are required, not suggested.
 - **New-file task without Pattern refs**. The implementer is haiku; it follows the refs you give it or it follows nothing.
 - **Glossing over a constitution violation**. If §1.1 is at risk, that is an Open question, not a footnote.
 - **Producing the spec in your prose response**. The spec lives in the file. Your response to the main thread is a one-paragraph summary plus the file path - not the full spec text.
