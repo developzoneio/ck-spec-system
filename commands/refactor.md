@@ -168,6 +168,26 @@ STOP after every batch. Display test results.
 - All green -> check off tasks in `02-tasks.md`, proceed to next batch.
 - Any red -> REFUSE to proceed. Revert the batch or fix the regression. The point of batched-with-tests-between is to localize failures.
 
+### Gate Re-plan (HARD) - adaptive re-plan on a plan-invalidating discovery
+
+Reachable from Phase 5 (a batch reveals a task's premise is false or an invariant cannot be preserved
+as planned) **and** Phase 6 (a holistic-review finding that the plan itself is wrong). Follow the
+**sd-replan-loop** skill - the same protocol `/sd:feature` uses, defined there once. In brief:
+
+1. STOP. Surface the trigger, the affected task IDs, and the proposed delta. Ask:
+
+   > Re-plan REF-<slug>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
+
+2. `approve` -> invoke `sd-spec-architect` with `TASK = plan`, `MODE = refactor`,
+   `REPLAN_SCOPE = <affected task IDs>`, `REVISION = R<n>`. It appends the `## Revisions` entry to
+   `01-plan.md` (append-only; original plan prose untouched), regenerates ONLY the affected task
+   blocks in `02-tasks.md` - preserving each task's `Parallel batch` field - and marks each
+   `Revised-by: R<n>`. `revise` -> adjust and re-ask. `abort task` -> normal task abort.
+3. Resume Phase 5 at the batch containing the first regenerated task. Re-check batch disjointness if a
+   regenerated task's `Files` set changed.
+
+Runs only while the spec is `in-progress`; never re-plans a `done` spec.
+
 ---
 
 ## Phase 6 - Holistic review
@@ -193,7 +213,10 @@ STOP. Display reviewer verdict counts + invariant verification table. Ask:
 > Refactor REF-<slug> ready for close-out? (yes / address findings / abort)
 
 - `yes` -> proceed.
-- Any 🔴 BLOCK -> loop to implementer with the finding.
+- Any 🔴 BLOCK that is a **code defect** -> loop to implementer with the finding.
+- Any 🔴 BLOCK that reveals the **plan itself was wrong** (e.g. a planned step cannot preserve an
+  invariant) -> enter **Gate Re-plan** (Phase 5) with `Phase: review`, recording the wrong step as a
+  revision and regenerating the affected tasks rather than hand-patching them.
 
 ---
 
@@ -218,3 +241,7 @@ STOP. Display reviewer verdict counts + invariant verification table. Ask:
 - Public API preservation is verified by reviewer (Phase 6), not assumed.
 - Max 3 parallel tasks per batch. More -> tests-between granularity is too coarse.
 - Each batch's tests must finish before the next batch starts. No "tests run in background while next batch starts".
+- **Gate Re-plan is a conditional gate, not a seventh always-on gate.** It fires only on a
+  plan-invalidating discovery (Phase 5) or a plan-is-wrong BLOCK (Phase 6); a run that hits neither
+  never sees it. `02-tasks.md` is re-planned only through it (the `sd-replan-loop` skill), never by a
+  silent hand-edit, and never on a `done` spec. Revisions are append-only in `01-plan.md`.

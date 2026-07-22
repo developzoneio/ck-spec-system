@@ -182,12 +182,39 @@ For each unchecked task:
    - Did implementer stay within `Files` list? If not -> revert, re-invoke.
    - Does the test pass? If not -> re-invoke implementer with failure output.
    - Any obvious constitution violation visible from the diff? If yes -> re-invoke with feedback.
+   - **Plan-invalidating discovery?** If the implementer reports (or the diff reveals) that the task's
+     premise is false - a `Pattern refs` precedent does not exist, an interface differs from what the
+     task assumed, a `Depends on` edge is backwards, or a task is now known missing/redundant - do
+     NOT hack-edit `02-tasks.md`. Enter **Gate Re-plan** below. This is distinct from an ordinary
+     in-task adjustment, which the implementer handles within its own scope (see `sd-replan-loop` for
+     the boundary).
 6. **Check off** the task in `02-tasks.md`.
 7. Log a one-line summary to `.specs/FEAT-<arg>/05-retro.md`: `T<NN>: <status> - <note>`.
 
 > **Why no per-task reviewer?** Each reviewer invocation spawns a sonnet-class subagent that reloads the full context (CLAUDE.md + constitution + spec + changed files). For N tasks, that is N expensive calls. The main thread self-check catches scope violations and test failures. Constitution compliance and cross-task issues are caught more efficiently by the batch review in Phase 5.
 
 Move to next task. Repeat until all tasks checked.
+
+### Gate Re-plan (HARD) - adaptive re-plan on a plan-invalidating discovery
+
+Reachable from Phase 4 (self-check above) **and** Phase 5b (a batch-review finding that the plan
+itself is wrong). Follow the **sd-replan-loop** skill; the protocol is defined there once and shared
+with `/sd:refactor`. In brief:
+
+1. STOP. Surface the trigger, the affected task IDs, and the proposed delta. Ask:
+
+   > Re-plan FEAT-<arg>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
+
+   - `approve` -> proceed. `revise` -> adjust the delta and re-ask. `abort task` -> normal task abort.
+2. Invoke `sd-spec-architect` with `TASK = plan`, `REPLAN_SCOPE = <affected task IDs>`,
+   `REVISION = R<n>` (next contiguous number). It appends the `## Revisions` entry to `01-plan.md`
+   (append-only; the original plan prose is never edited), regenerates ONLY the affected task blocks
+   in `02-tasks.md`, and marks each `Revised-by: R<n>`.
+3. Resume Phase 4 at the first regenerated task. Tasks the revision did not touch stay checked.
+
+This gate runs only while the spec is `in-progress` - it never re-plans a `done` spec. It adds no new
+top-level gate to the workflow's count: it fires only on a plan-invalidating discovery, exactly as
+Gate Complexity fires only over threshold.
 
 ---
 
@@ -225,7 +252,13 @@ Ask:
 > All clean for FEAT-<arg>? (yes / address findings / abort)
 
 Treat findings:
-- Any 🔴 BLOCK -> route back to implementer with finding as feedback. Re-run batch review after fix.
+- Any 🔴 BLOCK that is a **code defect** (the task was right, the implementation is wrong) -> route
+  back to implementer with the finding as feedback. Re-run batch review after fix.
+- Any 🔴 BLOCK that reveals the **plan itself was wrong** (a spec/plan decision proved incorrect once
+  written - e.g. a task asserts a behavior the codebase contradicts) -> enter **Gate Re-plan** (Phase
+  4) with `Phase: review`, not a bare implementer fix. This is the review-time re-plan path: the
+  wrong decision is recorded as a revision and the affected tasks are regenerated, rather than
+  hand-patched with only a retro sentence.
 - Any 🟠 WARN -> ask user: address now or log to `05-retro.md` as follow-up?
 - 🟡 SUGGEST and 🟢 PASS -> log to retro, proceed.
 
@@ -263,6 +296,13 @@ Treat findings:
 - **Gate Complexity is a face of Gate 2, not a fourth gate.** It fires ONLY when the plan is over
   threshold; a spec under threshold sees the normal plan approval with zero added friction. This is
   why the workflow still has 3 hard gates - do not describe it as 4.
+- **Gate Re-plan is a conditional gate, not a fourth always-on gate.** Like Gate Complexity, it
+  fires ONLY on a specific trigger - a plan-invalidating discovery in Phase 4 or a plan-is-wrong
+  BLOCK in Phase 5. A run that never hits one never sees it. It is HARD when it does fire (explicit
+  approval, no override), and it never re-plans a `done` spec. The protocol lives in the
+  `sd-replan-loop` skill; `02-tasks.md` is re-planned only through it - never by a silent hand-edit.
+  Any revision is recorded append-only in `01-plan.md`'s `## Revisions` log with the original plan
+  prose left intact.
 - **Model escalation is aliases only.** A create-time `complexity: L` bumps the explorer to
   `sonnet` (Phase 2) and the architect to `opus` (Phase 3). Never introduce a full model ID; never
   edit an agent's `model:` frontmatter - the override is per-invocation, from the main thread.

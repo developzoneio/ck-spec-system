@@ -16,3 +16,9 @@ tests/lessons/** text eol=lf
 # any byte-level or line-ending-sensitive reader disagree with the same file on
 # Linux. Pinned for the same reason as the lesson fixtures above.
 tests/task-format/** text eol=lf
+
+# tests/revision-log/** are revision-log integrity fixtures (SW-14). The
+# valid-revision case proves the original plan prose stays byte-intact while a
+# revision is appended below it; a CRLF checkout on Windows would break any
+# byte-level comparison. Pinned for the same reason as the fixtures above.
+tests/revision-log/** text eol=lf

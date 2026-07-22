@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Sanctioned mid-execution re-plan loop (SW-14). A new `sd-replan-loop` skill defines a **HARD Gate
+  Re-plan** for the two workflows that produce a `01-plan.md` + `02-tasks.md` pair - `/sd:feature`
+  and `/sd:refactor` - so a plan-invalidating discovery adapts the plan without violating
+  immutability or skipping a gate. The gate is reachable from **both** the Execute phase and the
+  batch/holistic **review** (the one real corpus failure surfaced at review, not mid-task). On
+  approval it appends an `R<n>` entry to an append-only `## Revisions` log at the end of `01-plan.md`
+  (original plan prose left intact), regenerates **only** the affected task blocks in `02-tasks.md`
+  via `sd-spec-architect` (`TASK = plan` with `REPLAN_SCOPE`, no new architect mode), and marks each
+  regenerated task `Revised-by: R<n>` (a conditional field in `sd-atomic-task-format`, like refactor's
+  `Parallel batch`). Like Gate Complexity, it is a **conditional** gate that fires only on its trigger,
+  so `/sd:feature` still advertises 3 hard gates and `/sd:refactor` still 6. It never re-plans a
+  `done` spec. Scope was corrected from the ticket on evidence: `/sd:bug` and `/sd:rca` produce no
+  task list to re-plan, and `/sd:perf` already carries its own revert-and-reselect loop, so all three
+  are left untouched. See `docs/adr/0003-adaptive-replan-loop.md`.
+- `SL070`-`SL073` in `/sd:spec validate`: a new **revision-log integrity** band cross-checking the
+  `## Revisions` log in `01-plan.md` against the `Revised-by` markers in `02-tasks.md`. `SL070`
+  (dangling marker), `SL071` (one-sided/unreferenced revision), and `SL072` (broken append-only
+  history) are 🔴 BLOCK; `SL073` (malformed entry) is 🟠 WARN. The checks run only when a `## Revisions`
+  section or a `Revised-by` marker exists, so a never-re-planned spec produces no finding. `SL074`-
+  `SL079` reserved. Honest boundary recorded in the ADR: `validate` is a static linter with no
+  Plan-phase snapshot, so it enforces the revision record's internal consistency but cannot detect an
+  unmarked silent edit by diffing - that is prevented by the gate, not the lint.
+- Conformance fixtures at `tests/revision-log/fixtures/` (SW-14): a valid revision record that passes
+  and a dangling-marker record that must BLOCK, pinned to LF via `.gitattributes`. They state the
+  contract; like the other fixture trees they have no runner (documented, not silently skipped).
 - Complexity triage + forced decomposition in `/sd:feature` (SW-13). The architect writes a
   spec-level `complexity` frontmatter field (`S` | `M` | `L`, distinct from a task's
   `Estimated complexity`) with a one-line rationale at create time. Gate 2 then measures the actual

@@ -8,7 +8,7 @@ The installer copies the engine (commands, agents, hooks, templates) into a Clau
 ├── agents/sd/          6 subagent definitions
 ├── hooks/sd/           3 hook scripts (.ps1 on Windows, .sh on Unix)
 ├── templates/sd/       9 templates (4 setup + 5 spec)
-└── skills/sd/          7 skills (one folder per skill with SKILL.md)
+└── skills/sd/          8 skills (one folder per skill with SKILL.md)
 ```
 
 Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
@@ -51,9 +51,9 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 | `hooks/powershell/` (Windows installer) | `hooks/sd/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
 | `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
 | `templates/` | `templates/sd/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
-| `skills/` | `skills/sd/` | 7 | One folder per skill, each with a `SKILL.md` |
+| `skills/` | `skills/sd/` | 8 | One folder per skill, each with a `SKILL.md` |
 
-**Total**: 37 files per OS.
+**Total**: 38 files per OS.
 
 ---
 

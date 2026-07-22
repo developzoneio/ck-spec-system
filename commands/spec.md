@@ -296,9 +296,19 @@ BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who ha
 | `SL054` | Duplicate entry in `linked_specs` | 🟠 WARN |
 | `SL055` | Spec status `done` but `06-verify.md` is missing or records `result: fail` | 🟠 WARN |
 | `SL060` | Task block in `02-tasks.md` has no `Pattern refs` field | 🟠 WARN |
+| `SL070` | Task carries `Revised-by: R<n>` but `01-plan.md` has no matching `## Revisions` entry `R<n>` | 🔴 BLOCK |
+| `SL071` | A `## Revisions` entry `R<n>` names an `Affected task` that does not carry `Revised-by: R<n>` (or does not exist) | 🔴 BLOCK |
+| `SL072` | Revision numbering is non-contiguous, duplicated, or a prior entry was rewritten (append-only violated) | 🔴 BLOCK |
+| `SL073` | A `## Revisions` entry is malformed - missing `Trigger`, `Gate: re-plan`, `Phase`, or `revised-from` | 🟠 WARN |
 
 `SL061`-`SL069` are **reserved** for further task-block content rules. Claim from this band rather
 than extending another one - `SL05x` is link integrity and has nothing to do with task content.
+
+`SL070`-`SL079` are the **revision-log integrity** band (the `sd-replan-loop` `## Revisions` log in
+`01-plan.md`, cross-checked against `Revised-by` markers in `02-tasks.md`). It is a distinct band on
+purpose: it is neither task-block *content* (`SL06x`) nor `linked_specs` symmetry (`SL05x`), though it
+borrows the two-sided-symmetry shape of the latter. `SL074`-`SL079` are reserved for further
+revision-record rules.
 
 Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
 so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
@@ -311,6 +321,13 @@ is fixed by re-planning the spec. It is deliberately **not** BLOCK - in the only
 every task authored after the field shipped already carried it (22 of 22), while the two specs
 without it predate the field entirely. Blocking would fail old specs for a rule they could not
 have followed, and would gain nothing on new ones.
+
+`SL070`-`SL072` are BLOCK: a task pointing at a revision that does not exist, a revision pointing at
+a task that does not carry its marker, or a rewritten revision entry, are all a registry that **lies**
+about its own audit trail - the append-only guarantee the `## Revisions` log exists to provide is
+exactly what these catch. `SL073` is WARN: an entry missing a descriptive line (`Trigger`, `Gate`,
+`Phase`, `revised-from`) is a poor record but leaves the task/log symmetry decidable and truthful,
+and is recoverable by editing the entry - the same test that makes `SL044` a WARN.
 
 ### Task-block checks
 
@@ -326,6 +343,40 @@ A field's value runs to the next field label, not to the next newline - `Accepta
 Report one `SL060` per offending task block, citing the task heading (e.g. `02-tasks.md` `T01`).
 A block that writes `Pattern refs: none` is **compliant** - the explicit `none` is the assertion
 the rule is asking for. Only an absent field is a finding.
+
+### Revision-log integrity
+
+Runs only when there is a revision record to check: `01-plan.md` has a `## Revisions` section, **or**
+any task block in `02-tasks.md` carries a `Revised-by` field. A spec with neither - the overwhelming
+common case, an original plan never re-planned - produces no `SL07x` finding. This is a cross-artifact
+check: the `## Revisions` log lives in `01-plan.md`, its markers in `02-tasks.md`, and the two must
+agree. Parse task blocks with the same tolerant **Field label grammar** used for `SL060`.
+
+The `## Revisions` log is written only by the Gate Re-plan of `/sd:feature` and `/sd:refactor` via the
+**sd-replan-loop** skill. Each entry is `### R<n> - <timestamp>` followed by `Trigger`, `Phase`,
+`Gate: re-plan`, `Affected tasks`, `Delta`, and `revised-from` lines. Checks:
+
+- **`SL070` - dangling marker.** A task carrying `Revised-by: R<n>` with no `### R<n>` entry in
+  `01-plan.md`. Cite the task's `Revised-by` line; name the absent entry in the finding.
+- **`SL071` - one-sided / unreferenced revision.** An `### R<n>` entry whose `Affected tasks` list
+  names a task that either does not exist or does not carry `Revised-by: R<n>`. An entry with no
+  parseable `Affected tasks` line is also `SL071` - the back-reference cannot be established, so the
+  revision points at nothing. Cite the entry's `Affected tasks` line (or the `### R<n>` heading when
+  the line is absent).
+- **`SL072` - broken append-only history.** Revision numbers must run contiguously from `R1` with no
+  gap, no duplicate, and no reuse. A gap (`R1`, `R3`), a duplicate `R<n>`, or a heading that reuses a
+  number already logged means the log was rewritten rather than appended. Cite the first offending
+  `### R<n>` heading.
+- **`SL073` - malformed entry.** An `### R<n>` entry missing any of `Trigger`, `Gate: re-plan`,
+  `Phase`, or `revised-from`. (A missing `Affected tasks` line is `SL071`, not `SL073` - it breaks
+  symmetry, not just completeness.) Cite the `### R<n>` heading.
+
+Report one finding per offending task or entry - a log with three problems reports three findings.
+`validate` is a static linter: it verifies the revision record is internally consistent and
+append-only shaped. It has no Plan-phase snapshot of `02-tasks.md`, so it **cannot** detect an
+undocumented silent edit by diffing - an edit that adds no `Revised-by` marker and no `## Revisions`
+entry is invisible here and is prevented by the HARD Gate Re-plan, not by this lint. Do not report,
+or imply, a finding the checks above cannot actually decide.
 
 ### Output
 

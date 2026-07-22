@@ -30,7 +30,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 | **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
-| **7 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline`, `sd-retro-lessons` |
+| **8 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline`, `sd-retro-lessons`, `sd-replan-loop` |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
 | **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, your project's database MCP, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
@@ -130,6 +130,7 @@ Skills are shared markdown rules that agents reference via frontmatter. They liv
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |
+| `sd-replan-loop` | `sd-spec-architect` (frontmatter); `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (read at runtime) | Sanctioned mid-execution re-plan: the HARD Gate Re-plan, the append-only `## Revisions` log, and the `Revised-by` marker that keeps adaptivity from violating immutability. |
 
 Agents declare the skills they apply via a `skills:` list in their frontmatter, e.g.:
 
