@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Size cap and single-generation rotation for the metrics log (SW-15). A new `hooks.metrics.maxSizeKb`
+  (default `1024` KB, ~1 MB) bounds `.specs/_metrics/events.jsonl`: before each append, if the live
+  file already meets or exceeds `maxSizeKb * 1024` bytes, the hook rolls it to `events.jsonl.1`
+  (single generation - any previous `.1` is overwritten) and starts fresh. Implemented in all four
+  metrics writers (`spec-gate` and `subagent-retro`, PowerShell and bash) so the two platforms roll
+  at the same raw-byte boundary (`(Get-Item).Length` / `wc -c`). Inherits every SW-10 invariant:
+  rotation is best-effort and **never stops the append** (a silent stop would read as "metrics
+  working" while dropping data - worse than unbounded growth, per the ticket), a failed roll (locked
+  file on Windows, read-only dir) is a silent no-op, and it never alters a gate decision or the
+  hook's exit code. An **absent** `maxSizeKb` is treated as `1024`, so a `project-config.json`
+  written before this feature stays bounded with no edit; an explicit `0`/negative disables rotation,
+  and any non-number is invalid and also disables it (SW-22 type-strictness). `events.jsonl.1` is a
+  grace buffer, **not** part of any read contract - there is no consumer of the log today, and when
+  one exists it reads only the live file. Added to `templates/project-config.template.json` and both
+  hooks' embedded default configs; documented in `docs/architecture.md` and `docs/troubleshooting.md`.
+  New conformance fixtures at `tests/hooks/fixtures/{spec-gate,subagent-retro}/metrics-rotates-at-cap`
+  and `.../metrics-rotation-failure-noop` prove PS and bash rotate identically.
 - Sanctioned mid-execution re-plan loop (SW-14). A new `sd-replan-loop` skill defines a **HARD Gate
   Re-plan** for the two workflows that produce a `01-plan.md` + `02-tasks.md` pair - `/sd:feature`
   and `/sd:refactor` - so a plan-invalidating discovery adapts the plan without violating

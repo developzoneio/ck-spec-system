@@ -140,7 +140,9 @@
     "metrics": {
       "enabled": true,
       "path": ".specs/_metrics/events.jsonl",
-      "_use": "Append-only, metadata-only event log (no code content, no file paths) consumed by the retro loop. Set enabled=false to opt out entirely."
+      "maxSizeKb": 1024,
+      "_use": "Append-only, metadata-only event log (no code content, no file paths) consumed by the retro loop. Set enabled=false to opt out entirely.",
+      "_maxSizeKb_use": "Soft byte cap (KB) for events.jsonl. When the live file reaches the cap, the next write rolls it to events.jsonl.1 (single generation, previous roll overwritten) and starts a fresh log. Default 1024 (~1MB, a guess - not tuned against a measured corpus); absent key also means 1024, so pre-existing configs stay bounded. Set to 0 to disable rotation and let the log grow unbounded. Rotation is best-effort: any failure (locked file, read-only dir) is a silent no-op and the hook never stops appending. events.jsonl.1 is a grace buffer, not part of any read contract - a consumer reads the live file only."
     }
   }
 }

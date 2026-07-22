@@ -249,9 +249,22 @@ Example lines:
 The log is metadata-only by design: no file paths, no code content, no commit messages - only spec
 IDs, lifecycle phases, decisions, and file extensions. Controlled by `hooks.metrics` in
 `.claude/project-config.json` (`enabled`, default `true`; `path`, default
-`.specs/_metrics/events.jsonl`). Set `hooks.metrics.enabled` to `false` to stop writing entirely.
-There is no rotation in v1 - the file grows unbounded (documented as a known limitation; see
-`docs/troubleshooting.md`).
+`.specs/_metrics/events.jsonl`; `maxSizeKb`, default `1024`). Set `hooks.metrics.enabled` to
+`false` to stop writing entirely.
+
+**Rotation (`maxSizeKb`).** Before each append, if the live file already meets or exceeds
+`maxSizeKb * 1024` bytes, the hook rolls `events.jsonl` to `events.jsonl.1` (single generation - any
+previous `.1` is overwritten) and starts a fresh log. Both hooks measure the same raw byte count
+(`(Get-Item).Length` / `wc -c`) so PowerShell and bash roll at the same boundary. The default is
+`1024` (~1 MB); an absent `maxSizeKb` is also treated as `1024`, so a `project-config.json` written
+before this feature stays bounded with no edit. Set `maxSizeKb` to `0` to disable rotation and let
+the log grow unbounded; any non-number is treated as invalid and also disables it. Rotation is
+**best-effort** and inherits every metrics invariant: the roll never stops the append (a silent stop
+would read as "metrics working" while dropping data - worse than growth), a failed roll (locked file
+on Windows, read-only dir) is a silent no-op that falls through to the append, and it never alters a
+gate decision or the hook's exit code. `events.jsonl.1` is a grace buffer, **not** part of any read
+contract: there is no consumer of `events.jsonl` today, and when one exists (e.g. `/sd:status`) it
+reads the live file only - a `.1` generation may be lost on the next roll.
 
 Hooks are **defensive**: any failure path exits `0` silently. They never block the user on their own bugs.
 

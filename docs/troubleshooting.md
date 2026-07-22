@@ -256,15 +256,15 @@ Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't for
 
 ### `.specs/_metrics/events.jsonl` keeps growing
 
-**Cause**: this is expected in v1. `spec-gate` and `subagent-retro` each append one line per gate decision, `.specs/index.md` lifecycle transition, or subagent-stop check. There is no rotation or size cap yet - documented as a known limitation. Each line is small (roughly 120 bytes), so even a heavy month of dogfooding stays well under a megabyte, but the file grows without bound over the life of a project.
+**Cause**: `spec-gate` and `subagent-retro` each append one line per gate decision, `.specs/index.md` lifecycle transition, or subagent-stop check. Each line is small (roughly 120 bytes). The log is bounded by `hooks.metrics.maxSizeKb` (default `1024` = ~1 MB): when the live file reaches the cap, the next write rolls it to `events.jsonl.1` and starts fresh, keeping at most one previous generation. If you see the *live* file far past 1 MB, either `maxSizeKb` is set to `0` (rotation disabled), or every roll is failing silently - most likely a read-only `_metrics/` directory or the file being held open, both of which degrade to "keep appending" by design.
 
-**Fix**: no action needed unless the file becomes inconvenient. To stop further writes:
+**Fix**: no action needed for normal growth - it rotates itself. To change the cap, set `hooks.metrics.maxSizeKb` (in KB) in `.claude/project-config.json`; set it to `0` to disable rotation entirely. To stop all writes instead:
 ```json
 "hooks": {
   "metrics": { "enabled": false }
 }
 ```
-in `.claude/project-config.json`. Existing lines are left untouched; only future writes stop.
+Existing lines are left untouched; only future writes stop. Note that a consumer of the metrics log reads only the live `events.jsonl` - `events.jsonl.1` is a grace buffer and a generation may be discarded on the next roll, so do not rely on `.1` for a complete history.
 
 ### Is it safe to commit or share `.specs/_metrics/events.jsonl`?
 

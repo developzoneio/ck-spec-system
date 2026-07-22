@@ -165,17 +165,16 @@ function Get-MetricsEventsPath {
     return (Join-Path $Ws ($relPath.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
 }
 
-function Get-CaseEvents {
-    param([string]$Ws)
-    # Read the events file BEFORE the caller deletes the workspace. Each line
-    # is normalized independently: ts is wall-clock and can never match a
+function Read-NormalizedEventLines {
+    param([string]$Path)
+    # Read a JSONL metrics file BEFORE the caller deletes the workspace. Each
+    # line is normalized independently: ts is wall-clock and can never match a
     # golden, so it is replaced with the literal "<TS>" once verified to look
     # like a real timestamp - a malformed ts becomes "<BAD-TS>" instead of
     # being silently erased, so a broken timestamp FAILS the case.
     $events = [System.Collections.Generic.List[object]]::new()
-    $eventsPath = Get-MetricsEventsPath -Ws $Ws
-    if (-not (Test-Path -LiteralPath $eventsPath)) { return , @() }
-    $lines = Get-Content -LiteralPath $eventsPath -ErrorAction SilentlyContinue
+    if (-not (Test-Path -LiteralPath $Path)) { return , @() }
+    $lines = Get-Content -LiteralPath $Path -ErrorAction SilentlyContinue
     foreach ($line in @($lines)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         try {
@@ -207,6 +206,20 @@ function Get-CaseEvents {
     return , @($events)
 }
 
+function Get-CaseEvents {
+    param([string]$Ws)
+    return Read-NormalizedEventLines -Path (Get-MetricsEventsPath -Ws $Ws)
+}
+
+# Rotation (SW-15): the previous generation the hook rolled off to
+# `events.jsonl.1`, read the same normalized way as the live log so a rotation
+# case can assert the old lines survived the roll byte-for-byte. Empty when
+# nothing rotated.
+function Get-CaseRotatedEvents {
+    param([string]$Ws)
+    return Read-NormalizedEventLines -Path ((Get-MetricsEventsPath -Ws $Ws) + '.1')
+}
+
 function Invoke-HookImpl {
     param(
         [string]$Impl,
@@ -224,12 +237,14 @@ function Invoke-HookImpl {
             $run = Invoke-HookProcess -Exe 'pwsh' -ProcArgs @('-NoProfile', '-File', $HookScript) -Payload $payload
         }
         $events = Get-CaseEvents -Ws $ws
+        $rotated = Get-CaseRotatedEvents -Ws $ws
         return [pscustomobject]@{
-            ExitCode  = $run.ExitCode
-            Stdout    = $run.Stdout
-            Stderr    = $run.Stderr
-            Events    = $events
-            Workspace = $ws
+            ExitCode      = $run.ExitCode
+            Stdout        = $run.Stdout
+            Stderr        = $run.Stderr
+            Events        = $events
+            RotatedEvents = $rotated
+            Workspace     = $ws
         }
     } finally {
         Remove-Item -LiteralPath $ws -Recurse -Force -ErrorAction SilentlyContinue
@@ -408,6 +423,20 @@ $script:noLeakCases = @{
     'spec-gate' = @('metrics-code-edit-allow')
 }
 
+# Rotation cases (SW-15). For these, the main golden (expected.json) proves the
+# LIVE events.jsonl restarted - it lists only the post-roll line(s), so a
+# rotation that never fired would leave the seed lines in the live file and
+# mismatch. This map adds the other half of the proof: the rolled-off
+# events.jsonl.1 must exist, be non-empty, hold exactly the pre-seeded lines
+# (from the case's rotated-expected.json golden), and be identical across bash
+# and pwsh - i.e. the roll preserved the old data byte-for-byte on both
+# platforms and lost nothing. A case whose name is NOT listed here must produce
+# NO .1 at all (no accidental rotation), which is asserted for every case.
+$script:rotationCases = @{
+    'spec-gate'      = @('metrics-rotates-at-cap')
+    'subagent-retro' = @('metrics-rotates-at-cap')
+}
+
 function Invoke-ConformanceCase {
     param(
         [string]$HookName,
@@ -440,13 +469,51 @@ function Invoke-ConformanceCase {
         }
     }
 
+    # Rotation proof (SW-15). Two halves, both required:
+    #   1. Every case must produce NO events.jsonl.1 unless it is a declared
+    #      rotation case - catches an accidental roll that the live-file golden
+    #      alone would miss.
+    #   2. A declared rotation case must roll the pre-seeded lines off to a
+    #      non-empty .1 that equals rotated-expected.json, identically on bash
+    #      and pwsh - the "old data survived byte-for-byte on both platforms"
+    #      half that the live-file golden cannot see.
+    $rotationNote = $null
+    $rotationCases = $script:rotationCases[$HookName]
+    $isRotationCase = ($null -ne $rotationCases -and $rotationCases -contains $caseName)
+    if ($isRotationCase) {
+        $rotExpectedPath = Join-Path $CaseDir 'rotated-expected.json'
+        if (-not (Test-Path -LiteralPath $rotExpectedPath)) {
+            $match = $false
+            $rotationNote = 'rotation case is missing rotated-expected.json'
+        } else {
+            $rotExpected = Get-Content -LiteralPath $rotExpectedPath -Raw | ConvertFrom-Json
+            $rotExpectedJson = Get-CanonicalJson $rotExpected
+            $bashRot = Get-CanonicalJson ([pscustomobject]@{ rotated = @($bashRun.RotatedEvents) })
+            $pwshRot = Get-CanonicalJson ([pscustomobject]@{ rotated = @($pwshRun.RotatedEvents) })
+            if (@($bashRun.RotatedEvents).Count -eq 0 -or @($pwshRun.RotatedEvents).Count -eq 0) {
+                $match = $false
+                $rotationNote = "expected a rolled events.jsonl.1 but it was empty/absent (bash=$(@($bashRun.RotatedEvents).Count), pwsh=$(@($pwshRun.RotatedEvents).Count))"
+            } elseif ($bashRot -ne $rotExpectedJson -or $pwshRot -ne $rotExpectedJson) {
+                $match = $false
+                $rotationNote = "rolled .1 content mismatch`n         rot-expected: $rotExpectedJson`n         bash .1     : $bashRot`n         pwsh .1     : $pwshRot"
+            }
+        }
+    } else {
+        # No non-rotation case may leave a .1 behind.
+        if (@($bashRun.RotatedEvents).Count -gt 0 -or @($pwshRun.RotatedEvents).Count -gt 0) {
+            $match = $false
+            $rotationNote = "unexpected events.jsonl.1 produced by a non-rotation case (bash=$(@($bashRun.RotatedEvents).Count), pwsh=$(@($pwshRun.RotatedEvents).Count))"
+        }
+    }
+
     return [pscustomobject]@{
-        CaseName = $caseName
-        Bash     = $bashJson
-        Pwsh     = $pwshJson
-        Expected = $expectedJson
-        Match    = $match
-        LeakNote = $leakNote
+        CaseName     = $caseName
+        Bash         = $bashJson
+        Pwsh         = $pwshJson
+        Expected     = $expectedJson
+        Match        = $match
+        LeakNote     = $leakNote
+        RotationNote = $rotationNote
     }
 }
 
@@ -457,6 +524,9 @@ function Write-CaseDiff {
     Write-Host "         pwsh     : $($Result.Pwsh)"
     if ($Result.LeakNote) {
         Write-Host "         leak     : $($Result.LeakNote)"
+    }
+    if ($Result.RotationNote) {
+        Write-Host "         rotation : $($Result.RotationNote)"
     }
 }
 

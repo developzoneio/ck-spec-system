@@ -53,7 +53,7 @@ function Get-ProjectConfig {
         }
         hooks = [pscustomobject]@{
             specGate = [pscustomobject]@{ enabled = $true; mode = 'warn' }
-            metrics  = [pscustomobject]@{ enabled = $true; path = '.specs/_metrics/events.jsonl' }
+            metrics  = [pscustomobject]@{ enabled = $true; path = '.specs/_metrics/events.jsonl'; maxSizeKb = 1024 }
         }
     }
 
@@ -432,6 +432,38 @@ function Write-MetricEvent {
         foreach ($key in $Fields.Keys) { $ordered[$key] = $Fields[$key] }
 
         $line = ([pscustomobject]$ordered) | ConvertTo-Json -Compress
+
+        # --- rotation (SW-15) --------------------------------------------------
+        # Bounded log: before appending, if the live file already meets or
+        # exceeds the byte cap, roll it to '.1' (single generation, overwriting
+        # any prior roll). maxSizeKb defaults to 1024 when the key is ABSENT, so
+        # a project-config.json written before SW-15 still gets a bounded log
+        # with no edit; an explicit 0 or negative disables rotation (the opt-out)
+        # and any non-number is invalid and also disables it (SW-22 scar - never
+        # let a bad type silently flip behavior). Best-effort - the Move-Item has
+        # its own -ErrorAction Stop / catch so a file the other hook holds open
+        # on Windows, or a read-only dir, is a silent no-op that falls through to
+        # the append below: rotation must NEVER stop the append (silent data loss
+        # reads as "metrics working", which the ticket flags as worse than
+        # growth) nor surface as a hook error. (Get-Item).Length is the raw byte
+        # count matching bash's `wc -c`, and the absent->1024 / bad-type->off
+        # rules match spec-gate.sh's jq, so PS and bash trip at the same
+        # boundary.
+        try {
+            $maxKb = 1024
+            $m = $Config.hooks.metrics
+            if (($null -ne $m) -and ($m.PSObject.Properties.Name -contains 'maxSizeKb')) {
+                $maxKb = $m.maxSizeKb
+            }
+            if (($maxKb -is [int] -or $maxKb -is [long] -or $maxKb -is [double]) -and ($maxKb -gt 0)) {
+                $maxBytes = [long][math]::Floor([double]$maxKb * 1024)
+                if (Test-Path -LiteralPath $fullPath) {
+                    if ((Get-Item -LiteralPath $fullPath).Length -ge $maxBytes) {
+                        Move-Item -LiteralPath $fullPath -Destination "$fullPath.1" -Force -ErrorAction Stop
+                    }
+                }
+            }
+        } catch { }
 
         # Add-Content opens and closes the file handle per call and is not
         # safe against the concurrent PreToolUse + SubagentStop appends this

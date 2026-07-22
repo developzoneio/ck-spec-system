@@ -48,7 +48,7 @@ fi
 # /sd:setup has run) must still get the built-in protected paths, so the
 # fallback is a full default document rather than an empty object. This must
 # stay byte-identical in meaning to $defaults in spec-gate.ps1.
-default_config='{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[".specs/constitution.md",".specs/index.md","LICENSE"]},"hooks":{"specGate":{"enabled":true,"mode":"warn"},"metrics":{"enabled":true,"path":".specs/_metrics/events.jsonl"}}}'
+default_config='{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[".specs/constitution.md",".specs/index.md","LICENSE"]},"hooks":{"specGate":{"enabled":true,"mode":"warn"},"metrics":{"enabled":true,"path":".specs/_metrics/events.jsonl","maxSizeKb":1024}}}'
 
 config_path="${cwd}/.claude/project-config.json"
 config_json="${default_config}"
@@ -262,6 +262,32 @@ write_metric_line() {
     local line
     line="$(printf '%s' "${body}" | jq -c --arg ts "${ts}" '{ts:$ts} + .' 2>/dev/null)"
     [[ -z "${line}" ]] && return 0
+
+    # --- rotation (SW-15) -----------------------------------------------------
+    # Bounded log: before appending, if the live file already meets or exceeds
+    # the byte cap, roll it to `.1` (single generation, overwriting any prior
+    # roll). maxSizeKb defaults to 1024 when the key is ABSENT, so a
+    # project-config.json written before SW-15 - and this hook's own `{}`
+    # no-config fallback - still gets a bounded log with no edit; an explicit 0
+    # or negative disables rotation (the opt-out) and any non-number is invalid
+    # and also disables it (SW-22 scar - never let a bad type silently flip
+    # behavior). Best-effort - every failure path (a file the other hook holds
+    # open on Windows, a read-only dir) is a silent no-op that falls through to
+    # the append below: rotation must NEVER stop the append (silent data loss
+    # reads as "metrics working", which the ticket flags as worse than growth)
+    # nor surface as a hook error. jq floors maxSizeKb*1024 to an integer so
+    # bash never does float math; `wc -c` is the byte count Write-MetricEvent
+    # also measures, and the absent->1024 / bad-type->off rules match its guard,
+    # so PS and bash trip at the same boundary.
+    local max_bytes
+    max_bytes="$(printf '%s' "${config_json}" | jq -r '(if (.hooks.metrics | type) == "object" and (.hooks.metrics | has("maxSizeKb")) then .hooks.metrics.maxSizeKb else 1024 end) as $k | if ($k | type) == "number" and $k > 0 then ($k * 1024 | floor) else "" end' 2>/dev/null)"
+    if [[ -n "${max_bytes}" && -f "${full_path}" ]]; then
+        local cur_bytes
+        cur_bytes="$(wc -c < "${full_path}" 2>/dev/null | tr -d '[:space:]')"
+        if [[ "${cur_bytes}" =~ ^[0-9]+$ && "${cur_bytes}" -ge "${max_bytes}" ]]; then
+            mv -f "${full_path}" "${full_path}.1" 2>/dev/null || true
+        fi
+    fi
 
     printf '%s\n' "${line}" >> "${full_path}" 2>/dev/null || true
     return 0

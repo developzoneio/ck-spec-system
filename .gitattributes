@@ -22,3 +22,12 @@ tests/task-format/** text eol=lf
 # revision is appended below it; a CRLF checkout on Windows would break any
 # byte-level comparison. Pinned for the same reason as the fixtures above.
 tests/revision-log/** text eol=lf
+
+# tests/hooks/fixtures/**/_metrics/events.jsonl are pre-seeded rotation inputs
+# (SW-15). The rotation trigger compares the file's raw byte size against
+# maxSizeKb*1024, so a CRLF checkout on Windows would change the seed's size.
+# The seed clears the 1 KB cap by a wide margin either way and the conformance
+# comparison is JSON-normalized, so correctness does not depend on this - but
+# pin LF anyway so the byte size is identical on every platform. Same reasoning
+# as the fixture pins above.
+tests/hooks/fixtures/**/_metrics/events.jsonl text eol=lf
