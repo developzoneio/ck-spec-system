@@ -264,7 +264,7 @@ Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't for
   "metrics": { "enabled": false }
 }
 ```
-Existing lines are left untouched; only future writes stop. Note that a consumer of the metrics log reads only the live `events.jsonl` - `events.jsonl.1` is a grace buffer and a generation may be discarded on the next roll, so do not rely on `.1` for a complete history.
+Existing lines are left untouched; only future writes stop. Note that the consumer of the metrics log, `/sd:status`, reads only the live `events.jsonl` - `events.jsonl.1` is a grace buffer and a generation may be discarded on the next roll, so do not rely on `.1` for a complete history.
 
 ### Is it safe to commit or share `.specs/_metrics/events.jsonl`?
 

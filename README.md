@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> Twelve slash commands, six specialized subagents, three guard-rail hooks, nine templates, seven reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> Thirteen slash commands, six specialized subagents, three guard-rail hooks, nine templates, eight reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -26,7 +26,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 | Capability | What you get |
 |---|---|
-| **12 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`, `/sd:verify` |
+| **13 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`, `/sd:verify`, `/sd:status` |
 | **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
@@ -100,6 +100,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:release [version]` | Utility | 1 | Release notes from `done` specs -> Keep-a-Changelog sections, then archive them |
 | `/sd:adr <spec-ID \| "decision title">` | Utility | 1 | Author an ADR from a spec's decisions under `.specs/_adr/` |
 | `/sd:verify <spec-ID>` | Utility | - | Verify criterion -> task -> test traceability; writes the close-out gate artifact |
+| `/sd:status` | Utility | - | Read-only summary of the metrics log + spec registry: in progress, gate activity, friction |
 
 ---
 

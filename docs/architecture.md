@@ -10,7 +10,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    12 workflow definitions                         |
+|    commands/sd/    13 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
@@ -118,10 +118,11 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:setup     -> (none - scaffolds CLAUDE.md / .specs/ / .claude/)
 /sd:release   -> (none - pure file ops; mirrors /sd:spec)
 /sd:verify    -> (none - pure file ops; traceability check + gate artifact)
+/sd:status    -> (none - pure file ops; read-only report over events.jsonl + index.md)
 ```
 
-Four commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify`) -
-they are deterministic file operations the main thread performs directly. The rest share one
+Five commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify`,
+`/sd:status`) - they are deterministic file operations the main thread performs directly. The rest share one
 backbone: the architect frames the spec, an investigator (explorer or debugger) gathers evidence,
 the implementer makes the change one atomic task at a time, and the reviewer gates the result. The
 reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
@@ -236,7 +237,7 @@ the PowerShell and bash implementations produce byte-comparable lines:
 | `decision` | when `event` is `gate` or `spec_transition` | `allow` \| `block` \| `warn` - on a transition, whether the index edit was ultimately allowed through. Most direct index edits are blocked by `paths.protected`, so `block` is the common case; a verified `done` close-out is the path that yields `allow`. |
 | `from` | when `event` is `spec_transition` | previous lifecycle status, or `-` if not derivable |
 | `ext` | when `gate` is `code-edit` | lowercased file extension, e.g. `.ps1` - never a path |
-| `stale` | when `event` is `subagent_stop` | count of stale/missing retros observed for that spec |
+| `stale` | when `event` is `subagent_stop` | `0` or `1` - a flag, not a count. One event is emitted per in-progress spec per subagent stop; `1` means that spec's `05-retro.md` was stale or missing at that moment. Retro pressure is measured by counting `1`s over time, never by reading a single value as a quantity |
 
 Example lines:
 
@@ -263,8 +264,9 @@ the log grow unbounded; any non-number is treated as invalid and also disables i
 would read as "metrics working" while dropping data - worse than growth), a failed roll (locked file
 on Windows, read-only dir) is a silent no-op that falls through to the append, and it never alters a
 gate decision or the hook's exit code. `events.jsonl.1` is a grace buffer, **not** part of any read
-contract: there is no consumer of `events.jsonl` today, and when one exists (e.g. `/sd:status`) it
-reads the live file only - a `.1` generation may be lost on the next roll.
+contract: the one consumer of the log, `/sd:status`, reads the **live file only** and merely notes
+that a `.1` exists - a `.1` generation may be lost on the next roll, so counting it would report a
+window that cannot be reproduced.
 
 Hooks are **defensive**: any failure path exits `0` silently. They never block the user on their own bugs.
 
@@ -383,7 +385,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 12 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 13 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---

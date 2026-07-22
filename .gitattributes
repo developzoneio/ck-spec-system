@@ -31,3 +31,10 @@ tests/revision-log/** text eol=lf
 # pin LF anyway so the byte size is identical on every platform. Same reasoning
 # as the fixture pins above.
 tests/hooks/fixtures/**/_metrics/events.jsonl text eol=lf
+
+# tests/metrics/** is the /sd:status verification corpus (SW-16). The command
+# counts events by exact substring over an LF-terminated log, and the malformed
+# fixture asserts an exact skipped count - a CRLF checkout on Windows would
+# change both the line contents under test and the well-formed-line test that
+# anchors on a trailing '}'. Pinned for the same reason as the fixtures above.
+tests/metrics/** text eol=lf

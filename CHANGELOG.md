@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `/sd:status` - a read-only reader for the metrics log (SW-16). SW-10 has been accumulating
+  `.specs/_metrics/events.jsonl` with no consumer; the data existed and was invisible. The new
+  13th slash command summarises the **live** log plus `.specs/index.md`: specs in progress, gate
+  activity broken out by kind (`verify` / `protected` / `code-edit`) and decision
+  (`allow` / `warn` / `block`), lifecycle transitions, and a **friction** section ranking where the
+  operator is actually stuck - which specs are blocked most, which code-edit warns are being
+  ignored, which specs accumulate stale retros, and which in-progress specs are absent from the log
+  entirely. Read-only: no spec is created, no gate is evaluated, nothing is written.
+  Three decisions are worth recording because they diverge from a naive reading of the ticket.
+  (1) **`jq` is an oracle, not a runtime dependency.** The acceptance criterion "counts reconcile
+  against `jq`" reads like a dependency; it is not. The schema is flat, metadata-only and written in
+  fixed key order, so exact substring counting is deterministic - and `jq` *aborts* on a
+  partially-written line, which would lose the whole report to one interrupted append, exactly what
+  the ticket forbids. `jq` verifies the numbers; it does not produce them.
+  (2) **Counting is delegated to the shell, never to eyeballing.** A capped log is ~8000 lines;
+  the command prescribes the exact count commands rather than asking for a summary, because a
+  number that was estimated cannot reconcile with an independent count.
+  (3) **The live file only** - `events.jsonl.1` is noted in one header line and never read, per the
+  read contract set in SW-15.
+  Every degrade path is a *labelled* state (`ST001`-`ST005`): no config, metrics disabled, log
+  absent, log empty. A blank report would read as "no friction", so an empty table is treated as a
+  defect rather than an edge case. Malformed lines are skipped **and counted**, and the skipped
+  count is always shown - a silent skip and a clean file are not the same fact.
+  Verification corpus at `tests/metrics/` (populated / malformed / empty fixtures, expected numbers,
+  and the `jq` oracle procedure), pinned to LF in `.gitattributes`. It is documented as a **manual**
+  corpus: `commands/status.md` is a prompt file and CI cannot execute it, so it is deliberately not
+  wired into `scripts/validate.*`.
+
 - Size cap and single-generation rotation for the metrics log (SW-15). A new `hooks.metrics.maxSizeKb`
   (default `1024` KB, ~1 MB) bounds `.specs/_metrics/events.jsonl`: before each append, if the live
   file already meets or exceeds `maxSizeKb * 1024` bytes, the hook rolls it to `events.jsonl.1`
@@ -229,6 +257,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across 10 files for no measurable gain. Recorded in the ADR and on the ticket.
 
 ### Fixed
+- `docs/architecture.md` described the metrics `stale` field as a "count of stale/missing retros
+  observed for that spec". It is a per-event flag, `0` or `1` - `subagent-retro` emits one event per
+  in-progress spec per subagent stop and sets `1` when that spec's retro is stale or missing
+  (`hooks/bash/subagent-retro.sh` `emit_subagent_stop_metric`). Retro pressure is measured by
+  counting `1`s over time, never by reading a single value as a quantity. Found while building the
+  first reader of the log (SW-16); the field had no consumer until now, so nothing had contradicted
+  the prose.
+- `README.md` claimed "seven reusable skills" in its intro line; the repo ships eight. Spelled-out
+  numbers escape the `claimPhrases` vocabulary in `specwright.manifest.json` (all patterns are
+  `[0-9]+`-anchored), so Check 7 could not see the drift. Pre-existing, unrelated to SW-16; the
+  blind spot itself is filed separately.
 - `subagent-retro.ps1` terminated its emitted block with `[Console]::Out.WriteLine`, which appends
   `[Environment]::NewLine` - CRLF on Windows - so its output differed from `subagent-retro.sh` by
   exactly one byte on the final line. Both the `<retro-reminder>` and the new `<retro-lessons>`
