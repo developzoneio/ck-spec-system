@@ -257,6 +257,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across 10 files for no measurable gain. Recorded in the ADR and on the ticket.
 
 ### Fixed
+- Four `subagent-retro` conformance fixtures (`lessons-already-shown`, `lessons-disabled`,
+  `lessons-scope-filter`, `lessons-surfaced`) were non-deterministic: each expects a **fresh** retro
+  (`emitted: false`, `stale: []`, `subagent_stop` with `stale: 0`) but shipped no `setup.json`, so the
+  harness copied `05-retro.md` with its on-disk mtime and the case failed on any checkout older than
+  `retroStaleMinutes` (default 30 min) - the hook then read the retro as stale, flipped to
+  `emitted: true`, and the drifted lesson selection no longer matched the golden (SW-23). Each now
+  ships a `setup.json` that `touch`es its retro to `ageMinutes: 5`, mirroring how `remind-stale-retro`
+  (120) and `metrics-emits-when-debounced` pin their fixtures; the four cases were introduced with the
+  lesson-injection loop (SW-19) and the omission stayed latent because the suite is usually run while
+  the retro is still fresh. Verified by backdating the retros two days on disk and confirming
+  65 passed / 0 failed (bash output byte-identical to pwsh, so this was always a fixture defect, never
+  a hook divergence). Test-only; no product-code or user-facing impact.
 - Four PowerShell hook config reads used PowerShell truthiness where the bash twin asks a
   type-strict question, so the two implementations disagreed on the same `project-config.json`
   (SW-22). Two failure modes, both invisible to a scaffolded project (the template ships
