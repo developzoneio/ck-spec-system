@@ -88,7 +88,14 @@ function Test-HookEnabled {
     try {
         if ($null -eq $Config.hooks) { return $true }
         if ($null -eq $Config.hooks.userPromptRouter) { return $true }
-        return [bool]$Config.hooks.userPromptRouter.enabled
+        # Type-strict: only a literal JSON boolean false disables the hook.
+        # [bool]$null is $false, so a userPromptRouter block with an ABSENT
+        # `enabled` would silently disable the router - diverging from
+        # prompt-router.sh's `== false`, which leaves it on. -is [bool] matches
+        # jq (SW-22).
+        $en = $Config.hooks.userPromptRouter.enabled
+        if (($en -is [bool]) -and (-not $en)) { return $false }
+        return $true
     } catch {
         return $true
     }

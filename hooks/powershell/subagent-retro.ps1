@@ -476,15 +476,24 @@ if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = 'no-session' }
 
 $config = Get-ProjectConfig -Cwd $cwd
 try {
-    if ($null -ne $config.hooks -and $null -ne $config.hooks.subagentRetro -and -not $config.hooks.subagentRetro.enabled) {
+    # Type-strict: only a literal JSON boolean false disables the hook. A plain
+    # `-not ...enabled` fires on an ABSENT key ($null), silently disabling the
+    # hook when a hand-trimmed config carries a subagentRetro block with no
+    # `enabled` - diverging from subagent-retro.sh's `== false`, which leaves it
+    # on. -is [bool] matches jq (SW-22); mirrors the metrics/injectLessons reads.
+    if (($config.hooks.subagentRetro.enabled -is [bool]) -and (-not $config.hooks.subagentRetro.enabled)) {
         exit 0
     }
 } catch { }
 
 $staleMinutes    = 30
 $debounceMinutes = 10
-try { if ($config.hooks.subagentRetro.retroStaleMinutes) { $staleMinutes = [int]$config.hooks.subagentRetro.retroStaleMinutes } } catch { }
-try { if ($config.hooks.subagentRetro.debounceMinutes)   { $debounceMinutes = [int]$config.hooks.subagentRetro.debounceMinutes } } catch { }
+# `$null -ne`, NOT a truthiness test: PowerShell treats 0 as falsy, so
+# `if ($config...retroStaleMinutes)` would silently ignore an explicit 0 and keep
+# the default while the bash twin's `// 30` / `// 10` accept 0. Mirrors the
+# maxLessons read that SW-19 already fixed for exactly this reason (SW-22).
+try { if ($null -ne $config.hooks.subagentRetro.retroStaleMinutes) { $staleMinutes = [int]$config.hooks.subagentRetro.retroStaleMinutes } } catch { }
+try { if ($null -ne $config.hooks.subagentRetro.debounceMinutes)   { $debounceMinutes = [int]$config.hooks.subagentRetro.debounceMinutes } } catch { }
 
 # Lesson injection (SW-19). Same explicit-false handling as the enabled flag:
 # an absent key means on, only a literal false turns it off.

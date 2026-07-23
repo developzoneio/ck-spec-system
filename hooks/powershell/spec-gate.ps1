@@ -562,7 +562,12 @@ $config = Get-ProjectConfig -Cwd $cwd
 
 # Hook globally disabled?
 try {
-    if ($null -ne $config.hooks -and $null -ne $config.hooks.specGate -and -not $config.hooks.specGate.enabled) {
+    # Type-strict: only a literal JSON boolean false disables the gate. A plain
+    # `-not ...enabled` fires on an ABSENT key ($null), silently disabling the
+    # gate when a hand-trimmed config carries a specGate block with no `enabled`
+    # - diverging from spec-gate.sh's `== false`, which leaves it on. -is [bool]
+    # matches jq (SW-22); mirrors the verifyGate/metrics reads below.
+    if (($config.hooks.specGate.enabled -is [bool]) -and (-not $config.hooks.specGate.enabled)) {
         exit 0
     }
 } catch { }

@@ -257,6 +257,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across 10 files for no measurable gain. Recorded in the ADR and on the ticket.
 
 ### Fixed
+- Four PowerShell hook config reads used PowerShell truthiness where the bash twin asks a
+  type-strict question, so the two implementations disagreed on the same `project-config.json`
+  (SW-22). Two failure modes, both invisible to a scaffolded project (the template ships
+  `enabled: true` and non-zero numbers) but reachable by the hand-trimmed config a user writes to
+  change one setting. (1) **Absent `enabled` disabled the hook in PowerShell only.** A `subagentRetro`
+  / `specGate` block that omitted `enabled` left the property `$null`, and `-not $null` is `$true`,
+  so `subagent-retro.ps1` and `spec-gate.ps1` exited silently; `prompt-router.ps1` had the same class
+  via `[bool]$null` (which is `$false`). All three bash twins use `== false`, so only a literal
+  `false` disables. The reads are now type-strict (`-is [bool]` / return `$false` only for a real
+  boolean `false`), mirroring the `verifyGate` and `metrics.enabled` reads already fixed this way.
+  (2) **An explicit `0` was treated as absent.** `subagent-retro.ps1`'s `retroStaleMinutes` and
+  `debounceMinutes` reads used `if ($config...)`, and PowerShell treats `0` as falsy, so an explicit
+  `0` was ignored and the default kept, while the bash `// 30` / `// 10` accept `0`; both now use
+  `$null -ne`, matching the `maxLessons` read SW-19 fixed for the same reason. Bash was already
+  correct, so no `.sh` changed - the fix converges the pair. Five conformance fixtures added
+  (`subagent-retro/{enabled-absent-still-on,stale-minutes-zero-honored,debounce-minutes-zero-honored}`,
+  `spec-gate/enabled-absent-warns`, `prompt-router/enabled-absent-emits`); every one fails if its
+  read is reverted - the previous fixture set could not, because all of them set `enabled` explicitly
+  and used non-zero numbers.
 - `docs/architecture.md` described the metrics `stale` field as a "count of stale/missing retros
   observed for that spec". It is a per-event flag, `0` or `1` - `subagent-retro` emits one event per
   in-progress spec per subagent stop and sets `1` when that spec's retro is stale or missing
