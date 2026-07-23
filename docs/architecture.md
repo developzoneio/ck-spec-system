@@ -10,11 +10,11 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    11 workflow definitions                         |
+|    commands/sd/    13 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
-|    skills/sd/      6 reusable rule packs (referenced by agents)    |
+|    skills/sd/      8 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |
@@ -89,7 +89,7 @@ Each subagent has a focused role, a minimal tool allowlist, and a model assignme
 |---|---|---|---|
 | `sd-spec-architect` | sonnet | Read/Write/Edit + Grep/Glob + Atlassian + Context7 | Authors specs, plans, tasks. Constitution-aware. |
 | `sd-code-explorer` | haiku | Read/Grep/Glob + GitNexus | Read-only navigation. Every finding cites `file:line`. |
-| `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + MSSQL (SELECT only) + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
+| `sd-debugger` | sonnet | Read/Grep/Glob/Bash + sequential-thinking + GitNexus + Tavily + Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
 | `sd-implementer` | haiku | Read/Write/Edit/MultiEdit/Grep/Glob/Bash + Context7 | Executes ONE atomic task with scope discipline. |
 | `sd-reviewer` | sonnet | Read/Grep/Glob + sequential-thinking + GitNexus | Severity-tagged review (🔴 BLOCK / 🟠 WARN / 🟡 SUGGEST / 🟢 PASS). Cannot write. |
 | `sd-docs-writer` | sonnet | Read/Write/Glob/Grep + sd-evidence-citation | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
@@ -117,13 +117,16 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:spec      -> (none - pure file ops on .specs/)
 /sd:setup     -> (none - scaffolds CLAUDE.md / .specs/ / .claude/)
 /sd:release   -> (none - pure file ops; mirrors /sd:spec)
+/sd:verify    -> (none - pure file ops; traceability check + gate artifact)
+/sd:status    -> (none - pure file ops; read-only report over events.jsonl + index.md)
 ```
 
-Three commands invoke no subagent at all (`/sd:spec`, `/sd:setup`, `/sd:release`) - they are deterministic
-file operations the main thread performs directly. The rest share one backbone: the architect frames the
-spec, an investigator (explorer or debugger) gathers evidence, the implementer makes the change one atomic
-task at a time, and the reviewer gates the result. The reviewer has no write tools, so the loop cannot
-auto-fix - findings always route back through a fresh implementer call.
+Some commands invoke no subagent at all - `/sd:spec`, `/sd:setup`, `/sd:release`, `/sd:verify` and
+`/sd:status` are deterministic file operations the main thread performs directly. The rest share one
+backbone: the architect frames the spec, an investigator (explorer or debugger) gathers evidence,
+the implementer makes the change one atomic task at a time, and the reviewer gates the result. The
+reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
+fresh implementer call.
 
 ---
 
@@ -141,10 +144,11 @@ The split exists for three reasons:
 |---|---|---|
 | `sd-severity-taxonomy` | `sd-reviewer` | Severity levels + per-severity rules + mandatory output markdown. |
 | `sd-hypothesis-tree` | `sd-debugger` | Enumerate / verify protocol, the 5 mental models, score formula `(L × I) / C`, proximate-vs-root ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (9 required fields + `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
+| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The task block (11 required fields, including `Pattern refs`) + canonical enums (`Step type`, `Complexity`, `Reversibility`). |
 | `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | `file:line` discipline, snippet length, evidence taxonomy, grouping. |
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
+| `sd-replan-loop` | `sd-spec-architect`; `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (runtime read) | Mid-execution re-plan protocol: HARD Gate Re-plan, append-only `## Revisions` log in `01-plan.md`, `Revised-by` task marker. Shared by the two plan+tasks workflows so the revision format is defined once. |
 
 Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
 
@@ -162,9 +166,11 @@ A skill is **not** an agent. It cannot be invoked directly, has no tools of its 
 
 ---
 
-## Hooks as context injection + guardrails
+## Hooks as context injection, guardrails, and recording
 
-Three hooks ship in cross-platform pairs (PowerShell + bash):
+3 hooks ship in cross-platform pairs (PowerShell + bash). Each plays one of three roles:
+`prompt-router` injects context, `spec-gate` guards edits (and records), `subagent-retro`
+reminds about stale retros (and records).
 
 ### `prompt-router` (`UserPromptSubmit`)
 
@@ -183,6 +189,11 @@ Runs before any code-editing tool. Decides:
 - Editing a code file (cs/ts/py/rs/go/etc.) with no in-progress spec? -> block or warn (configurable).
 
 This catches the common failure mode where the user (or Claude) jumps straight to editing code without creating a spec first.
+
+Alongside guarding, `spec-gate` also **records**: every gate decision (verify / protected /
+code-edit) and every `.specs/index.md` lifecycle transition it observes is appended as one JSON
+line to `.specs/_metrics/events.jsonl`. Recording is purely observational - it never alters a
+gate decision, only measures it after the fact. See the event log section below for the schema.
 
 **Block output schema (dual-format).** When `spec-gate` denies a tool call, it emits a single JSON object that carries **both** the new and the legacy schema fields so it works across Claude Code CLI versions:
 
@@ -205,6 +216,58 @@ This catches the common failure mode where the user (or Claude) jumps straight t
 
 Runs after every subagent invocation. If any in-progress spec has a `05-retro.md` older than `retroStaleMinutes`, emits a `<retro-reminder>` block. Debounced per session via `.claude/.hookstate/`.
 
+`subagent-retro` also **records**: it appends one `subagent_stop` event per in-progress spec to
+`.specs/_metrics/events.jsonl`, carrying the same stale/missing-retro count the reminder is based
+on. Recording happens regardless of debounce - debounce only suppresses the user-facing reminder,
+not the measurement.
+
+### Event log (`.specs/_metrics/events.jsonl`)
+
+`spec-gate` and `subagent-retro` are the hooks that record. Each appends one JSON object per
+line (append-only, UTF-8, LF-terminated) to `.specs/_metrics/events.jsonl`, in a fixed key order so
+the PowerShell and bash implementations produce byte-comparable lines:
+
+| Field | Present | Values |
+|---|---|---|
+| `ts` | always | `yyyy-MM-ddTHH:mm:ssZ` - whole-second UTC, the same format used by the `subagent-retro` debounce state file |
+| `spec_id` | always | `FEAT-x` / `BUG-x` / ... , or `-` when no spec is in scope |
+| `phase` | always | lifecycle status of `spec_id` (`draft` / `approved` / `in-progress` / `done`), or `-` |
+| `event` | always | `gate` \| `spec_transition` \| `subagent_stop` |
+| `gate` | when `event` is `gate` | `verify` \| `protected` \| `code-edit` |
+| `decision` | when `event` is `gate` or `spec_transition` | `allow` \| `block` \| `warn` - on a transition, whether the index edit was ultimately allowed through. Most direct index edits are blocked by `paths.protected`, so `block` is the common case; a verified `done` close-out is the path that yields `allow`. |
+| `from` | when `event` is `spec_transition` | previous lifecycle status, or `-` if not derivable |
+| `ext` | when `gate` is `code-edit` | lowercased file extension, e.g. `.ps1` - never a path |
+| `stale` | when `event` is `subagent_stop` | `0` or `1` - a flag, not a count. One event is emitted per in-progress spec per subagent stop; `1` means that spec's `05-retro.md` was stale or missing at that moment. Retro pressure is measured by counting `1`s over time, never by reading a single value as a quantity |
+
+Example lines:
+
+```json
+{"ts":"2026-07-21T09:14:02Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"spec_transition","from":"approved","decision":"block"}
+{"ts":"2026-07-21T09:31:44Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"gate","gate":"code-edit","decision":"warn","ext":".ps1"}
+{"ts":"2026-07-21T09:40:55Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"subagent_stop","stale":1}
+```
+
+The log is metadata-only by design: no file paths, no code content, no commit messages - only spec
+IDs, lifecycle phases, decisions, and file extensions. Controlled by `hooks.metrics` in
+`.claude/project-config.json` (`enabled`, default `true`; `path`, default
+`.specs/_metrics/events.jsonl`; `maxSizeKb`, default `1024`). Set `hooks.metrics.enabled` to
+`false` to stop writing entirely.
+
+**Rotation (`maxSizeKb`).** Before each append, if the live file already meets or exceeds
+`maxSizeKb * 1024` bytes, the hook rolls `events.jsonl` to `events.jsonl.1` (single generation - any
+previous `.1` is overwritten) and starts a fresh log. Both hooks measure the same raw byte count
+(`(Get-Item).Length` / `wc -c`) so PowerShell and bash roll at the same boundary. The default is
+`1024` (~1 MB); an absent `maxSizeKb` is also treated as `1024`, so a `project-config.json` written
+before this feature stays bounded with no edit. Set `maxSizeKb` to `0` to disable rotation and let
+the log grow unbounded; any non-number is treated as invalid and also disables it. Rotation is
+**best-effort** and inherits every metrics invariant: the roll never stops the append (a silent stop
+would read as "metrics working" while dropping data - worse than growth), a failed roll (locked file
+on Windows, read-only dir) is a silent no-op that falls through to the append, and it never alters a
+gate decision or the hook's exit code. `events.jsonl.1` is a grace buffer, **not** part of any read
+contract: the one consumer of the log, `/sd:status`, reads the **live file only** and merely notes
+that a `.1` exists - a `.1` generation may be lost on the next roll, so counting it would report a
+window that cannot be reproduced.
+
 Hooks are **defensive**: any failure path exits `0` silently. They never block the user on their own bugs.
 
 ---
@@ -217,7 +280,7 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 .specs/FEAT-INV-2501/
 ├── 00-spec.md        Why / What / Success criteria / Constitution check
 ├── 01-plan.md        Phased implementation plan
-├── 02-tasks.md       Atomic tasks (9 required fields + Pattern refs)
+├── 02-tasks.md       Atomic tasks (11 required fields, incl. Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
 ├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups
@@ -306,7 +369,7 @@ specwright is built around a small set of MCP servers most useful for spec-drive
 |---|---|---|
 | `atlassian` | Fetch JIRA tickets for `<ID>` arguments + snapshot ticket / related tickets / linked Confluence pages | spec-architect, commands |
 | `gitnexus` | Fast symbol search, callers, call graph | code-explorer, debugger, reviewer |
-| `mssql` (SELECT/EXPLAIN only) | Inspect schema and query plans | debugger |
+| `database` (project-provided, e.g. `mssql`, `postgres`; SELECT/EXPLAIN only) | Inspect schema and query plans | debugger |
 
 The split exists because user-scope servers are generic (any project benefits from `context7`), while project-scope servers carry project-specific connection strings or credentials.
 
@@ -322,7 +385,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 11 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 13 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---

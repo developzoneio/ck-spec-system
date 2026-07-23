@@ -49,16 +49,224 @@ function Get-ProjectConfig {
                 retroStaleMinutes = 30
                 debounceMinutes   = 10
             }
+            metrics = [pscustomobject]@{ enabled = $true; path = '.specs/_metrics/events.jsonl'; maxSizeKb = 1024 }
         }
     }
 
     $cfgPath = Join-Path $Cwd '.claude/project-config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { return $defaults }
+    # -ErrorAction Stop is required: the script-wide SilentlyContinue preference
+    # would otherwise make a malformed config a NON-terminating error, so the
+    # catch never fires and the function returns $null instead of the defaults.
     try {
-        return (Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+        $loaded = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 -ErrorAction Stop |
+            ConvertFrom-Json -ErrorAction Stop
+        if ($null -eq $loaded) { return $defaults }
+        return $loaded
     } catch {
         return $defaults
     }
+}
+
+function Test-IsRootedPath {
+    param([string]$Path)
+    # Mirrors spec-gate.sh's rootedness test ("${fp}" != /* && "${fp}" != ?:*),
+    # evaluated on the RAW path (before backslash->slash conversion): a leading
+    # '/' or a drive-letter prefix like 'C:' is rooted, anything else - a plain
+    # relative path such as 'src/../.specs/constitution.md' - is not.
+    if ([string]::IsNullOrEmpty($Path)) { return $false }
+    if ($Path[0] -eq '/') { return $true }
+    if ($Path.Length -ge 2 -and $Path[1] -eq ':') { return $true }
+    return $false
+}
+
+function ConvertTo-CollapsedPath {
+    param([string]$Path)
+    # Pure string-based collapse of '.' and '..' segments on a forward-slash
+    # path - no filesystem access, no .NET path resolution. This mirrors
+    # collapse_dot_segments in spec-gate.sh exactly, including:
+    #   - a rooted path (leading '/' or a drive prefix 'C:/') clamps a '..' at
+    #     its own root instead of walking above it;
+    #   - an unrooted path with nothing to clamp against keeps an unresolved
+    #     leading '..' rather than discarding it;
+    #   - an empty segment (produced by '//' or by a TRAILING separator, e.g.
+    #     ".specs/constitution.md/") is a no-op, same as a '.' segment - this
+    #     is what makes a trailing separator collapse away instead of
+    #     defeating the later exact-match comparison against paths.protected.
+    $rootPrefix = ''
+    $body = $Path
+    $rooted = $false
+    if ($Path.StartsWith('/')) {
+        $rootPrefix = '/'
+        $body = $Path.Substring(1)
+        $rooted = $true
+    } elseif ($Path.Length -ge 2 -and $Path[1] -eq ':') {
+        $rootPrefix = $Path.Substring(0, 2) + '/'
+        $body = $Path.Substring(2)
+        if ($body.StartsWith('/')) { $body = $body.Substring(1) }
+        $rooted = $true
+    }
+
+    $acc = ''
+    foreach ($seg in $body -split '/') {
+        if ($seg -eq '' -or $seg -eq '.') {
+            continue
+        }
+        if ($seg -eq '..') {
+            if ($acc -ne '') {
+                $lastSlash = $acc.LastIndexOf('/')
+                if ($lastSlash -ge 0) { $last = $acc.Substring($lastSlash + 1) } else { $last = $acc }
+                if ($last -eq '..') {
+                    # Already-stacked leading '..' (unrooted overflow) - keep stacking.
+                    $acc = "$acc/.."
+                } elseif ($lastSlash -ge 0) {
+                    $acc = $acc.Substring(0, $lastSlash)
+                } else {
+                    # acc was a single segment with no slash - pop to empty.
+                    $acc = ''
+                }
+            } elseif ($rooted) {
+                # Cannot go above the root - drop it, matching the bash clamp.
+            } else {
+                # No root to clamp against - keep the unresolved '..'.
+                $acc = '..'
+            }
+        } else {
+            if ($acc -eq '') { $acc = $seg } else { $acc = "$acc/$seg" }
+        }
+    }
+
+    return "$rootPrefix$acc"
+}
+
+function Test-MetricsPathSafe {
+    param([string]$RelPath)
+    # A metrics path is not an arbitrary-write primitive: reject anything
+    # rooted (absolute, or a drive-letter path) or that escapes Cwd via '..'
+    # rather than ever writing outside the workspace. Reuses the same
+    # rootedness test and dot-segment collapse used for the gate's own path
+    # safety above, so the two safety checks cannot silently diverge.
+    if ([string]::IsNullOrWhiteSpace($RelPath)) { return $false }
+    if (Test-IsRootedPath -Path $RelPath) { return $false }
+    $collapsed = ConvertTo-CollapsedPath -Path ($RelPath.Replace('\','/'))
+    if ($collapsed -eq '..' -or $collapsed.StartsWith('../')) { return $false }
+    return $true
+}
+
+function Write-MetricEvent {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [string]$EventKind,
+        [System.Collections.Specialized.OrderedDictionary]$Fields
+    )
+    # Fully wrapped: a metrics failure must NEVER surface as a hook error or
+    # change a gate decision. Every call site invokes this AFTER the decision
+    # is already computed (and, for a block, already written to stdout) -
+    # never from inside the decision path itself.
+    try {
+        $enabled = $true
+        # Type-strict: only a literal JSON boolean false disables metrics -
+        # copies the verifyGate `-is [bool]` pattern above so a string
+        # "false" in project-config.json leaves metrics on, matching
+        # spec-gate.sh's `== false` jq comparison.
+        if (($Config.hooks.metrics.enabled -is [bool]) -and (-not $Config.hooks.metrics.enabled)) {
+            $enabled = $false
+        }
+        if (-not $enabled) { return }
+
+        $relPath = '.specs/_metrics/events.jsonl'
+        try { if ($Config.hooks.metrics.path) { $relPath = [string]$Config.hooks.metrics.path } } catch { }
+        $relPath = $relPath.Replace('\','/')
+
+        if (-not (Test-MetricsPathSafe -RelPath $relPath)) { return }
+
+        $fullPath = Join-Path $Cwd $relPath
+        $parent = Split-Path -Path $fullPath -Parent
+        if (-not (Test-Path -LiteralPath $parent)) {
+            New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null
+        }
+
+        # [ordered] (not a plain hashtable) so ConvertTo-Json emits keys in
+        # the exact insertion order below - a plain hashtable does not
+        # guarantee enumeration order, which would let the two
+        # implementations drift apart on key order for the same input.
+        $ordered = [ordered]@{}
+        $ordered['ts']      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $ordered['spec_id'] = $SpecId
+        $ordered['phase']   = $Phase
+        $ordered['event']   = $EventKind
+        foreach ($key in $Fields.Keys) { $ordered[$key] = $Fields[$key] }
+
+        $line = ([pscustomobject]$ordered) | ConvertTo-Json -Compress
+
+        # --- rotation (SW-15) --------------------------------------------------
+        # Bounded log: before appending, if the live file already meets or
+        # exceeds the byte cap, roll it to '.1' (single generation, overwriting
+        # any prior roll). maxSizeKb defaults to 1024 when the key is ABSENT, so
+        # a project-config.json written before SW-15 still gets a bounded log
+        # with no edit; an explicit 0 or negative disables rotation (the opt-out)
+        # and any non-number is invalid and also disables it (SW-22 scar - never
+        # let a bad type silently flip behavior). Best-effort - the Move-Item has
+        # its own -ErrorAction Stop / catch so a file the other hook holds open
+        # on Windows, or a read-only dir, is a silent no-op that falls through to
+        # the append below: rotation must NEVER stop the append (silent data loss
+        # reads as "metrics working", which the ticket flags as worse than
+        # growth) nor surface as a hook error. (Get-Item).Length is the raw byte
+        # count matching bash's `wc -c`, and the absent->1024 / bad-type->off
+        # rules match subagent-retro.sh's jq, so PS and bash trip at the same
+        # boundary.
+        try {
+            $maxKb = 1024
+            $m = $Config.hooks.metrics
+            if (($null -ne $m) -and ($m.PSObject.Properties.Name -contains 'maxSizeKb')) {
+                $maxKb = $m.maxSizeKb
+            }
+            if (($maxKb -is [int] -or $maxKb -is [long] -or $maxKb -is [double]) -and ($maxKb -gt 0)) {
+                $maxBytes = [long][math]::Floor([double]$maxKb * 1024)
+                if (Test-Path -LiteralPath $fullPath) {
+                    if ((Get-Item -LiteralPath $fullPath).Length -ge $maxBytes) {
+                        Move-Item -LiteralPath $fullPath -Destination "$fullPath.1" -Force -ErrorAction Stop
+                    }
+                }
+            }
+        } catch { }
+
+        # Add-Content opens and closes the file handle per call and is not
+        # safe against the concurrent PreToolUse + SubagentStop appends this
+        # log can see; retry briefly on a transient sharing violation instead
+        # of failing loudly.
+        $attempt = 0
+        while ($attempt -lt 5) {
+            try {
+                # UTF8Encoding($false): NO byte-order-mark. [Encoding]::UTF8
+                # writes a BOM preamble on the FIRST write to a new/empty
+                # file, which subagent-retro.sh's plain `>>` append never
+                # does - that would make the two implementations' first line
+                # differ by 3 bytes for the exact same input.
+                [System.IO.File]::AppendAllText($fullPath, "$line`n", (New-Object System.Text.UTF8Encoding($false)))
+                break
+            } catch {
+                $attempt++
+                if ($attempt -ge 5) { break }
+                Start-Sleep -Milliseconds 20
+            }
+        }
+    } catch { }
+}
+
+function Write-SubagentStopMetric {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [string]$SpecId,
+        [string]$Phase,
+        [int]$Stale
+    )
+    $fields = [ordered]@{ stale = $Stale }
+    Write-MetricEvent -Cwd $Cwd -Config $Config -SpecId $SpecId -Phase $Phase -EventKind 'subagent_stop' -Fields $fields
 }
 
 function Get-IndexSpecs {
@@ -112,24 +320,50 @@ function Get-StaleRetros {
     return $stale
 }
 
-function Test-DebounceElapsed {
-    param(
-        [string]$StatePath,
-        [int]$DebounceMinutes
-    )
-    if (-not (Test-Path -LiteralPath $StatePath)) { return $true }
+# Read once, written once - mirrors the single state read in subagent-retro.sh.
+# The state file is an ON-DISK CONTRACT shared with that twin and carries two
+# keys: lastReminderUtc (debounce stamp) and shownLessons (lesson lines already
+# surfaced in THIS session). Both writers must preserve the key they are not
+# updating, or a reminder would wipe the session's lesson history and every
+# lesson would repeat.
+function Read-State {
+    param([string]$StatePath)
+
+    $result = [pscustomobject]@{
+        LastIso = ''
+        Shown   = (New-Object 'System.Collections.Generic.List[string]')
+    }
+    if (-not (Test-Path -LiteralPath $StatePath)) { return $result }
     try {
         $st = Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 | ConvertFrom-Json
         # PowerShell 7's ConvertFrom-Json auto-converts an ISO-8601 "...Z" string to a
         # [datetime] with Kind=Utc; PowerShell 5.1 leaves it as a plain string. Re-Parse-ing
         # an already-converted [datetime] stringifies it with the local culture (dropping the
-        # UTC marker), so [datetimeoffset]::Parse silently re-interprets it as local time -
-        # skewing $age by the machine's UTC offset. Only Parse when it is still a string.
-        if ($st.lastReminderUtc -is [datetime]) {
-            $last = $st.lastReminderUtc.ToUniversalTime()
-        } else {
-            $last = [datetimeoffset]::Parse([string]$st.lastReminderUtc).UtcDateTime
+        # UTC marker), so a later Parse silently re-interprets it as local time - skewing the
+        # debounce by the machine's UTC offset. Normalise back to the on-disk format here so
+        # everything downstream sees the same plain string the bash twin sees.
+        if ($null -ne $st.lastReminderUtc) {
+            if ($st.lastReminderUtc -is [datetime]) {
+                $result.LastIso = $st.lastReminderUtc.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            } else {
+                $result.LastIso = [string]$st.lastReminderUtc
+            }
         }
+        if ($null -ne $st.shownLessons) {
+            foreach ($s in $st.shownLessons) { [void]$result.Shown.Add([string]$s) }
+        }
+    } catch { }
+    return $result
+}
+
+function Test-DebounceElapsed {
+    param(
+        [string]$LastIso,
+        [int]$DebounceMinutes
+    )
+    if ([string]::IsNullOrWhiteSpace($LastIso)) { return $true }
+    try {
+        $last = [datetimeoffset]::Parse($LastIso).UtcDateTime
         $age = (Get-Date).ToUniversalTime() - $last
         return ($age.TotalMinutes -ge $DebounceMinutes)
     } catch {
@@ -138,7 +372,11 @@ function Test-DebounceElapsed {
 }
 
 function Save-State {
-    param([string]$StatePath)
+    param(
+        [string]$StatePath,
+        [string]$LastIso,
+        $Shown
+    )
     try {
         # -Path, not -LiteralPath: some PowerShell builds reject -LiteralPath combined
         # with -Parent as an unresolvable parameter set. -Parent does no filesystem
@@ -147,9 +385,67 @@ function Save-State {
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        $obj = [pscustomobject]@{ lastReminderUtc = (Get-Date).ToUniversalTime().ToString('o') }
-        $obj | ConvertTo-Json -Compress | Set-Content -LiteralPath $StatePath -Encoding UTF8
+        # Key order matches the jq object written by subagent-retro.sh. The
+        # whole-second UTC format must stay identical in both - 'o' was writing
+        # 7 fractional digits that only the bash side ever had to cope with.
+        $arr = @()
+        if ($null -ne $Shown) { $arr = @($Shown) }
+        if ([string]::IsNullOrEmpty($LastIso)) {
+            $obj = [pscustomobject]@{ shownLessons = $arr }
+        } else {
+            $obj = [pscustomobject]@{ lastReminderUtc = $LastIso; shownLessons = $arr }
+        }
+        $obj | ConvertTo-Json -Compress -Depth 3 | Set-Content -LiteralPath $StatePath -Encoding UTF8
     } catch { }
+}
+
+# Lesson selection (SW-19). Returns the lines to surface, in file order.
+#
+# lessons.md is rendered in a total, deterministic order by aggregate-lessons.*,
+# so "the first N that match" is itself deterministic - no sorting is done or
+# needed here, and there is no tie-break that could diverge from the bash twin.
+# All comparisons are ORDINAL: PowerShell's default -eq is case-insensitive and
+# would drop a lesson the bash twin keeps.
+function Select-Lessons {
+    param(
+        [string]$LessonsPath,
+        $Specs,
+        [int]$MaxLessons,
+        $Shown
+    )
+    $picked = New-Object 'System.Collections.Generic.List[string]'
+    if ($MaxLessons -le 0) { return $picked }
+    if (-not (Test-Path -LiteralPath $LessonsPath -PathType Leaf)) { return $picked }
+
+    # Scope selector: the workflow types currently in flight, plus 'all'.
+    $wanted = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    [void]$wanted.Add('all')
+    foreach ($spec in $Specs) {
+        switch ($spec.Type) {
+            'FEAT' { [void]$wanted.Add('feature') }
+            'BUG'  { [void]$wanted.Add('bug') }
+            'REF'  { [void]$wanted.Add('refactor') }
+            'PERF' { [void]$wanted.Add('perf') }
+            'RCA'  { [void]$wanted.Add('rca') }
+        }
+    }
+
+    $shownSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    if ($null -ne $Shown) { foreach ($s in $Shown) { [void]$shownSet.Add([string]$s) } }
+
+    $lessonRe = '^- \[([a-z-]+)\] ([a-z]+)/([a-z]+): (.+)$'
+    try {
+        foreach ($line in (Get-Content -LiteralPath $LessonsPath)) {
+            if (-not $line.StartsWith('- [')) { continue }
+            if ($line -cnotmatch $lessonRe) { continue }
+            if (-not $wanted.Contains($Matches[3])) { continue }
+            if ($shownSet.Contains($line)) { continue }
+
+            [void]$picked.Add($line)
+            if ($picked.Count -ge $MaxLessons) { break }
+        }
+    } catch { }
+    return $picked
 }
 
 function Remove-StaleStateFiles {
@@ -180,31 +476,112 @@ if ([string]::IsNullOrWhiteSpace($sessionId)) { $sessionId = 'no-session' }
 
 $config = Get-ProjectConfig -Cwd $cwd
 try {
-    if ($null -ne $config.hooks -and $null -ne $config.hooks.subagentRetro -and -not $config.hooks.subagentRetro.enabled) {
+    # Type-strict: only a literal JSON boolean false disables the hook. A plain
+    # `-not ...enabled` fires on an ABSENT key ($null), silently disabling the
+    # hook when a hand-trimmed config carries a subagentRetro block with no
+    # `enabled` - diverging from subagent-retro.sh's `== false`, which leaves it
+    # on. -is [bool] matches jq (SW-22); mirrors the metrics/injectLessons reads.
+    if (($config.hooks.subagentRetro.enabled -is [bool]) -and (-not $config.hooks.subagentRetro.enabled)) {
         exit 0
     }
 } catch { }
 
 $staleMinutes    = 30
 $debounceMinutes = 10
-try { if ($config.hooks.subagentRetro.retroStaleMinutes) { $staleMinutes = [int]$config.hooks.subagentRetro.retroStaleMinutes } } catch { }
-try { if ($config.hooks.subagentRetro.debounceMinutes)   { $debounceMinutes = [int]$config.hooks.subagentRetro.debounceMinutes } } catch { }
+# `$null -ne`, NOT a truthiness test: PowerShell treats 0 as falsy, so
+# `if ($config...retroStaleMinutes)` would silently ignore an explicit 0 and keep
+# the default while the bash twin's `// 30` / `// 10` accept 0. Mirrors the
+# maxLessons read that SW-19 already fixed for exactly this reason (SW-22).
+try { if ($null -ne $config.hooks.subagentRetro.retroStaleMinutes) { $staleMinutes = [int]$config.hooks.subagentRetro.retroStaleMinutes } } catch { }
+try { if ($null -ne $config.hooks.subagentRetro.debounceMinutes)   { $debounceMinutes = [int]$config.hooks.subagentRetro.debounceMinutes } } catch { }
+
+# Lesson injection (SW-19). Same explicit-false handling as the enabled flag:
+# an absent key means on, only a literal false turns it off.
+$injectLessons = $true
+$maxLessons    = 3
+try { if ($null -ne $config.hooks.subagentRetro.injectLessons -and -not $config.hooks.subagentRetro.injectLessons) { $injectLessons = $false } } catch { }
+# `$null -ne`, NOT a truthiness test: PowerShell treats 0 as falsy, so
+# `if ($config...maxLessons)` would silently ignore an explicit 0 and keep the
+# default of 3 while the bash twin's `// 3` accepts 0 and goes quiet. A
+# non-numeric or negative value falls back to 3 in both, matching the bash
+# `^[0-9]+$` guard.
+try {
+    if ($null -ne $config.hooks.subagentRetro.maxLessons) {
+        $maxLessons = [int]$config.hooks.subagentRetro.maxLessons
+    }
+} catch { $maxLessons = 3 }
+if ($maxLessons -lt 0) { $maxLessons = 3 }
 
 $specDir   = if ($config.spec.dir)       { Join-Path $cwd $config.spec.dir }       else { Join-Path $cwd '.specs' }
 $indexFile = if ($config.spec.indexFile) { Join-Path $cwd $config.spec.indexFile } else { Join-Path $cwd '.specs/index.md' }
-$stateDir  = Join-Path $cwd '.claude/.hookstate'
-$safeId    = ($sessionId -replace '[^A-Za-z0-9_\-]','_')
-$statePath = Join-Path $stateDir ("subagent-retro-$safeId.json")
+$stateDir    = Join-Path $cwd '.claude/.hookstate'
+$safeId      = ($sessionId -replace '[^A-Za-z0-9_\-]','_')
+$statePath   = Join-Path $stateDir ("subagent-retro-$safeId.json")
+$lessonsPath = Join-Path $specDir (Join-Path '_lessons' 'lessons.md')
 
 Remove-StaleStateFiles -StateDir $stateDir
+
+$state = Read-State -StatePath $statePath
 
 $specs = Get-IndexSpecs -IndexPath $indexFile
 if ($specs.Count -eq 0) { exit 0 }
 
 $stale = Get-StaleRetros -SpecDir $specDir -Specs $specs -StaleMinutes $staleMinutes
+
+# Metrics: one subagent_stop event per in-progress spec, emitted regardless
+# of staleness or debounce - debounce below only suppresses the user-facing
+# reminder, never this measurement (SW-10). A spec not in $stale (including
+# every RCA, which Get-StaleRetros always skips) reports stale=0.
+$staleIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+foreach ($s in $stale) { [void]$staleIds.Add($s.Id) }
+foreach ($spec in $specs) {
+    $staleCount = if ($staleIds.Contains($spec.Id)) { 1 } else { 0 }
+    Write-SubagentStopMetric -Cwd $cwd -Config $config -SpecId $spec.Id -Phase 'in-progress' -Stale $staleCount
+}
+
+# --- lesson injection (SW-19) ---
+#
+# PLACEMENT IS LOAD-BEARING. This sits beside the metrics emit above, BEFORE the
+# staleness early-exit and BEFORE the debounce window - deliberately, and for the
+# same reason the metrics call site does. Moved down to the reminder block, it
+# would only ever surface lessons to users who are already behind on their
+# retros, which is exactly the population that needs them least.
+#
+# The one gate it keeps is the in-progress-spec check above: no spec in flight,
+# no output. That gate IS the relevance filter - the workflow type of the
+# in-progress spec selects which lessons apply.
+#
+# Repetition is bounded per SESSION, not by a clock. shownLessons records what
+# has already been surfaced, so maxLessons caps how many NEW lessons appear at
+# one stop and a session converges to silence once it has said everything
+# relevant. A time debounce was rejected: it would suppress a lesson the user
+# has never seen purely because a different one was shown recently.
+if ($injectLessons) {
+    $picked = Select-Lessons -LessonsPath $lessonsPath -Specs $specs -MaxLessons $maxLessons -Shown $state.Shown
+    if ($picked.Count -gt 0) {
+        $lessonLines = New-Object System.Collections.Generic.List[string]
+        $lessonLines.Add('<retro-lessons>') | Out-Null
+        $lessonLines.Add('Lessons recorded in earlier retros of this project, matching the workflow') | Out-Null
+        $lessonLines.Add('type of the spec(s) currently in progress:') | Out-Null
+        foreach ($p in $picked) { $lessonLines.Add("  $p") | Out-Null }
+        $lessonLines.Add('') | Out-Null
+        $lessonLines.Add('These are not shown again this session.') | Out-Null
+        $lessonLines.Add('</retro-lessons>') | Out-Null
+
+        # Write, not WriteLine: WriteLine appends [Environment]::NewLine, which is
+        # CRLF on Windows, so the final line would differ from the bash twin by
+        # exactly one byte and fail the conformance comparison. The body is
+        # already LF-joined; terminate it the same way.
+        [Console]::Out.Write(($lessonLines -join "`n") + "`n")
+
+        foreach ($p in $picked) { [void]$state.Shown.Add($p) }
+        Save-State -StatePath $statePath -LastIso $state.LastIso -Shown $state.Shown
+    }
+}
+
 if ($stale.Count -eq 0) { exit 0 }
 
-if (-not (Test-DebounceElapsed -StatePath $statePath -DebounceMinutes $debounceMinutes)) { exit 0 }
+if (-not (Test-DebounceElapsed -LastIso $state.LastIso -DebounceMinutes $debounceMinutes)) { exit 0 }
 
 # Emit reminder
 $lines = New-Object System.Collections.Generic.List[string]
@@ -221,6 +598,12 @@ $lines.Add('') | Out-Null
 $lines.Add('Consider appending: decisions made, surprises encountered, follow-ups identified.') | Out-Null
 $lines.Add('</retro-reminder>') | Out-Null
 
-[Console]::Out.WriteLine($lines -join "`n")
-Save-State -StatePath $statePath
+# Write, not WriteLine - see the note on the lesson block above. This block had
+# the same one-byte CRLF divergence from the bash twin before SW-19.
+[Console]::Out.Write(($lines -join "`n") + "`n")
+
+# Re-emits shownLessons alongside the new stamp - dropping it here would clear
+# the session's lesson history and make every lesson repeat.
+$stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+Save-State -StatePath $statePath -LastIso $stamp -Shown $state.Shown
 exit 0

@@ -1,5 +1,5 @@
 ---
-description: Spec-driven feature workflow. Spec -> impact -> plan -> execute -> batch review -> close. 3 hard gates.
+description: Spec-driven feature workflow. Spec -> impact -> plan (complexity triage) -> execute -> batch review -> close. 3 hard gates.
 argument-hint: <JIRA-ID or slug>
 ---
 
@@ -23,6 +23,7 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
 | `02-tasks.md` exists, unchecked tasks remain | `in-progress` | Resume Phase 4 at next unchecked task |
 | All tasks checked, no integration pass | `tasks-complete` | Start Phase 5 |
 | status=`done` | `done` | Print summary, exit |
+| status=`archived`, spawned children (has `spawns` links) | `umbrella` | Print the child IDs + `/sd:feature <child-arg>` for each, in dependency order; exit |
 | status=`archived` | `archived` | Print archived notice, exit |
 
 ---
@@ -51,7 +52,7 @@ On re-invocation with the same `<arg>`, detect the current state of `.specs/FEAT
    - `TEMPLATE = feature.template.md`
    - `TICKET_CONTEXT = <fetched or pasted>`
    - `SPEC_ID = FEAT-<arg>`
-3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check, Linked specs.
+3. Spec-architect produces `.specs/FEAT-<arg>/00-spec.md` with: Why (business value), What (Given/When/Then), Success criteria, Out of scope, Open questions, Constitution check. Cross-references are not authored here - they go in the `linked_specs` frontmatter field via `/sd:spec link`.
 4. If a ticket was fetched, spec-architect also snapshots it (ticket content + related tickets + linked Confluence pages, per its Ticket snapshot protocol) to `.specs/FEAT-<arg>/04-artifacts/ticket/`.
 5. Register in `.specs/index.md` with status=`draft`.
 
@@ -69,7 +70,12 @@ STOP. Present the spec to the user. Ask:
 
 ## Phase 2 - Impact analysis
 
-1. Invoke `sd-code-explorer` with:
+0. **Complexity escalation check.** Read the `complexity` frontmatter field of
+   `.specs/FEAT-<arg>/00-spec.md`. If it is `L`, invoke the explorer in step 1 with a model
+   override to `sonnet` (overriding its `haiku` default) - a create-time `L` estimate is exactly
+   the multi-subsystem case where the shallow haiku impact map degrades. For `S` / `M`, use the
+   default model. Aliases only - never a full model ID.
+1. Invoke `sd-code-explorer` (model: default, or `sonnet` per step 0) with:
    - `TASK = impact-map`
    - `SPEC = .specs/FEAT-<arg>/00-spec.md`
    - `OUTPUT_TARGET = .specs/FEAT-<arg>/03-decisions.md`
@@ -84,26 +90,77 @@ No gate here - impact analysis is informational. User reviews it in Phase 3.
 
 ## Phase 3 - Plan + tasks
 
-1. Invoke `sd-spec-architect` with:
+0. **Complexity escalation check.** Read the `complexity` frontmatter field of
+   `.specs/FEAT-<arg>/00-spec.md`. If it is `L`, invoke the architect in step 1 with a model
+   override to `opus` (overriding its `sonnet` default) - single-pass planning is where large scope
+   degrades non-linearly. For `S` / `M`, use the default model. Aliases only - never a full model ID.
+1. Invoke `sd-spec-architect` (model: default, or `opus` per step 0) with:
    - `TASK = plan`
    - `SPEC = .specs/FEAT-<arg>/00-spec.md`
    - `IMPACT = .specs/FEAT-<arg>/03-decisions.md`
 2. Spec-architect produces:
    - `.specs/FEAT-<arg>/01-plan.md` (approach, alternatives considered, rationale).
    - `.specs/FEAT-<arg>/02-tasks.md` with atomic tasks, each formatted per the
-     **sd-atomic-task-format** skill (9 required fields + `Pattern refs`; the architect applies
+     **sd-atomic-task-format** skill (11 required fields, including `Pattern refs`; the architect applies
      this format, do not re-specify it here).
-3. Set status=`in-progress` in `00-spec.md` and `index.md`.
+   - It also self-assesses the plan against the decompose thresholds and returns either a normal
+     report (under threshold) or `STATUS = needs-input` carrying a **decompose proposal** or a
+     **no-split** flag (over threshold). See its "Complexity self-assessment" section.
+3. **Do not set status yet** - the Gate 2 branch below decides whether this spec executes its own
+   plan or becomes an umbrella. Setting `in-progress` happens inside the resolved branch.
 
-### ⛔ Gate 2 - Plan approval
+### ⛔ Gate 2 - Plan approval (with complexity triage)
 
-STOP. Present the plan and task list. Ask:
+STOP. This gate has two faces. Which one you present is decided by the architect's self-assessment
+from Phase 3 step 2 - **not** by adding a separate always-on gate. A spec **under** the decompose
+thresholds sees only the normal plan approval below, with **zero added friction**.
 
-> Approve plan for FEAT-<arg>? (<N> tasks, estimated <complexity>) (yes / refine <feedback> / abort)
+**Face A - normal plan approval** (plan is under threshold). Present the plan and task list. Ask:
 
-- `yes` -> proceed.
+> Approve plan for FEAT-<arg>? (<N> tasks, complexity <S|M|L>) (yes / refine <feedback> / abort)
+
+- `yes` -> set status=`in-progress` in `00-spec.md` and `index.md`; proceed to Phase 4.
 - `refine` -> invoke `sd-spec-architect` with `TASK = refine`, `SPEC = .specs/FEAT-<arg>/00-spec.md`, `FEEDBACK = <user feedback>`. Loop.
 - `abort` -> set status=`archived`, exit.
+
+**Face B - Gate Complexity (HARD)** (plan is over threshold: tasks > 8; spans > 2 production
+layers/subsystems - distinct `Layer` values excluding `Tests`/`Config`, which cross-cut every
+change; impact surface > 8 files; or an unresolved Open question remains). The workflow **refuses to
+execute one oversized plan.** Present the architect's proposal and STOP.
+
+If the architect returned a **decompose proposal**, ask:
+
+> FEAT-<arg> exceeds the complexity threshold (<reason: e.g. 14 tasks, spans 3 layers>).
+> Split into <N> child specs? (approve split / no-split <reason> / refine <feedback> / abort)
+
+- `approve split` -> for each proposed child, in dependency order:
+  1. Invoke `sd-spec-architect` with `TASK = create`, `TEMPLATE = feature.template.md`,
+     `SPEC_ID = FEAT-<parent-arg>-<child-slug>`, and a `TICKET_CONTEXT` carved from the parent (the
+     child's SC/AC slice + relevant Why/What). The child is a normal feature spec at status=`draft`
+     - its own `/sd:feature` run will plan and execute it later. Children inherit medium scope by
+     construction.
+  2. Register the child in `.specs/index.md` at status=`draft`.
+  3. Link it: `/sd:spec link FEAT-<parent-arg> spawns FEAT-<parent-arg>-<child-slug>` (the command
+     writes the inverse `spawned-by` on the child). Then wire declared dependencies between
+     children with `/sd:spec link FEAT-...-<a> depends-on FEAT-...-<b>`.
+  Then make the **parent an umbrella record**: set parent status=`archived` in `00-spec.md` and
+  `index.md` (it spawned its children; it does not execute its own oversized plan), and append to
+  `05-retro.md` a one-line note naming the children it spawned and why it decomposed. The parent's
+  `00-spec.md`, `01-plan.md`, `02-tasks.md` are left intact as the historical record - **immutable,
+  never edited to match the split**. Print the child IDs and tell the user to run `/sd:feature
+  <child-arg>` on each, respecting the dependency order. Exit this workflow.
+- `no-split <reason>` -> the user judges the work legitimately atomic (large but cohesive, no clean
+  partition). Apply the **sanctioned model escalation** if not already applied: the plan was written
+  by the escalated `opus` architect (Phase 3 step 0) only if `complexity` was `L`; if the estimate
+  under-called it, re-invoke Phase 3 once with the architect overridden to `opus`. Then treat as
+  Face A `yes`: set status=`in-progress`, proceed to Phase 4. Log the no-split decision and its
+  reason to `05-retro.md`.
+- `refine` -> `sd-spec-architect` `TASK = refine`; loop back through the self-assessment.
+- `abort` -> set status=`archived`, exit.
+
+If the architect returned a **no-split** flag itself (over threshold but it found no clean split),
+present that reasoning and ask the same question - the user still owns the call between forcing a
+split and accepting the escalated single plan.
 
 ---
 
@@ -125,12 +182,39 @@ For each unchecked task:
    - Did implementer stay within `Files` list? If not -> revert, re-invoke.
    - Does the test pass? If not -> re-invoke implementer with failure output.
    - Any obvious constitution violation visible from the diff? If yes -> re-invoke with feedback.
+   - **Plan-invalidating discovery?** If the implementer reports (or the diff reveals) that the task's
+     premise is false - a `Pattern refs` precedent does not exist, an interface differs from what the
+     task assumed, a `Depends on` edge is backwards, or a task is now known missing/redundant - do
+     NOT hack-edit `02-tasks.md`. Enter **Gate Re-plan** below. This is distinct from an ordinary
+     in-task adjustment, which the implementer handles within its own scope (see `sd-replan-loop` for
+     the boundary).
 6. **Check off** the task in `02-tasks.md`.
 7. Log a one-line summary to `.specs/FEAT-<arg>/05-retro.md`: `T<NN>: <status> - <note>`.
 
 > **Why no per-task reviewer?** Each reviewer invocation spawns a sonnet-class subagent that reloads the full context (CLAUDE.md + constitution + spec + changed files). For N tasks, that is N expensive calls. The main thread self-check catches scope violations and test failures. Constitution compliance and cross-task issues are caught more efficiently by the batch review in Phase 5.
 
 Move to next task. Repeat until all tasks checked.
+
+### Gate Re-plan (HARD) - adaptive re-plan on a plan-invalidating discovery
+
+Reachable from Phase 4 (self-check above) **and** Phase 5b (a batch-review finding that the plan
+itself is wrong). Follow the **sd-replan-loop** skill; the protocol is defined there once and shared
+with `/sd:refactor`. In brief:
+
+1. STOP. Surface the trigger, the affected task IDs, and the proposed delta. Ask:
+
+   > Re-plan FEAT-<arg>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
+
+   - `approve` -> proceed. `revise` -> adjust the delta and re-ask. `abort task` -> normal task abort.
+2. Invoke `sd-spec-architect` with `TASK = plan`, `REPLAN_SCOPE = <affected task IDs>`,
+   `REVISION = R<n>` (next contiguous number). It appends the `## Revisions` entry to `01-plan.md`
+   (append-only; the original plan prose is never edited), regenerates ONLY the affected task blocks
+   in `02-tasks.md`, and marks each `Revised-by: R<n>`.
+3. Resume Phase 4 at the first regenerated task. Tasks the revision did not touch stay checked.
+
+This gate runs only while the spec is `in-progress` - it never re-plans a `done` spec. It adds no new
+top-level gate to the workflow's count: it fires only on a plan-invalidating discovery, exactly as
+Gate Complexity fires only over threshold.
 
 ---
 
@@ -168,7 +252,13 @@ Ask:
 > All clean for FEAT-<arg>? (yes / address findings / abort)
 
 Treat findings:
-- Any 🔴 BLOCK -> route back to implementer with finding as feedback. Re-run batch review after fix.
+- Any 🔴 BLOCK that is a **code defect** (the task was right, the implementation is wrong) -> route
+  back to implementer with the finding as feedback. Re-run batch review after fix.
+- Any 🔴 BLOCK that reveals the **plan itself was wrong** (a spec/plan decision proved incorrect once
+  written - e.g. a task asserts a behavior the codebase contradicts) -> enter **Gate Re-plan** (Phase
+  4) with `Phase: review`, not a bare implementer fix. This is the review-time re-plan path: the
+  wrong decision is recorded as a revision and the affected tasks are regenerated, rather than
+  hand-patched with only a retro sentence.
 - Any 🟠 WARN -> ask user: address now or log to `05-retro.md` as follow-up?
 - 🟡 SUGGEST and 🟢 PASS -> log to retro, proceed.
 
@@ -176,15 +266,26 @@ Treat findings:
 
 ## Phase 6 - Close-out
 
-1. Append to `.specs/FEAT-<arg>/05-retro.md`:
+1. Review each `AC-<n>` checkbox in `00-spec.md` against evidence (a passing test, a measured
+   value, a reviewer verdict) and check it only with a `file:line` or test citation logged to
+   `.specs/FEAT-<arg>/05-retro.md`. Never tick a box just to make VF030 pass - an unearned
+   checkbox is a fabricated result, not a shortcut.
+2. Run `/sd:verify FEAT-<arg>`. It must report `result: pass`.
+   - On FAIL: address the findings (uncovered criterion -> back to Phase 3 to add tasks;
+     failing tests -> back to Phase 4; unchecked `AC-<n>` criterion with real evidence already
+     in hand -> gather the citation and check the box per step 1; unchecked criterion with no
+     evidence yet -> route back to the phase that produces it, e.g. Phase 4 for an untested
+     behavior). Re-run until it passes. Do NOT proceed on fail - the spec-gate hook will block
+     step 5 without a passing `06-verify.md`.
+3. Append to `.specs/FEAT-<arg>/05-retro.md`:
    - Tasks completed (count + IDs).
    - Surprises encountered.
    - Deferred follow-ups (with reserved spec IDs, if any).
    - Constitution exceptions taken (should be none).
    - Cost rough estimate if available.
-2. Set frontmatter status=`done` in `00-spec.md`.
-3. Update `.specs/index.md`: state -> `done`, completion date.
-4. Print a 5-line summary to the user.
+4. Set frontmatter status=`done` in `00-spec.md`.
+5. Update `.specs/index.md`: state -> `done`, completion date.
+6. Print a 5-line summary to the user.
 
 ---
 
@@ -192,6 +293,22 @@ Treat findings:
 
 - Phase 0 always runs. No exceptions, even on resume.
 - Gates 1-3 are HARD. The workflow refuses to proceed without explicit approval.
+- **Gate Complexity is a face of Gate 2, not a fourth gate.** It fires ONLY when the plan is over
+  threshold; a spec under threshold sees the normal plan approval with zero added friction. This is
+  why the workflow still has 3 hard gates - do not describe it as 4.
+- **Gate Re-plan is a conditional gate, not a fourth always-on gate.** Like Gate Complexity, it
+  fires ONLY on a specific trigger - a plan-invalidating discovery in Phase 4 or a plan-is-wrong
+  BLOCK in Phase 5. A run that never hits one never sees it. It is HARD when it does fire (explicit
+  approval, no override), and it never re-plans a `done` spec. The protocol lives in the
+  `sd-replan-loop` skill; `02-tasks.md` is re-planned only through it - never by a silent hand-edit.
+  Any revision is recorded append-only in `01-plan.md`'s `## Revisions` log with the original plan
+  prose left intact.
+- **Model escalation is aliases only.** A create-time `complexity: L` bumps the explorer to
+  `sonnet` (Phase 2) and the architect to `opus` (Phase 3). Never introduce a full model ID; never
+  edit an agent's `model:` frontmatter - the override is per-invocation, from the main thread.
+- **A decomposed parent is an immutable umbrella.** Once split, the parent's spec/plan/tasks are a
+  historical record and are never edited to match the children. Children are normal feature specs,
+  linked via `/sd:spec link spawns` / `depends-on` - no bespoke decomposition mechanism.
 - Implementer touches only files declared in the task's `Files` list. Any scope creep -> stop, surface to main thread, log to retro.
 - Reviewer is invoked ONCE in Phase 5b for the entire changeset (not per-task). This is a deliberate cost optimization.
 - BLOCK findings from the batch review must be addressed before close-out.

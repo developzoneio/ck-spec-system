@@ -35,6 +35,11 @@ fi
 
 # --- load config (defaults if missing) ---------------------------------------
 
+# An empty object is a safe fallback HERE only because every value this hook
+# reads has a `//` default below (and match_keywords has $default_list), and
+# those defaults are the same values as $defaults in prompt-router.ps1. Any new
+# read must keep that property or the fallback has to become a full default
+# document, as it is in spec-gate.sh.
 config_path="${cwd}/.claude/project-config.json"
 config_json="{}"
 if [[ -f "${config_path}" ]]; then
@@ -43,8 +48,9 @@ if [[ -f "${config_path}" ]]; then
     fi
 fi
 
-# Hook enabled?
-enabled="$(printf '%s' "${config_json}" | jq -r '.hooks.userPromptRouter.enabled // true' 2>/dev/null)"
+# Hook enabled? The jq alternative operator treats an explicit `false` as
+# absent, so compare directly against `false` instead of relying on it here.
+enabled="$(printf '%s' "${config_json}" | jq -r 'if .hooks.userPromptRouter.enabled == false then "false" else "true" end' 2>/dev/null)"
 if [[ "${enabled}" == "false" ]]; then
     exit 0
 fi

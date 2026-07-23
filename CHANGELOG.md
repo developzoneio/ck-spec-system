@@ -9,6 +9,490 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Three CI-only failures surfaced by PR #23, none reachable from a real install. (1)
+  `scripts/validate.sh` Check 7 used `declare -A` and `mapfile` (both bash 4+), which crash on
+  macOS's stock `/bin/bash` 3.2 (`declare: -A: invalid option`, then `mapfile: command not found`
+  once the first was fixed) - rewritten as plain indexed arrays with linear-scan
+  `q_get`/`q_set`/`fp_get`/`fp_append` lookup helpers and a `while read` loop in place of
+  `mapfile`, no behavior change. (2) The
+  "Lesson validator (PowerShell)" CI step asserts the leaky fixture correctly FAILS validation,
+  but GitHub Actions appends an implicit `exit $LASTEXITCODE` to every pwsh step, so the
+  intentional non-zero exit code from the leaky-fixture check failed the step even though the
+  assertion itself passed - fixed with an explicit `exit 0` after the assertion. (3)
+  `tests/hooks/run-conformance.ps1`'s `-SelfTest` stub bash script exits immediately without
+  reading stdin, and writing the JSON payload to its now-closed pipe raised an unhandled
+  `IOException: Broken pipe` on Linux runners - `Invoke-HookProcess` now wraps the
+  `StandardInput.Write`/`Close` pair in a try/catch, since a child that never reads its input is
+  not a harness failure.
+
+### Added
+- `/sd:status` - a read-only reader for the metrics log (SW-16). SW-10 has been accumulating
+  `.specs/_metrics/events.jsonl` with no consumer; the data existed and was invisible. The new
+  13th slash command summarises the **live** log plus `.specs/index.md`: specs in progress, gate
+  activity broken out by kind (`verify` / `protected` / `code-edit`) and decision
+  (`allow` / `warn` / `block`), lifecycle transitions, and a **friction** section ranking where the
+  operator is actually stuck - which specs are blocked most, which code-edit warns are being
+  ignored, which specs accumulate stale retros, and which in-progress specs are absent from the log
+  entirely. Read-only: no spec is created, no gate is evaluated, nothing is written.
+  Three decisions are worth recording because they diverge from a naive reading of the ticket.
+  (1) **`jq` is an oracle, not a runtime dependency.** The acceptance criterion "counts reconcile
+  against `jq`" reads like a dependency; it is not. The schema is flat, metadata-only and written in
+  fixed key order, so exact substring counting is deterministic - and `jq` *aborts* on a
+  partially-written line, which would lose the whole report to one interrupted append, exactly what
+  the ticket forbids. `jq` verifies the numbers; it does not produce them.
+  (2) **Counting is delegated to the shell, never to eyeballing.** A capped log is ~8000 lines;
+  the command prescribes the exact count commands rather than asking for a summary, because a
+  number that was estimated cannot reconcile with an independent count.
+  (3) **The live file only** - `events.jsonl.1` is noted in one header line and never read, per the
+  read contract set in SW-15.
+  Every degrade path is a *labelled* state (`ST001`-`ST005`): no config, metrics disabled, log
+  absent, log empty. A blank report would read as "no friction", so an empty table is treated as a
+  defect rather than an edge case. Malformed lines are skipped **and counted**, and the skipped
+  count is always shown - a silent skip and a clean file are not the same fact.
+  Verification corpus at `tests/metrics/` (populated / malformed / empty fixtures, expected numbers,
+  and the `jq` oracle procedure), pinned to LF in `.gitattributes`. It is documented as a **manual**
+  corpus: `commands/status.md` is a prompt file and CI cannot execute it, so it is deliberately not
+  wired into `scripts/validate.*`.
+
+- Size cap and single-generation rotation for the metrics log (SW-15). A new `hooks.metrics.maxSizeKb`
+  (default `1024` KB, ~1 MB) bounds `.specs/_metrics/events.jsonl`: before each append, if the live
+  file already meets or exceeds `maxSizeKb * 1024` bytes, the hook rolls it to `events.jsonl.1`
+  (single generation - any previous `.1` is overwritten) and starts fresh. Implemented in all four
+  metrics writers (`spec-gate` and `subagent-retro`, PowerShell and bash) so the two platforms roll
+  at the same raw-byte boundary (`(Get-Item).Length` / `wc -c`). Inherits every SW-10 invariant:
+  rotation is best-effort and **never stops the append** (a silent stop would read as "metrics
+  working" while dropping data - worse than unbounded growth, per the ticket), a failed roll (locked
+  file on Windows, read-only dir) is a silent no-op, and it never alters a gate decision or the
+  hook's exit code. An **absent** `maxSizeKb` is treated as `1024`, so a `project-config.json`
+  written before this feature stays bounded with no edit; an explicit `0`/negative disables rotation,
+  and any non-number is invalid and also disables it (SW-22 type-strictness). `events.jsonl.1` is a
+  grace buffer, **not** part of any read contract - there is no consumer of the log today, and when
+  one exists it reads only the live file. Added to `templates/project-config.template.json` and both
+  hooks' embedded default configs; documented in `docs/architecture.md` and `docs/troubleshooting.md`.
+  New conformance fixtures at `tests/hooks/fixtures/{spec-gate,subagent-retro}/metrics-rotates-at-cap`
+  and `.../metrics-rotation-failure-noop` prove PS and bash rotate identically.
+- Sanctioned mid-execution re-plan loop (SW-14). A new `sd-replan-loop` skill defines a **HARD Gate
+  Re-plan** for the two workflows that produce a `01-plan.md` + `02-tasks.md` pair - `/sd:feature`
+  and `/sd:refactor` - so a plan-invalidating discovery adapts the plan without violating
+  immutability or skipping a gate. The gate is reachable from **both** the Execute phase and the
+  batch/holistic **review** (the one real corpus failure surfaced at review, not mid-task). On
+  approval it appends an `R<n>` entry to an append-only `## Revisions` log at the end of `01-plan.md`
+  (original plan prose left intact), regenerates **only** the affected task blocks in `02-tasks.md`
+  via `sd-spec-architect` (`TASK = plan` with `REPLAN_SCOPE`, no new architect mode), and marks each
+  regenerated task `Revised-by: R<n>` (a conditional field in `sd-atomic-task-format`, like refactor's
+  `Parallel batch`). Like Gate Complexity, it is a **conditional** gate that fires only on its trigger,
+  so `/sd:feature` still advertises 3 hard gates and `/sd:refactor` still 6. It never re-plans a
+  `done` spec. Scope was corrected from the ticket on evidence: `/sd:bug` and `/sd:rca` produce no
+  task list to re-plan, and `/sd:perf` already carries its own revert-and-reselect loop, so all three
+  are left untouched. See `docs/adr/0003-adaptive-replan-loop.md`.
+- `SL070`-`SL073` in `/sd:spec validate`: a new **revision-log integrity** band cross-checking the
+  `## Revisions` log in `01-plan.md` against the `Revised-by` markers in `02-tasks.md`. `SL070`
+  (dangling marker), `SL071` (one-sided/unreferenced revision), and `SL072` (broken append-only
+  history) are 🔴 BLOCK; `SL073` (malformed entry) is 🟠 WARN. The checks run only when a `## Revisions`
+  section or a `Revised-by` marker exists, so a never-re-planned spec produces no finding. `SL074`-
+  `SL079` reserved. Honest boundary recorded in the ADR: `validate` is a static linter with no
+  Plan-phase snapshot, so it enforces the revision record's internal consistency but cannot detect an
+  unmarked silent edit by diffing - that is prevented by the gate, not the lint.
+- Conformance fixtures at `tests/revision-log/fixtures/` (SW-14): a valid revision record that passes
+  and a dangling-marker record that must BLOCK, pinned to LF via `.gitattributes`. They state the
+  contract; like the other fixture trees they have no runner (documented, not silently skipped).
+- Complexity triage + forced decomposition in `/sd:feature` (SW-13). The architect writes a
+  spec-level `complexity` frontmatter field (`S` | `M` | `L`, distinct from a task's
+  `Estimated complexity`) with a one-line rationale at create time. Gate 2 then measures the actual
+  plan against decompose thresholds - **> 8 tasks, > 2 production layers (Tests/Config excluded),
+  > 8 impacted files, or an unresolved Open question** (the `> 8` line set from the corpus canyon
+  between 3-4-task and 10-12-task specs; the Tests/Config exclusion keeps ordinary 2-layer mediums
+  under threshold).
+  Over threshold, Gate 2 becomes a HARD **Gate Complexity** that refuses one oversized plan and
+  forces a split into medium child specs (`FEAT-<parent-arg>-<child-slug>`, linked via existing
+  `/sd:spec link spawns` / `depends-on`; the parent becomes an immutable `archived` umbrella). Under
+  threshold it stays the normal plan approval with **zero added friction** - still 3 hard gates, not
+  4. A create-time `complexity: L` also escalates models a tier (explorer -> `sonnet`, architect ->
+  `opus`, aliases only, per-invocation), deepening the impact map and plan for genuinely large work.
+  Task counts use the tolerant `sd-atomic-task-format` heading grammar, not a naive `### T<NN>`
+  regex. See `docs/adr/0002-complexity-triage-decomposition.md`. Linting of the field + split
+  integrity is deferred to SW-4 (`/sd:spec validate`).
+- Field label grammar in `sd-atomic-task-format` (SW-11). Task-block labels are now matched
+  case-insensitively, with `**` optional and the colon permitted inside or outside the emphasis -
+  all three forms found in live specs (`- **Files**:`, `- Files:`, `- **Files:**`) parse
+  identically. A field's value runs to the next field label, not the next newline, so multi-line
+  `Acceptance` and `Pattern refs` values are no longer truncated. The grammar is defined once and
+  applies to every field and every reader; per-field matchers are forbidden.
+- `SL060` (WARN) in `/sd:spec validate`: a task block in `02-tasks.md` with no `Pattern refs`
+  field. `SL061`-`SL069` reserved for further task-block content rules. This is the first rule
+  that reads *inside* a spec artifact rather than around it - see
+  `docs/adr/0001-validate-parses-task-content.md`.
+- `docs/adr/` for specwright's own engine-level decision records, numbered the same way `/sd:adr`
+  numbers them (`^[0-9]{4}-<slug>.md`). Deliberately **not** `.specs/_adr/`: `.specs/` is Layer 2
+  (target-project context), and this repo has none.
+- Conformance fixtures at `tests/task-format/fixtures/` covering the three label forms plus a
+  negative case, pinned to LF via `.gitattributes`. They state the contract; they have no runner
+  (documented, not silently skipped).
+
+- Lesson surfacing, part 3 and the close of the learning loop (SW-19, under epic SW-7):
+  `subagent-retro.{ps1,sh}` now emit a `<retro-lessons>` block when a subagent finishes work on an
+  in-progress spec, gated by `hooks.subagentRetro.injectLessons` (default `true`) and
+  `maxLessons` (default `3`). **Placement is load-bearing:** the emit sits beside the existing
+  metrics call site, *before* the staleness early-exit and *before* the debounce window - moved
+  down to the reminder block it would have surfaced lessons only to users already behind on their
+  retros, the population that needs them least. The one gate it keeps is the in-progress-spec
+  check, and that gate *is* the relevance filter: the workflow type of the in-progress spec selects
+  the scope (`FEAT-` pulls `feature`, `REF-` pulls `refactor`, and `all`-scoped lessons always
+  apply), so there is no ranking, no scoring, and no tie-break that could diverge between
+  implementations. This replaces the `prompt-router` placement and the
+  `hooks.promptRouter.injectLessons` key named in the SW-7 epic; the epic records why.
+  Repetition is bounded per **session** rather than by a clock - a new `shownLessons` key in the
+  hook state file records what has already been surfaced, so `maxLessons` caps how many *new*
+  lessons appear at one stop and a session converges to silence once it has said everything
+  relevant. A time debounce was rejected because it would suppress a lesson the user has never
+  seen purely because a different one was shown recently. Four cross-implementation conformance
+  fixtures cover surfacing, scope filtering, already-shown state and the disabled flag, and the
+  conformance decision object now captures emitted lessons in emission order (sorting them would
+  hide exactly the selection-order divergence the fixtures exist to catch).
+- Lesson aggregator, part 2 of the closed learning loop (SW-18, under epic SW-7):
+  `scripts/aggregate-lessons.{ps1,sh}` collect tagged lesson lines from every
+  `<spec-dir>/*/05-retro.md`, dedupe them, and render `<spec-dir>/_lessons/lessons.md`.
+  `--check` / `-Check` writes nothing and exits non-zero on drift, which is how idempotence is
+  asserted in CI. Two decisions differ from the SW-18 description and are recorded here: (1) the
+  **retros** are append-only and `lessons.md` is a derived file regenerated on every run - the
+  ticket called `lessons.md` itself append-only, but dedupe-with-a-count requires rewriting the
+  line, so append-only and idempotent are mutually exclusive; (2) abstraction stays in the
+  `sd-retro-lessons` skill, so the aggregator makes no judgement calls and its output is
+  reproducible. Deduplication is on (tag, scope, case- and whitespace-normalised rule);
+  a repeat adds a count and **never** raises severity, and the surviving wording is resolved
+  independently of severity (byte-smallest) so a sloppier phrasing cannot win just by carrying a
+  lower one. All ordering is byte-wise - `LC_ALL=C` in bash, `[string]::CompareOrdinal` plus an
+  ordinal dictionary comparer in PowerShell, whose culture-aware defaults would otherwise
+  diverge - and PowerShell writes UTF-8 without BOM and LF endings rather than going through
+  `Set-Content`. A committed corpus fixture and expected output pin both implementations to the
+  same bytes in CI; the corpus deliberately includes retros containing only `/sd:spec status`
+  transition lines (which must contribute zero lessons) and an out-of-enum tag (which must be
+  skipped). No hook is modified; surfacing (SW-19) follows.
+- Structured retro lessons, part 1 of the closed learning loop (SW-17, under epic SW-7): new
+  `sd-retro-lessons` skill defining a 10-tag enum, the one-line lesson record
+  (`- [tag] severity/scope: Rule sentence.`), and the abstraction discipline that turns a
+  retro note into a rule portable to another codebase. The tag enum is **derived from a mined
+  corpus of real retros**, not authored up front - two of the three tags originally proposed
+  in SW-7 were confirmed by that data and one (`pattern-violation`) was retired as overlapping
+  `sibling-repo-assumption` and `precedent-conflict`. New standalone validators
+  `scripts/validate-lessons.ps1` / `.sh` enforce grammar, the closed tag/severity/scope sets, a
+  120-character ceiling, and the privacy contract (no paths, extensions, backticks, line
+  citations, or Pascal/camel/snake_case identifiers), so `.specs/_lessons/lessons.md` is
+  shareable outside the org as-is. They are **separate from `scripts/validate.*` on purpose**:
+  that validator checks this repo's own invariants, and specwright has no `.specs/` tree - these
+  take a file argument and default to `.specs/_lessons/lessons.md` in the current directory, so
+  a consumer repo can run them directly. Paired fixtures under `tests/lessons/fixtures/` assert
+  both directions in CI (clean must pass, leaky must fail) - a validator that rots into a no-op
+  would otherwise report green forever. No hook is modified by this change; aggregation (SW-18)
+  and surfacing (SW-19) follow.
+- Local, privacy-safe spec metrics (SW-10): `spec-gate` and `subagent-retro` now append one JSON
+  line per gate decision, `index.md` lifecycle transition, and subagent-stop check to
+  `.specs/_metrics/events.jsonl` - metadata only (timestamp, spec ID, lifecycle phase, decision,
+  file extension), never a file path or code content. Controlled by `hooks.metrics.enabled` in
+  `.claude/project-config.json`, which **defaults to `true`** - an existing install starts writing
+  `.specs/_metrics/events.jsonl` on the next hook run after upgrading, with no action required. Set
+  `hooks.metrics.enabled` to `false` to opt out entirely. No log rotation in v1 (documented as a
+  known limitation; ~120 bytes/line). Foundation for the closed retro-learning loop (SW-7).
+- `/sd:verify <spec-ID>` traceability gate: SC-/AC-IDs in the feature template, a `Covers`
+  task field, a `06-verify.md` pass artifact, and spec-gate hook enforcement (Rule 0 in
+  `spec-gate.{ps1,sh}`, flag `hooks.specGate.verifyGate`) that blocks a feature (FEAT-)
+  `index.md` row transitioning to `done` without a passing artifact. The gate is deliberately
+  scoped to feature specs - bug/refactor/perf/rca workflows produce no `02-tasks.md`, so
+  non-FEAT rows fall through to the unconditional protected-path block exactly as before,
+  pending a follow-up spec that integrates verify into those workflows. `/sd:spec status`
+  pre-checks the artifact before mutating any file on a FEAT `in-progress -> done` transition
+  (prevents an `SL030` frontmatter/index strand), and `/sd:feature` Phase 6 requires an
+  evidence citation before ticking an `AC-<n>` checkbox. 11 new conformance fixtures pin the
+  gate, including the FEAT-only scoping (`block-index-done-bug-row-protected`) and the
+  documented bundled-edit limitation (`allow-index-done-with-verify-bundled-edit`). (SW-6)
+- Cross-implementation hook conformance suite (`tests/hooks/`): golden fixtures are piped into
+  both the bash and PowerShell implementation of every hook and the normalized decisions must
+  match; wired into CI on all matrix platforms with a self-test proving divergence detection (E4).
+- Six more seeded lint rules in `examples/spec-lint-fixture/broken/` (SW-4, seam 4), taking
+  coverage from 18 of 26 rules to 24: `SL004` (type/prefix mismatch), `SL005` + `SL043` (illegal
+  status, which cannot have a legal retro log and so always drags `SL043` with it), `SL021`
+  (`done` with a header-only retro), `SL041` (non-contiguous transition chain) and `SL044`
+  (`archived -> in-progress` with an empty reason, the one WARN in the transition family). The
+  two remaining rules, `SL001` and `SL013`, need the fixture or the engine install itself to be
+  broken, so they need a corrupting harness rather than another seeded spec.
+- Boundary documentation on the four seeds whose neighbouring rules overlap (SW-4, seam 4). The
+  transition rules `SL040`-`SL044` are close enough that a linter can collapse several into one
+  and still look correct, so each seed is built to make exactly one fire and names in-file which
+  others must stay silent - e.g. `PERF-BROKEN-012` separates `SL021` (retro exists but is empty)
+  from `SL043` (no retro at all), and `REF-BROKEN-013` isolates `SL041` behind two legal edges,
+  a matching last entry and a present retro.
+- Severity-tagged output for `/sd:spec validate` (SW-4, seam 3), with a stable rule table
+  (`SL001`-`SL054`). BLOCK is reserved for a registry that lies about itself or evidence that was
+  fabricated; WARN for a real but recoverable problem that leaves the registry truthful. The
+  command reads `sd-severity-taxonomy` and `sd-evidence-citation` from disk at runtime, because
+  only agents load skills via frontmatter and `validate` invokes no subagent.
+- Anchor table in `sd-severity-taxonomy` (SW-4, seam 3): BLOCK/WARN still requires an anchor, but
+  the legal anchor now depends on the target - a constitution `§N.M` or acceptance criterion for
+  code, a lint rule ID for the `.specs/` tree. The code row stays strict.
+- `examples/spec-lint-fixture/` (SW-4, seam 3): a clean `.specs/` tree that must report all-PASS
+  and a seeded-broken one covering 18 of the 26 lint rules, each violation self-documented with a
+  `SEEDED` comment. The two perf specs are a matched pair guarding the seam-1 regression: the
+  correct one (unfilled baseline at `approved`) must PASS and the fabricated one must BLOCK.
+  Run by hand - the linter is a prompt, so CI cannot execute it; see the fixture README.
+- `linked_specs` frontmatter field on all five spec templates (SW-4, seam 2), replacing the
+  "Linked specs" body section that only `feature.template.md` ever had - `/sd:spec link` accepted
+  any spec ID but had nowhere to write on the other four types. Cross-references are now a
+  structured YAML list maintained by `link` on both sides.
+- Four structural checks in `/sd:spec validate` (SW-4, seam 2): index <-> folder symmetry (orphan
+  folders, ghost rows, duplicate rows), transition replay against the state machine from the
+  `05-retro.md` append-only log (catches a hand-edited status that bypassed `/sd:spec status`),
+  link resolution (no dangling links), and link symmetry (no one-sided links).
+- `<<PHASE-N: ...>>` token in the spec templates (SW-4, seam 1 of the `/sd:spec validate` linter):
+  a distinguishable marker for cross-phase fields, replacing 20 phase-deferred fields that were
+  previously indistinguishable from author-fill `<<placeholder>>`s. This makes the engine's
+  cross-phase discipline machine-checkable in both directions - `validate` can now assert that an
+  author-fill token is *gone* by `approved` and that a phase-deferred token is *still there*, so
+  pre-filling a field from memory is caught rather than merely discouraged.
+- `specwright.manifest.json` (SW-3): canonical inventory contract declaring where assets live
+  (`areas`) and where the docs publish numbers about them (`docClaims`). Stores no counts - they
+  are derived from disk at runtime, so adding a command/agent/skill/template means adding the file
+  and nothing else.
+- Check 7 (docs consistency) in `scripts/validate.{ps1,sh}`: fails the build when a published
+  number disagrees with disk. Also fails on a *vacuous* claim (a pattern that matches nothing, i.e.
+  a reworded doc that silently disabled its own check) and on an *undeclared* claim (a number no
+  `docClaims` entry covers). Closes the gap that let SW-1's drift reach `main` with CI green.
+- `scripts/selftest-docs.{ps1,sh}`: negative self-test proving Check 7 still bites, by corrupting a
+  throwaway repo copy across four scenarios. Runs in CI on Ubuntu, macOS and Windows.
+
+### Changed
+- `Pattern refs` is required on **every** atomic task (SW-11), not only on tasks that create a new
+  file or public symbol. A task with no precedent writes `Pattern refs: none` explicitly - `none`
+  asserts the architect looked, an absent field asserts nothing. Legacy blocks with the field
+  missing are still read as `none`, so existing `.specs/` folders keep working; the omission is a
+  WARN, never a block. Task-block field count is now 11 across all docs (README,
+  `docs/architecture.md`, `commands/feature.md`, `commands/refactor.md`,
+  `agents/spec-architect.md`, `agents/implementer.md`), correcting a pre-existing drift where six
+  of those sites still said 9 after SW-6 bumped the skill to 10.
+- SW-11 explicitly did **not** add the `Context refs` field its ticket asked for. `Pattern refs`
+  already covers the need with 22-of-22 adoption in the live corpus; renaming would touch 37 sites
+  across 10 files for no measurable gain. Recorded in the ADR and on the ticket.
+
+### Fixed
+- Four `subagent-retro` conformance fixtures (`lessons-already-shown`, `lessons-disabled`,
+  `lessons-scope-filter`, `lessons-surfaced`) were non-deterministic: each expects a **fresh** retro
+  (`emitted: false`, `stale: []`, `subagent_stop` with `stale: 0`) but shipped no `setup.json`, so the
+  harness copied `05-retro.md` with its on-disk mtime and the case failed on any checkout older than
+  `retroStaleMinutes` (default 30 min) - the hook then read the retro as stale, flipped to
+  `emitted: true`, and the drifted lesson selection no longer matched the golden (SW-23). Each now
+  ships a `setup.json` that `touch`es its retro to `ageMinutes: 5`, mirroring how `remind-stale-retro`
+  (120) and `metrics-emits-when-debounced` pin their fixtures; the four cases were introduced with the
+  lesson-injection loop (SW-19) and the omission stayed latent because the suite is usually run while
+  the retro is still fresh. Verified by backdating the retros two days on disk and confirming
+  65 passed / 0 failed (bash output byte-identical to pwsh, so this was always a fixture defect, never
+  a hook divergence). Test-only; no product-code or user-facing impact.
+- Four PowerShell hook config reads used PowerShell truthiness where the bash twin asks a
+  type-strict question, so the two implementations disagreed on the same `project-config.json`
+  (SW-22). Two failure modes, both invisible to a scaffolded project (the template ships
+  `enabled: true` and non-zero numbers) but reachable by the hand-trimmed config a user writes to
+  change one setting. (1) **Absent `enabled` disabled the hook in PowerShell only.** A `subagentRetro`
+  / `specGate` block that omitted `enabled` left the property `$null`, and `-not $null` is `$true`,
+  so `subagent-retro.ps1` and `spec-gate.ps1` exited silently; `prompt-router.ps1` had the same class
+  via `[bool]$null` (which is `$false`). All three bash twins use `== false`, so only a literal
+  `false` disables. The reads are now type-strict (`-is [bool]` / return `$false` only for a real
+  boolean `false`), mirroring the `verifyGate` and `metrics.enabled` reads already fixed this way.
+  (2) **An explicit `0` was treated as absent.** `subagent-retro.ps1`'s `retroStaleMinutes` and
+  `debounceMinutes` reads used `if ($config...)`, and PowerShell treats `0` as falsy, so an explicit
+  `0` was ignored and the default kept, while the bash `// 30` / `// 10` accept `0`; both now use
+  `$null -ne`, matching the `maxLessons` read SW-19 fixed for the same reason. Bash was already
+  correct, so no `.sh` changed - the fix converges the pair. Five conformance fixtures added
+  (`subagent-retro/{enabled-absent-still-on,stale-minutes-zero-honored,debounce-minutes-zero-honored}`,
+  `spec-gate/enabled-absent-warns`, `prompt-router/enabled-absent-emits`); every one fails if its
+  read is reverted - the previous fixture set could not, because all of them set `enabled` explicitly
+  and used non-zero numbers.
+- `docs/architecture.md` described the metrics `stale` field as a "count of stale/missing retros
+  observed for that spec". It is a per-event flag, `0` or `1` - `subagent-retro` emits one event per
+  in-progress spec per subagent stop and sets `1` when that spec's retro is stale or missing
+  (`hooks/bash/subagent-retro.sh` `emit_subagent_stop_metric`). Retro pressure is measured by
+  counting `1`s over time, never by reading a single value as a quantity. Found while building the
+  first reader of the log (SW-16); the field had no consumer until now, so nothing had contradicted
+  the prose.
+- Check 7 could not see three whole classes of inventory claim, and each class had let a real,
+  wrong number sit in a tracked doc through many green runs (SW-24). The `claimPhrases` vocabulary
+  in `specwright.manifest.json` now closes all three:
+  (1) **Spelled-out numbers.** Every pattern was anchored on `[0-9]+`, so `README.md`'s intro line
+  saying "seven reusable skills" was invisible from the moment an eighth skill shipped in SW-17.
+  (2) **Capitalisation.** Adding a lowercase word alternation is *not* enough - a spelled-out count
+  in prose is usually sentence-initial, which is exactly where it is capitalised. `Three hooks ship
+  in cross-platform pairs` in `docs/architecture.md` escaped a lowercase-only fix. POSIX ERE (bash
+  `[[ =~ ]]`) has no inline case flag, so each word carries an explicit `[Tt]`-style class rather
+  than a flag only one of the two engines supports.
+  (3) **Bare nouns.** Only decorated forms were listed (`slash commands`, `workflow commands`), so
+  `Five commands invoke no subagent` matched nothing at all - a line added by SW-16 itself, one
+  commit before this one. Bare `commands` and `agents` are now in the vocabulary.
+  Measured across the whole tracked tree: 4 real claims surfaced, 0 false positives.
+  The four offending lines are resolved under a policy now recorded in the manifest
+  (`$claimPolicyComment`): **if a number is derivable from an area, write it in digits and declare
+  it; if it is not derivable, publish no number and let the names carry the meaning.** So
+  `README.md`'s intro became digits with five new `docClaims` entries, `Three hooks ship ...`
+  became `3 hooks ship ...` with a `docClaims` entry against `hooksPowerShell`, and the two counts
+  that no area derives (`Five commands invoke no subagent ...`, `the two hooks that record`) had
+  the number removed - both already listed every item by name.
+  `selftest-docs.{sh,ps1}` grow from 4 scenarios to 6, one per new escape, and they are kept
+  separate on purpose: a fix that only adds a lowercase alternation passes scenario 4 and fails 5,
+  and a fix that only handles decorated nouns passes 5 and fails 6. Both were verified by
+  sabotage - reverting the vocabulary to digit-only makes scenario 5 report `THE CHECK DID NOT
+  BITE` while 6 stays green, and removing the bare-noun entries produces the mirror image.
+  Check 7 now validates 52 published claims, up from 46.
+- `subagent-retro.ps1` terminated its emitted block with `[Console]::Out.WriteLine`, which appends
+  `[Environment]::NewLine` - CRLF on Windows - so its output differed from `subagent-retro.sh` by
+  exactly one byte on the final line. Both the `<retro-reminder>` and the new `<retro-lessons>`
+  block now `Write` an explicitly LF-terminated string. Pre-existing; surfaced by SW-19's
+  byte-comparison requirement.
+- `selftest-docs.{sh,ps1}` scenarios 2 and 3 had silently stopped testing anything (SW-20). Both
+  planted their corruption by string-replacing the literal `**11 slash commands**`; the repo now
+  ships 12, so the pattern matched nothing, the sandbox copy was never corrupted, the validator
+  correctly passed, and the scenario reported `THE CHECK DID NOT BITE`. Scenario 2's setup guard
+  could not catch this because it only checked that the *planted* text was present - and the
+  planted value (12) had since become the **true** value already in `README.md`, so the guard
+  found the real line and passed vacuously. Scenario 3 had no guard at all. Both counts are now
+  derived from disk (plant `true + 1`, which can never collide), and both scenarios assert the
+  *transition* rather than the destination, reporting a `fixture setup` failure when the pattern
+  does not match. Check 7 itself was never broken - only the proof that it still bites, which had
+  been absent since the 12th command landed on an unpushed branch CI never ran. A hardcoded count
+  in the selftest was the last instance in the repo of the exact anti-pattern
+  `specwright.manifest.json` exists to abolish.
+- `subagent-retro`'s debounce state file, an on-disk contract shared between the two
+  implementations, was not written in the same shape by both (SW-5): `subagent-retro.ps1` wrote
+  the round-trip `o` format with 7 fractional digits while `subagent-retro.sh` wrote whole
+  seconds, so only the bash reader ever had to cope with fractions. PowerShell now writes the same
+  whole-second `yyyy-MM-ddTHH:mm:ssZ` stamp. The bash reader's two date fallbacks were also both
+  wrong on BSD/macOS: neither passed `-u`, so a UTC stamp was read as local time and skewed the
+  debounce window by the machine's offset, and the BSD branch handed `date -f` a string with a
+  trailing `Z` it would warn about on stderr - breaking the hook's silence. Both branches now
+  force UTC and the value is trimmed before parsing. The debounce branch had no fixture coverage
+  at all until now; `setup.json` grew a `write` action that plants a file whose content carries a
+  `{{UTCNOW-45M}}`-style token resolved at run time, so a state-file fixture cannot rot.
+- `spec-gate` path matching disagreed on case (SW-5). `spec-gate.ps1` compared with
+  `OrdinalIgnoreCase` throughout; `spec-gate.sh` used case-sensitive `==` and `case` globs, so a
+  protected entry of `.specs/Constitution.md` blocked an edit to `.specs/CONSTITUTION.md` under
+  PowerShell and allowed it under bash. bash now lowercases both sides for the protected list, the
+  allow-listed directory prefixes and the cwd-prefix strip. Case-insensitive is the right
+  semantics for a gate, not merely the parity-preserving one: Windows and macOS filesystems are
+  case-insensitive by default, so a case-sensitive rule is bypassable there by retyping the path.
+- The `spec-gate` basename allow-list let source files through under a documentation name (SW-5).
+  Both implementations allow-listed anything called `README*`, so `README.py` bypassed the gate
+  outright, and the two disagreed on multi-dot names - bash's `README.*` glob allowed
+  `README.old.py` while the PowerShell regex's single optional extension did not match it at all.
+  Only EXTENSION-LESS `README`/`CHANGELOG`/`CONTRIBUTING`/`LICENSE`/`NOTICE`/`AUTHORS` are now
+  allow-listed by name; everything with an extension is decided by the extension rules, so
+  `README.md` is still a doc and `README.old.py` is now correctly gated as Python.
+- `spec-gate.sh` applied NO protected paths when `.claude/project-config.json` was absent or
+  unparseable (SW-5), while `spec-gate.ps1` applied its built-in defaults - so on a project that
+  had not run `/sd:setup` yet, the most common state there is, editing `.specs/constitution.md`
+  was blocked under PowerShell and silently allowed under bash. The bash fallback is now the same
+  full default document (`.specs/constitution.md`, `.specs/index.md`, `LICENSE` protected;
+  `mode: warn`) instead of `{}`. `Get-ProjectConfig` in all three PowerShell hooks now reads the
+  config with `-ErrorAction Stop`, since the script-wide `SilentlyContinue` preference could
+  otherwise turn a malformed config into a non-terminating error that skips the `catch` and
+  returns `$null` rather than the defaults. `prompt-router` and `subagent-retro` were checked for
+  the same asymmetry and have none - every value they read has a matching `//` default - which is
+  now stated in both scripts so a future read does not quietly reintroduce it.
+- Conformance decision objects were too coarse to prove much (SW-5). `spec-gate` decisions kept
+  only `decision`/`permissionDecision` and threw away the human-readable `reason`, which the two
+  implementations hand-duplicate - the reason strings could have drifted completely and all 20
+  cases would still have passed. The decision now carries `reason`, and reports
+  `REASON-MISMATCH-BETWEEN-SCHEMA-HALVES` if the legacy and `hookSpecificOutput` copies of it ever
+  disagree. `subagent-retro` decisions likewise dropped the measured age and the threshold it was
+  compared against, so the two implementations could have disagreed on the arithmetic unnoticed;
+  both are now asserted, and `subagent-retro.sh` rounds the age to the nearest minute instead of
+  truncating it, matching `subagent-retro.ps1`'s `[Math]::Round`. Every decision object now also
+  carries `stderr`, so the repo's "every failure path exits 0 SILENTLY" invariant is actually
+  checked rather than assumed - a hook that regressed into printing a diagnostic on every
+  invocation used to pass.
+- Two bash hook bugs surfaced by the cross-implementation conformance suite (SW-5). `prompt-router`,
+  `spec-gate` and `subagent-retro` all read `enabled` with jq's `//` operator, which treats an
+  explicit JSON `false` as absent - a project that set `enabled: false` in `project-config.json`
+  got a hook that ran anyway; the three scripts now use an `if`/`then`/`else` jq expression that
+  compares directly against `false`. Separately, `spec-gate`'s protected-path loop never blocked a
+  protected path on Windows because Windows `jq.exe` emits CRLF for `join("\n")` output, leaving a
+  trailing `\r` on each path that broke the exact-match comparison; the loop now strips a trailing
+  CR before comparing, mirroring the existing strip in `prompt-router.sh`'s keyword loop.
+- Three spec stubs in `examples/spec-lint-fixture/broken/` (SW-4, seam 4) raised an unlisted
+  `SL011` BLOCK: `BUG-BROKEN-001` and `BUG-BROKEN-008` carried none of the bug template's four
+  phase-3 tokens and `RCA-BROKEN-005` carried four of the rca template's seven, because each had
+  dropped the enclosing section wholesale. At `draft` a spec must carry at least its template's
+  per-phase token count, so all three failed a rule the fixture's expected-findings table does
+  not list - which would have read as a linter bug rather than a fixture one. Found by running
+  the linter against the tree rather than by inspection, which is the first time the SW-4
+  acceptance criterion was executed end-to-end rather than reasoned about.
+- Placeholder tokens spelled out inside `<!-- SEEDED: ... -->` comments in the fixture (SW-4,
+  seam 4). A token named in a comment is indistinguishable from a real one to any linter that
+  scans line-wise rather than parsing, so the comments explaining the placeholder rules were
+  themselves seeding phantom findings in a tree whose contract is "these findings and no others".
+  The comments now describe tokens in prose.
+- `/sd:spec link` inverse map (SW-4) was partial and ambiguous: it accepted 9 relations but
+  defined inverses for only 5, so `blocks`, `blocked-by`, `spawned-by` and `superseded-by` had no
+  defined other side. `depends-on` and `blocked-by` also asserted the same edge in two spellings.
+  `blocked-by` is now an input alias normalized to `depends-on`, and the map is total and closed -
+  every stored relation has exactly one inverse, which is what makes link symmetry checkable.
+- `/sd:spec validate` required-field rules (SW-4) had drifted from
+  `skills/sd-spec-templates/SKILL.md`, the skill that authors the specs: `validate` checked only
+  `id`/`type`/`status`/`created` (+`severity` for bug, +`incident_started` for rca), so it passed
+  malformed specs missing `target_metric` (perf), `smell` (refactor), `jira` (feature/bug) and
+  `incident_resolved` (rca). The rules are now per-type and match the skill.
+- `/sd:spec validate` placeholder rule (SW-4) contradicted the templates it validates: "status >=
+  `approved` -> no `<<placeholder>>` remaining" failed a *correct* perf spec, whose baseline field
+  must still be unfilled at `approved` by the cross-phase rule in `CLAUDE.md`. Author-fill and
+  phase-deferred tokens are now separate forms with separate rules.
+- Doc count/inventory drift (SW-1): `README.md` listed `/sd:setup` at no gates (`-` -> `2`, matching
+  the two approval gates in `commands/setup.md`) and omitted `sd-docs-writer` from
+  `sd-evidence-citation`'s "Used by" list (4 agents, not 3).
+- Stale `MSSQL` references in the docs, left over from the stack-agnostic database rename
+  (`mcp.mssql` -> `mcp.database`): `docs/architecture.md` listed a hardcoded MSSQL tool in
+  `sd-debugger`'s tool surface and an `mssql` server in the project-scope MCP table; `README.md`
+  named MSSQL in the MCP-friendly summary and the MCP table; `docs/troubleshooting.md` had an
+  MSSQL-titled section. All now describe the project-provided database MCP, matching
+  `agents/debugger.md` and `templates/project-config.template.json`. Addresses `REVIEW-TODO.md`
+  item 5's doc half; the `agents/debugger.md` body-vs-allowlist defect it also names remains open.
+- `spec-gate`'s protected-path matching could be bypassed via `..` path traversal under the bash
+  hook: `spec-gate.ps1` normalizes `file_path` with `[System.IO.Path]::GetFullPath`, which resolves
+  `..`/`.` segments before comparing against `paths.protected`, but `spec-gate.sh`'s `normalize_rel`
+  only normalized separators and stripped the cwd prefix - it never collapsed `..`. A path like
+  `<cwd>/src/../.specs/constitution.md` reached the protected constitution file while presenting a
+  relative form (`src/../.specs/constitution.md`) that matched nothing in `paths.protected`, so
+  bash exited 0 and silently allowed editing a protected file that PowerShell correctly blocked.
+  `spec-gate.sh` now collapses `.`/`..` segments with pure string processing (no `realpath`,
+  `readlink -f`, or `cd`, since the file may not exist yet under `Write` and the decision must not
+  depend on filesystem state) before the protected-path and allow-list comparisons, clamping a
+  rooted `..` at its own root the same way `GetFullPath` does, and falling back to the raw,
+  un-collapsed path when resolution would escape the workspace entirely - matching
+  `ConvertTo-RelativePath`'s own fallback branch. Covered by three new conformance fixtures:
+  `..` traversing into a protected file, a bare `.` segment, and a benign `..` that resolves to a
+  non-protected code file, proving the fix does not over-block.
+- The bash-side `..` traversal fix above was one-sided: `spec-gate.ps1` had the mirror-image
+  weakness, still live, letting the same class of edit through under PowerShell. Its
+  `ConvertTo-RelativePath` called `[System.IO.Path]::GetFullPath($FilePath)` on a RELATIVE
+  `file_path`, which resolves it against this hook PROCESS's own working directory rather than the
+  `cwd` supplied in the hook payload; the result then failed the base-prefix check and fell through
+  to the raw, un-collapsed path, matching nothing in `paths.protected`. A relative
+  `src/../.specs/constitution.md` therefore reached the protected constitution file while
+  PowerShell exited 0 silently and bash (already fixed) correctly blocked it. Separately,
+  `GetFullPath` preserves a trailing path separator, so `<cwd>/.specs/constitution.md/` failed the
+  protected-path equality test outright and, since `GetExtension` also returns `""` for a
+  trailing-separator path, was not even caught by the code-file rule - a second silent bypass.
+  `spec-gate.ps1` now collapses `.`/`..` segments with the same pure string processing as
+  `spec-gate.sh`'s `collapse_dot_segments`/`normalize_rel` (a relative `file_path` is collapsed
+  directly rather than joined onto the process cwd; a trailing separator collapses away as a
+  no-op segment) so the two implementations resolve identically. `prompt-router` and
+  `subagent-retro` were checked for the same pattern and do not have it - neither reads
+  `tool_input.file_path` or compares a user-supplied path against `paths.protected`. Covered by
+  three new conformance fixtures: a relative `..` traversal into the protected constitution file,
+  a trailing separator on the protected constitution file, and a benign relative `..` resolving to
+  a non-protected code file, proving the fix does not over-block.
+- Extended `.gitattributes` with a repo-wide `* text=auto` default plus `*.sh` and `*.ps1` pinned to
+  `eol=lf`, so shell scripts no longer check out as CRLF on Windows, where a `#!/usr/bin/env bash`
+  line with a trailing CR fails with `bad interpreter` and heredocs / `[[ ... ]]` mis-parse (SW-21).
+  Folds the previously narrow, fixtures-only policy into a repo-wide one; the byte-comparison fixture
+  pins (`tests/**`) stay because `* text=auto` still yields a native CRLF checkout on Windows. The
+  first checkout after this lands renormalizes line endings in existing Windows working trees - a
+  one-time large diff, not a real change.
+
 ## [1.4.0] - 2026-07-05
 
 ### Added

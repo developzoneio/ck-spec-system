@@ -4,7 +4,18 @@ type: feature
 status: draft
 jira: <<TICKET-ID-or-none>>
 created: <<YYYY-MM-DD>>
+complexity: <<S|M|L>>  # <<one-line rationale, e.g. spans 3 layers, ~14 tasks estimated>>
+linked_specs: []
 ---
+
+<!-- `complexity` is the WHOLE-SPEC size estimate the architect writes at create time (S | M | L),
+     with a one-line rationale in the trailing comment. It is distinct from a task's
+     `Estimated complexity` field in 02-tasks.md (which sizes one line item). It is an estimate,
+     not a measurement: Phase 3 measures the real plan against the complexity thresholds at the
+     Gate 2 / Gate Complexity checkpoint. A create-time estimate of `L` also escalates the impact
+     and planning models (see /sd:feature). Leave the `<<S|M|L>>` and rationale tokens for the
+     architect to fill; both must be gone before `approved`. -->
+
 
 # <<Short imperative title - what this feature does>>
 
@@ -18,21 +29,24 @@ created: <<YYYY-MM-DD>>
 
 ## What
 
-<!-- Behavior described as Given/When/Then. List ALL relevant scenarios, including failure modes. -->
+<!-- Behavior described as Given/When/Then. List ALL relevant scenarios, including failure
+     modes. Scenario IDs (SC-1, SC-2, ...) are stable handles: tasks reference them in their
+     `Covers` field and /sd:verify checks the coverage. Number sequentially; never reuse an ID
+     after deleting a scenario. -->
 
-### Scenario 1: <<happy path name>>
-
-- **Given** <<initial state>>
-- **When** <<action>>
-- **Then** <<observable outcome>>
-
-### Scenario 2: <<edge case name>>
+### SC-1: <<happy path name>>
 
 - **Given** <<initial state>>
 - **When** <<action>>
 - **Then** <<observable outcome>>
 
-### Scenario 3: <<failure mode>>
+### SC-2: <<edge case name>>
+
+- **Given** <<initial state>>
+- **When** <<action>>
+- **Then** <<observable outcome>>
+
+### SC-3: <<failure mode>>
 
 - **Given** <<initial state>>
 - **When** <<action that should fail>>
@@ -40,14 +54,15 @@ created: <<YYYY-MM-DD>>
 
 ## Success criteria
 
-<!-- Concrete, checkable. NOT "works well" - measurable. -->
+<!-- Concrete, checkable. NOT "works well" - measurable. Criterion IDs (AC-1, AC-2, ...) are
+     stable handles referenced by task `Covers` fields and checked by /sd:verify. -->
 
-- [ ] <<criterion 1, e.g. POST /api/notifications/subscribe returns 201 with subscription ID>>
-- [ ] <<criterion 2, e.g. Webhook fires within 5s of inventory drop below threshold>>
-- [ ] <<criterion 3, e.g. Failed webhook retries 3x with exponential backoff>>
-- [ ] <<criterion 4, e.g. p95 latency on subscribe endpoint < 100ms>>
-- [ ] Unit + integration tests cover all scenarios above
-- [ ] No new constitution exceptions
+- [ ] AC-1: <<criterion 1, e.g. POST /api/notifications/subscribe returns 201 with subscription ID>>
+- [ ] AC-2: <<criterion 2, e.g. Webhook fires within 5s of inventory drop below threshold>>
+- [ ] AC-3: <<criterion 3, e.g. Failed webhook retries 3x with exponential backoff>>
+- [ ] AC-4: <<criterion 4, e.g. p95 latency on subscribe endpoint < 100ms>>
+- [ ] AC-5: Unit + integration tests cover all scenarios above
+- [ ] AC-6: No new constitution exceptions
 
 ## Out of scope
 
@@ -73,10 +88,9 @@ created: <<YYYY-MM-DD>>
 - **§3 Quality bars**: <<coverage target and integration-test requirements for this change>>
 - **Risk of violation**: <<none | low | medium - explain>>
 
-## Linked specs
+<!-- Cross-references live in the `linked_specs` frontmatter field, not in a body section.
+     They are written by `/sd:spec link <ID-A> <relation> <ID-B>`, which maintains the inverse
+     entry on the other spec. Do not hand-edit `linked_specs` - the two sides must stay in sync,
+     and `/sd:spec validate` fails a one-sided link. -->
 
-<!-- Cross-references. Empty if this spec stands alone. -->
 
-- Depends on: <<spec ID or none>>
-- Related to: <<spec ID or none>>
-- Spawns: <<spec ID or none - filled if this feature reveals a needed refactor / perf work>>

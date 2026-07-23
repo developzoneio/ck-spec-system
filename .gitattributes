@@ -1,0 +1,50 @@
+# Line-ending policy. Normalize all text to LF in the repo; check shell and PowerShell scripts out
+# as LF on every platform so shebangs and heredocs parse and cross-platform parity holds (SW-21).
+# PowerShell 5.1 reads either; pinning LF is cheap consistency and is unaffected by the pure-ASCII
+# rule for *.ps1 (CLAUDE.md). With core.autocrlf=true (the Git default on Windows and on the
+# windows-latest CI runner) an unpinned *.sh checks out CRLF, putting a trailing CR on the
+# `#!/usr/bin/env bash` shebang (bad interpreter) and mis-parsing heredocs and `[[ ... ]]`.
+* text=auto
+
+*.sh  text eol=lf
+*.ps1 text eol=lf
+
+# Byte-comparison fixtures must keep LF on every platform.
+#
+# scripts/aggregate-lessons.{ps1,sh} deliberately render LF and compare the
+# result against tests/lessons/fixtures/expected-lessons.md byte for byte. With
+# core.autocrlf=true (the Git default on Windows, and on the windows-latest CI
+# runner) that fixture would be checked out as CRLF, and the comparison would
+# fail for a reason that has nothing to do with the code under test.
+#
+# The `* text=auto` default above normalizes to LF in the repo but still yields a
+# native (CRLF) checkout on Windows, so these fixture trees keep an explicit eol=lf pin.
+tests/lessons/** text eol=lf
+
+# tests/task-format/** are field-grammar fixtures (SW-11). They assert how a
+# reader splits a task block into fields; a CRLF checkout on Windows would make
+# any byte-level or line-ending-sensitive reader disagree with the same file on
+# Linux. Pinned for the same reason as the lesson fixtures above.
+tests/task-format/** text eol=lf
+
+# tests/revision-log/** are revision-log integrity fixtures (SW-14). The
+# valid-revision case proves the original plan prose stays byte-intact while a
+# revision is appended below it; a CRLF checkout on Windows would break any
+# byte-level comparison. Pinned for the same reason as the fixtures above.
+tests/revision-log/** text eol=lf
+
+# tests/hooks/fixtures/**/_metrics/events.jsonl are pre-seeded rotation inputs
+# (SW-15). The rotation trigger compares the file's raw byte size against
+# maxSizeKb*1024, so a CRLF checkout on Windows would change the seed's size.
+# The seed clears the 1 KB cap by a wide margin either way and the conformance
+# comparison is JSON-normalized, so correctness does not depend on this - but
+# pin LF anyway so the byte size is identical on every platform. Same reasoning
+# as the fixture pins above.
+tests/hooks/fixtures/**/_metrics/events.jsonl text eol=lf
+
+# tests/metrics/** is the /sd:status verification corpus (SW-16). The command
+# counts events by exact substring over an LF-terminated log, and the malformed
+# fixture asserts an exact skipped count - a CRLF checkout on Windows would
+# change both the line contents under test and the well-formed-line test that
+# anchors on a trailing '}'. Pinned for the same reason as the fixtures above.
+tests/metrics/** text eol=lf

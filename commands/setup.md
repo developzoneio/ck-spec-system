@@ -322,11 +322,11 @@ Setup complete. Generated:
   - .claude/settings.json (hooks: prompt-router, spec-gate, subagent-retro)
 
 Installed engine paths:
-  - ~/.claude/commands/sd/     (11 workflow commands)
+  - ~/.claude/commands/sd/     (13 workflow commands)
   - ~/.claude/agents/sd/       (6 specialist agents)
   - ~/.claude/hooks/sd/        (3 hooks)
   - ~/.claude/templates/sd/    (templates)
-  - ~/.claude/skills/sd/       (6 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline)
+  - ~/.claude/skills/sd/       (8 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline, retro-lessons, replan-loop)
 
 Next steps:
   1. Fill placeholders in CLAUDE.md and .specs/constitution.md (open them in your editor).

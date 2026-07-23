@@ -15,6 +15,14 @@ It covers:
 
 ---
 
+## What is here now
+
+- [`spec-lint-fixture/`](spec-lint-fixture/) - a clean `.specs/` tree and a seeded-broken one for
+  exercising `/sd:spec validate`. Backs the SW-4 acceptance criterion. Run by hand, not in CI -
+  the linter is a prompt, so no script can execute it; the fixture README explains the trade-off.
+
+---
+
 ## What this folder will hold over time
 
 Ideas under consideration, no committed timeline (see [`../ROADMAP.md`](../ROADMAP.md) for what

@@ -68,7 +68,7 @@ Behavior:
 2. Read `00-spec.md`. Display:
    - Frontmatter (id, type, status, created, jira/severity if present).
    - First H2 (title or "Why").
-   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md` exist.
+   - Status of each phase artifact: which of `00-spec.md`, `01-plan.md`, `02-tasks.md`, `03-decisions.md`, `04-artifacts/`, `05-retro.md`, `06-verify.md` (written by `/sd:verify`; gates the `done` transition) exist.
 3. If `02-tasks.md` exists, show task completion count `N/M`.
 4. Print folder URL: `file://<absolute path>`.
 
@@ -92,6 +92,12 @@ done -> archived
 archived -> in-progress (only via 'revive', with reason)
 ```
 
+The `in-progress -> done` transition of a feature (FEAT) spec is hook-enforced: spec-gate
+blocks the `index.md` edit unless `<spec.dir>/<ID>/06-verify.md` exists and records
+`result: pass`. Run `/sd:verify <ID>` first. Disable only via `hooks.specGate.verifyGate: false`
+in project-config. Other spec types (bug, refactor, perf, rca) close out as before - the hook
+does not gate their `index.md` row.
+
 3. Illegal transitions are REFUSED. Do NOT mutate any file. Print a refusal that names the current
    state, the requested state, the valid next state(s) for the current state (from the machine above),
    and - when the requested state is reachable - the shortest legal path to it:
@@ -110,6 +116,21 @@ Valid next state(s) from 'draft': approved.
 To reach 'done', follow: draft -> approved -> in-progress -> done.
 ```
 4. On valid transition:
+   - If this is an `in-progress -> done` transition of a feature (FEAT) spec: BEFORE mutating
+     any file, check `<spec.dir>/<ID>/06-verify.md` exists and records `result: pass`. If not,
+     REFUSE the transition with no file mutated:
+
+```
+Refused: <ID> cannot move from 'in-progress' to 'done' - no passing /sd:verify artifact.
+Run /sd:verify <ID> first; close-out is allowed only after <spec.dir>/<ID>/06-verify.md records
+'result: pass'.
+```
+
+     This check exists because the frontmatter, index, and retro log are mutated one file at a
+     time below; without it, a spec-gate block on the `index.md` edit alone would strand the
+     frontmatter already updated to `done` while the index still says `in-progress` - an
+     `SL030` disagreement. Checking first keeps the transition atomic: either nothing moves, or
+     all three files do.
    - Update frontmatter `status:` field in `00-spec.md`.
    - Update the row in `.specs/index.md`.
    - Append a log entry to `.specs/<ID>/05-retro.md`:
@@ -130,22 +151,47 @@ Args:
 - `<ID-B>` (required).
 
 Behavior:
-1. Verify both spec folders exist.
-2. Validate relation is in the allow-list.
-3. Update both specs:
-   - In `00-spec.md` "Linked specs" section of ID-A: add line `<relation>: <ID-B>`.
-   - In ID-B add the inverse: `<inverse-relation>: <ID-A>`.
-4. Inverse map:
+1. Verify both spec folders exist. A link to a non-existent ID is REFUSED - do not create a
+   dangling entry.
+2. Validate relation is in the allow-list, then normalize it (see below).
+3. Refuse a self-link (`ID-A` == `ID-B`).
+4. If the link already exists on either side, do nothing and say so - `link` is idempotent.
+5. Update the `linked_specs` frontmatter list on both specs:
+   - On ID-A: add `- <canonical-relation>: <ID-B>`.
+   - On ID-B: add `- <inverse-relation>: <ID-A>`.
+6. Append a log line to both retros.
 
-| Relation | Inverse |
-|---|---|
-| `depends-on` | `blocks` (other side has `blocked-by`) |
-| `spawns` | `spawned-by` |
-| `supersedes` | `superseded-by` |
-| `related-to` | `related-to` (symmetric) |
-| `duplicate-of` | `duplicate-of` (symmetric) |
+### Relation vocabulary
 
-5. Append a log line to both retros.
+`blocked-by` is an **input alias**, not a stored relation: "A is blocked-by B" and "A depends-on B"
+assert the same edge, so storing both would let one spec carry two spellings of one fact and make
+symmetry unverifiable. `link` normalizes `blocked-by` to `depends-on` and reports the rewrite.
+The other eight inputs are already canonical and are stored as given.
+
+| Input | Stored as | Inverse written on the other side |
+|---|---|---|
+| `depends-on` | `depends-on` | `blocks` |
+| `blocked-by` | `depends-on` (alias) | `blocks` |
+| `blocks` | `blocks` | `depends-on` |
+| `spawns` | `spawns` | `spawned-by` |
+| `spawned-by` | `spawned-by` | `spawns` |
+| `supersedes` | `supersedes` | `superseded-by` |
+| `superseded-by` | `superseded-by` | `supersedes` |
+| `related-to` | `related-to` | `related-to` (symmetric) |
+| `duplicate-of` | `duplicate-of` | `duplicate-of` (symmetric) |
+
+The map is total and closed: every stored relation has exactly one inverse, and that inverse is
+itself a stored relation. This is what makes the link-symmetry check in `validate` decidable.
+
+### linked_specs format
+
+A YAML list of single-key maps in `00-spec.md` frontmatter. Empty is `[]`.
+
+```yaml
+linked_specs:
+  - depends-on: FEAT-INV-2501
+  - related-to: BUG-1247
+```
 
 ---
 
@@ -194,19 +240,275 @@ Args:
 - `<ID>` (optional, default `--all`).
 
 Behavior:
-1. For each target spec:
+1. Per-spec checks. For each target spec:
    - Frontmatter present and parseable.
-   - Required fields per type: `id`, `type`, `status`, `created`. Bugs need `severity`. RCAs need `incident_started`.
+   - Required fields present, per type (see "Required frontmatter fields" below).
    - `id` field matches the folder name.
    - `type` matches the prefix.
    - `status` is in `spec.lifecycle` from project-config.
+   - Placeholder discipline (see "Placeholder tokens" below).
    - Expected files present per status:
-     - status >= `approved` -> `00-spec.md` must NOT have "<<placeholder>>" tokens remaining.
      - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (feature and refactor
        only; bug, perf, and rca do not produce plan/tasks artifacts).
      - status == `done` -> `05-retro.md` exists with at least one entry.
    - Index row matches frontmatter status.
-2. Output: one line per spec with PASS / FAIL and the first failure reason.
+   - Transition history is legal (see "Transition replay" below).
+   - Links resolve and are symmetric (see "Link integrity" below).
+   - Task-block content, when `02-tasks.md` exists (see "Task-block checks" below). This is the
+     only check that reads inside an artifact rather than around it.
+2. Tree-wide checks (run once, only when the target is `--all`):
+   - Index <-> folder symmetry (see below).
+3. Report every finding using the severity taxonomy (see "Output" below). Do not stop at the
+   first failure - a spec with three problems reports three findings.
+
+### Rule table
+
+Every finding cites one of these IDs. The ID is the finding's anchor - the taxonomy forbids a
+BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who has pinned a rule.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `SL001` | Frontmatter missing or unparseable | 🔴 BLOCK |
+| `SL002` | Required field missing for type | 🔴 BLOCK |
+| `SL003` | `id` does not match folder name | 🔴 BLOCK |
+| `SL004` | `type` does not match ID prefix | 🔴 BLOCK |
+| `SL005` | `status` not in `spec.lifecycle` | 🔴 BLOCK |
+| `SL006` | `linked_specs` missing, or present but not a list | 🔴 BLOCK |
+| `SL010` | Author-fill `<<...>>` token remains at status >= `approved` | 🔴 BLOCK |
+| `SL011` | Phase-deferred `<<PHASE-N: ...>>` token pre-filled at `draft` / `approved` | 🔴 BLOCK |
+| `SL012` | Phase-deferred token still unfilled at `done` | 🟠 WARN |
+| `SL013` | Type template unreadable - placeholder checks could not run | 🟠 WARN |
+| `SL020` | Required artifact missing for status | 🔴 BLOCK |
+| `SL021` | Status `done` but `05-retro.md` has no entry | 🔴 BLOCK |
+| `SL030` | Index row status disagrees with frontmatter status | 🔴 BLOCK |
+| `SL031` | Orphan folder - spec exists but has no index row | 🔴 BLOCK |
+| `SL032` | Ghost row - index row whose folder does not exist | 🔴 BLOCK |
+| `SL033` | Duplicate index rows for one ID | 🔴 BLOCK |
+| `SL040` | Illegal transition edge in the retro log | 🔴 BLOCK |
+| `SL041` | Transition chain not contiguous | 🔴 BLOCK |
+| `SL042` | Last logged transition disagrees with frontmatter status | 🔴 BLOCK |
+| `SL043` | Status is not `draft` but there is no retro log | 🔴 BLOCK |
+| `SL044` | `archived -> in-progress` logged with an empty reason | 🟠 WARN |
+| `SL050` | Link target does not resolve to an existing spec | 🔴 BLOCK |
+| `SL051` | One-sided link - inverse entry missing on the target | 🔴 BLOCK |
+| `SL052` | Self-link | 🔴 BLOCK |
+| `SL053` | Stored relation is `blocked-by` - an input alias, so the field was hand-edited | 🟠 WARN |
+| `SL054` | Duplicate entry in `linked_specs` | 🟠 WARN |
+| `SL055` | Spec status `done` but `06-verify.md` is missing or records `result: fail` | 🟠 WARN |
+| `SL060` | Task block in `02-tasks.md` has no `Pattern refs` field | 🟠 WARN |
+| `SL070` | Task carries `Revised-by: R<n>` but `01-plan.md` has no matching `## Revisions` entry `R<n>` | 🔴 BLOCK |
+| `SL071` | A `## Revisions` entry `R<n>` names an `Affected task` that does not carry `Revised-by: R<n>` (or does not exist) | 🔴 BLOCK |
+| `SL072` | Revision numbering is non-contiguous, duplicated, or a prior entry was rewritten (append-only violated) | 🔴 BLOCK |
+| `SL073` | A `## Revisions` entry is malformed - missing `Trigger`, `Gate: re-plan`, `Phase`, or `revised-from` | 🟠 WARN |
+
+`SL061`-`SL069` are **reserved** for further task-block content rules. Claim from this band rather
+than extending another one - `SL05x` is link integrity and has nothing to do with task content.
+
+`SL070`-`SL079` are the **revision-log integrity** band (the `sd-replan-loop` `## Revisions` log in
+`01-plan.md`, cross-checked against `Revised-by` markers in `02-tasks.md`). It is a distinct band on
+purpose: it is neither task-block *content* (`SL06x`) nor `linked_specs` symmetry (`SL05x`), though it
+borrows the two-sided-symmetry shape of the latter. `SL074`-`SL079` are reserved for further
+revision-record rules.
+
+Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
+so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
+(`SL011` - a measured field filled from memory). WARN is for a real problem that leaves the
+registry still truthful and is recoverable by re-running a command. There is no SUGGEST rule
+today; the section is still printed, per the taxonomy.
+
+`SL060` is WARN by that same test: a task with no `Pattern refs` leaves the registry truthful and
+is fixed by re-planning the spec. It is deliberately **not** BLOCK - in the only corpus measured,
+every task authored after the field shipped already carried it (22 of 22), while the two specs
+without it predate the field entirely. Blocking would fail old specs for a rule they could not
+have followed, and would gain nothing on new ones.
+
+`SL070`-`SL072` are BLOCK: a task pointing at a revision that does not exist, a revision pointing at
+a task that does not carry its marker, or a rewritten revision entry, are all a registry that **lies**
+about its own audit trail - the append-only guarantee the `## Revisions` log exists to provide is
+exactly what these catch. `SL073` is WARN: an entry missing a descriptive line (`Trigger`, `Gate`,
+`Phase`, `revised-from`) is a poor record but leaves the task/log symmetry decidable and truthful,
+and is recoverable by editing the entry - the same test that makes `SL044` a WARN.
+
+### Task-block checks
+
+Run only when `02-tasks.md` exists. Parse it per the **Field label grammar** in the
+`sd-atomic-task-format` skill - label matching is case-insensitive, `**` around the label is
+optional, and the colon may sit inside or outside the emphasis. All three forms occur in live
+specs; a reader that accepts only the canonical `- **Label**:` form reports false `SL060`s against
+correctly authored tasks, which is worse than not running the check at all.
+
+A field's value runs to the next field label, not to the next newline - `Acceptance` and
+`Pattern refs` are routinely multi-line with nested bullets.
+
+Report one `SL060` per offending task block, citing the task heading (e.g. `02-tasks.md` `T01`).
+A block that writes `Pattern refs: none` is **compliant** - the explicit `none` is the assertion
+the rule is asking for. Only an absent field is a finding.
+
+### Revision-log integrity
+
+Runs only when there is a revision record to check: `01-plan.md` has a `## Revisions` section, **or**
+any task block in `02-tasks.md` carries a `Revised-by` field. A spec with neither - the overwhelming
+common case, an original plan never re-planned - produces no `SL07x` finding. This is a cross-artifact
+check: the `## Revisions` log lives in `01-plan.md`, its markers in `02-tasks.md`, and the two must
+agree. Parse task blocks with the same tolerant **Field label grammar** used for `SL060`.
+
+The `## Revisions` log is written only by the Gate Re-plan of `/sd:feature` and `/sd:refactor` via the
+**sd-replan-loop** skill. Each entry is `### R<n> - <timestamp>` followed by `Trigger`, `Phase`,
+`Gate: re-plan`, `Affected tasks`, `Delta`, and `revised-from` lines. Checks:
+
+- **`SL070` - dangling marker.** A task carrying `Revised-by: R<n>` with no `### R<n>` entry in
+  `01-plan.md`. Cite the task's `Revised-by` line; name the absent entry in the finding.
+- **`SL071` - one-sided / unreferenced revision.** An `### R<n>` entry whose `Affected tasks` list
+  names a task that either does not exist or does not carry `Revised-by: R<n>`. An entry with no
+  parseable `Affected tasks` line is also `SL071` - the back-reference cannot be established, so the
+  revision points at nothing. Cite the entry's `Affected tasks` line (or the `### R<n>` heading when
+  the line is absent).
+- **`SL072` - broken append-only history.** Revision numbers must run contiguously from `R1` with no
+  gap, no duplicate, and no reuse. A gap (`R1`, `R3`), a duplicate `R<n>`, or a heading that reuses a
+  number already logged means the log was rewritten rather than appended. Cite the first offending
+  `### R<n>` heading.
+- **`SL073` - malformed entry.** An `### R<n>` entry missing any of `Trigger`, `Gate: re-plan`,
+  `Phase`, or `revised-from`. (A missing `Affected tasks` line is `SL071`, not `SL073` - it breaks
+  symmetry, not just completeness.) Cite the `### R<n>` heading.
+
+Report one finding per offending task or entry - a log with three problems reports three findings.
+`validate` is a static linter: it verifies the revision record is internally consistent and
+append-only shaped. It has no Plan-phase snapshot of `02-tasks.md`, so it **cannot** detect an
+undocumented silent edit by diffing - an edit that adds no `Revised-by` marker and no `## Revisions`
+entry is invisible here and is prevented by the HARD Gate Re-plan, not by this lint. Do not report,
+or imply, a finding the checks above cannot actually decide.
+
+### Output
+
+Read `~/.claude/skills/sd/sd-severity-taxonomy/SKILL.md` and
+`~/.claude/skills/sd/sd-evidence-citation/SKILL.md` before emitting the report, and follow them.
+This command has no `skills:` frontmatter - only agents load skills that way, and `validate`
+invokes no subagent - so the rules are read at runtime instead. If either file is unreadable, say
+so and fall back to plain PASS / FAIL lines rather than inventing a format.
+
+Structure: the taxonomy's mandated output, plus a per-spec summary table above it.
+
+```markdown
+# Spec lint: <N> spec(s) under `.specs/`
+
+**Verdict**: <N> 🔴 BLOCK, <N> 🟠 WARN, <N> 🟡 SUGGEST, <N> 🟢 PASS across <N> specs.
+
+| Spec | Status | Result |
+|---|---|---|
+| `FEAT-INV-2501` | in-progress | PASS |
+| `BUG-1247` | done | 2 findings (1 BLOCK, 1 WARN) |
+
+## 🔴 BLOCK
+
+### B1: `id` does not match folder name
+- **File:line**: `.specs/BUG-1247/00-spec.md:2`
+- **Rule**: `SL003`
+- **Finding**: Frontmatter declares `id: BUG-1246` but the folder is `BUG-1247`. `show` and
+  `link` resolve by folder, `list` renders the frontmatter - so the two disagree about what
+  this spec is called.
+- **Suggested direction**: Decide which ID is real, then fix the other side and the index row.
+```
+
+Citation rules for this command, applying `sd-evidence-citation`:
+
+- Every finding cites `file:line`, relative to the project root.
+- A finding about something **absent** (a missing artifact, a missing inverse link) has no line
+  of its own. Cite the line that **creates the obligation** - e.g. for `SL020`, the `status:`
+  line whose value requires the artifact - and name the absent path in the finding text. Never
+  cite a bare directory: the skill rejects it, and the obligation line is the better evidence.
+- Tree-wide findings (`SL031` / `SL032` / `SL033`) cite `.specs/index.md:<row>` where a row
+  exists, and `.specs/<ID>/00-spec.md:1` for an orphan folder that has no row to point at.
+- A clean tree prints the summary table with every spec `PASS`, and `_No findings._` under each
+  of the four severity sections. Do not omit the empty sections.
+
+### Index <-> folder symmetry
+
+Only meaningful for `--all`; a single-ID run cannot see orphans. Compare the set of spec folders
+under `spec.dir` against the set of rows in `spec.indexFile`:
+
+- **Orphan folder**: a spec folder with no index row. The spec is invisible to `list` / `stats`.
+- **Ghost row**: an index row whose folder does not exist. Points at nothing.
+- **Duplicate row**: the same ID on more than one index row.
+
+Directories whose name starts with `_` are engine-reserved (`_explorations/`, `_reviews/`,
+`_adr/`, `_archived/`) and are NOT specs - skip them. Skip `index.md` and `constitution.md` too.
+
+### Transition replay
+
+`05-retro.md` is the append-only status log written by `status` / `link`. Replay it against the
+state machine in the `status` section above:
+
+- Parse every `- [<ts>] Status: <old> -> <new>.` line, in file order.
+- Each `<old> -> <new>` must be a legal edge. `archived -> in-progress` is legal only when the
+  entry's reason is non-empty (that edge exists only via `revive`).
+- The chain must be contiguous: each entry's `<old>` equals the previous entry's `<new>`.
+- The last entry's `<new>` must equal the current frontmatter `status`. A mismatch means a
+  status was hand-edited, bypassing `status` - which is exactly what the log exists to catch.
+- A spec with no retro and status `draft` is fine (nothing has transitioned yet). Any other
+  status with no retro is a failure.
+
+Replay reads only committed history - it cannot see a transition that was never logged. A
+hand-edit that updated frontmatter, index, *and* forged a matching log line is out of scope.
+
+### Link integrity
+
+For every entry in a spec's `linked_specs`:
+
+- The relation is a **stored** relation from the `link` vocabulary. A stored `blocked-by` is a
+  failure: it is an input alias that `link` normalizes away, so its presence means the field was
+  hand-edited.
+- The target ID resolves to an existing spec folder (no dangling links).
+- The inverse entry exists on the target, pointing back (no one-sided links). Symmetric relations
+  (`related-to`, `duplicate-of`) require the same relation back.
+- No self-link, no duplicate entries.
+
+### Required frontmatter fields
+
+Presence is what is checked, not value - a field may legitimately hold a `<<placeholder>>` at
+`draft`. The "Placeholder tokens" rules below govern when a value must be real.
+
+Every type additionally requires `linked_specs` (a YAML list; `[]` when the spec stands alone).
+
+| Type | Required fields (beyond `linked_specs`) |
+|---|---|
+| `feature` | `id`, `type`, `status`, `jira`, `created` |
+| `bug` | `id`, `type`, `severity`, `status`, `jira`, `created` |
+| `refactor` | `id`, `type`, `smell`, `status`, `created` |
+| `perf` | `id`, `type`, `status`, `target_metric`, `created` |
+| `rca` | `id`, `type`, `status`, `severity`, `incident_started`, `incident_resolved`, `created` |
+
+`jira` is required to be present but may hold `none`. `incident_resolved` may hold a placeholder
+while an incident is still open - an RCA for an unresolved incident cannot pass `approved`.
+`linked_specs` must be present and a list; `[]` is the valid empty form, a bare `none` is not.
+
+### Placeholder tokens
+
+Two token forms with opposite rules. Both live in `00-spec.md`.
+
+| Form | Meaning | Filled by |
+|---|---|---|
+| `<<description>>` | Author-fill. Written when the spec is drafted. | The spec author |
+| `<<PHASE-N: description>>` | Phase-deferred. MUST NOT be pre-filled - the workflow's Phase N fills it from measured evidence. | Phase N of the owning workflow |
+
+The reference set of phase-deferred tokens for a type is the `<<PHASE-N: ...>>` tokens in
+`~/.claude/templates/sd/specs/<type>.template.md`. If that template is unreadable, raise `SL013`
+and skip only the placeholder checks for that spec - never silently pass them.
+
+Rules:
+- status >= `approved` -> no author-fill `<<...>>` token remains. Phase-deferred tokens are
+  exempt and are NOT a failure.
+- status in {`draft`, `approved`} -> for each phase `N`, the spec MUST carry at least as many
+  `<<PHASE-N: ...>>` tokens as the template does. A filled-in phase-deferred field at these
+  states is a failure: it means the value was written from memory rather than measured. This is
+  the check that makes the cross-phase discipline enforceable rather than advisory.
+
+  Match on the `<<PHASE-N:` prefix and count per phase - do NOT require the description text to
+  match the template verbatim. Filling a field deletes its token, which the count catches;
+  trimming an example out of a token's description is not pre-filling and must not fail.
+- status == `in-progress` -> no assertion either way. The lifecycle records status, not which
+  phase is current, so a phase-deferred token may legitimately be filled or unfilled. This is a
+  known blind spot, not an oversight: narrowing it would mean tracking phase in frontmatter.
+- status == `done` -> no `<<PHASE-N: ...>>` token remains.
 
 ---
 

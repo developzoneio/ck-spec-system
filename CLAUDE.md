@@ -18,7 +18,7 @@ Note: `templates/CLAUDE.template.md` is the template `/sd:setup` scaffolds into 
 
 # Sandbox install test (run before any PR touching install/hooks/commands/agents)
 .\install\install.ps1 -BasePath C:\temp\sd-test
-Get-ChildItem C:\temp\sd-test\commands\sd\          # expect 11 .md files
+Get-ChildItem C:\temp\sd-test\commands\sd\          # expect 13 .md files
 .\install\uninstall.ps1 -BasePath C:\temp\sd-test -Force   # round-trip: removes the 5 sd\ dirs
 Remove-Item -Recurse -Force C:\temp\sd-test         # cleanup
 ```
@@ -44,11 +44,11 @@ Every PR adds a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog
 
 | Source | Installs to | Contents |
 |---|---|---|
-| `commands/` | `~/.claude/commands/sd/` | 11 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`) |
+| `commands/` | `~/.claude/commands/sd/` | 13 slash commands (`/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`, `/sd:verify`, `/sd:status`) |
 | `agents/` | `~/.claude/agents/sd/` | 6 subagents (`sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer`) |
 | `hooks/powershell/` + `hooks/bash/` | `~/.claude/hooks/sd/` | 3 hooks × 2 platforms (`prompt-router`, `spec-gate`, `subagent-retro`) |
 | `templates/` | `~/.claude/templates/sd/` | 4 setup templates + 5 spec templates in `specs/` |
-| `skills/` | `~/.claude/skills/sd/` | 6 rule packs, one folder per skill with `SKILL.md` |
+| `skills/` | `~/.claude/skills/sd/` | 8 rule packs, one folder per skill with `SKILL.md` |
 
 Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespace comes from frontmatter `name:` and the `sd/` install subfolder. The namespace exists for collision avoidance and clean uninstall — never use bare names when assets reference each other.
 
@@ -57,8 +57,8 @@ Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespac
 - **Commands** are phased workflow definitions with **hard gates** — checkpoints that STOP and wait for explicit user approval (silence ≠ approval). Phase 0 always bootstraps (read CLAUDE.md, constitution, project-config, index); a state machine at the top of each file defines resume behavior on re-invocation. Gates marked HARD (bug reproduction, perf baseline) have no override path.
 - **Agents** declare frontmatter: `name`, `description`, `color`, `model`, minimal `tools` allowlist, and a `skills:` list. Tool allowlists enforce roles structurally — the reviewer has no write tools, so it *cannot* auto-fix. Heavy reasoning agents (architect, debugger, reviewer) use `sonnet`; mechanical agents (explorer, implementer) use `haiku`.
 - **Skills** are shared rule packs loaded into agent context via frontmatter reference. A rule used by multiple agents (e.g. `sd-evidence-citation`, used by 3) lives in one `SKILL.md`, never copy-pasted into agent bodies.
-- **Hooks** inject context (`prompt-router` on UserPromptSubmit, `subagent-retro` on SubagentStop) or guard edits (`spec-gate` on PreToolUse blocks code edits with no in-progress spec). `spec-gate` denials emit a dual-format JSON object carrying both the new schema (`hookSpecificOutput.permissionDecision: "deny"`) and the legacy schema (`decision: "block"`) for CLI version compatibility.
-- **Spec artifacts** (`.specs/<ID>/00-spec.md` … `05-retro.md`) are the input contract between agents, not after-the-fact docs. Spec templates intentionally leave cross-phase fields empty with `<!-- Filled by Phase N -->` comments — workflows enforce sequencing through those empty fields. Do not pre-fill them.
+- **Hooks** inject context (`prompt-router` on UserPromptSubmit, `subagent-retro` on SubagentStop) or guard edits (`spec-gate` on PreToolUse blocks code edits with no in-progress spec). `spec-gate` denials emit a dual-format JSON object carrying both the new schema (`hookSpecificOutput.permissionDecision: "deny"`) and the legacy schema (`decision: "block"`) for CLI version compatibility. `spec-gate` and `subagent-retro` also *record*: metadata-only events (spec ID, phase, decision - never a path) appended to `.specs/_metrics/events.jsonl`, opt-out via `hooks.metrics.enabled: false`.
+- **Spec artifacts** (`.specs/<ID>/00-spec.md` … `05-retro.md`) are the input contract between agents, not after-the-fact docs. Spec templates intentionally leave cross-phase fields empty, marked with a `<<PHASE-N: ...>>` token (plus an explanatory `<!-- ... -->` comment) — workflows enforce sequencing through those empty fields. Do not pre-fill them.
 
 ## Hard rules when editing
 
@@ -67,7 +67,10 @@ Source filenames are unprefixed (`agents/reviewer.md`); the `sd-`/`sd:` namespac
 3. **Model fields are aliases only** (`sonnet`, `haiku`, `opus`, `inherit`) — never full model IDs.
 4. **Stack-agnostic, no exceptions.** Commands and agents must not contain hardcoded stack commands (`dotnet test`, `npm test`) or language assumptions; reference `commands.test` etc. from `project-config.json`. An agent that hardcodes a stack is a bug.
 5. **Minimal tool allowlists.** Read-only agents never get `Write`; add a tool only if the role requires it.
-6. **Templates** use `<<placeholder>>` for user-filled fields and stay short.
+6. **Templates** use `<<placeholder>>` for user-filled fields and stay short. Spec templates also
+   use `<<PHASE-N: ...>>` for cross-phase fields that Phase N must fill from measured evidence —
+   the two forms have opposite rules (author-fill must be gone by `approved`; phase-deferred must
+   still be there), and `/sd:spec validate` enforces both. Never pre-fill a `<<PHASE-N: ...>>`.
 
 ## Style
 

@@ -9,6 +9,7 @@ Common issues and fixes. Skim the table of contents first; the fix you need is u
 - [Workflow issues](#workflow-issues)
 - [Spec issues](#spec-issues)
 - [Spec-gate blocking unexpectedly](#spec-gate-blocking-unexpectedly)
+- [Spec metrics log](#spec-metrics-log)
 - [MCP issues](#mcp-issues)
 - [Resetting](#resetting)
 
@@ -251,6 +252,28 @@ Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't for
 
 ---
 
+## Spec metrics log
+
+### `.specs/_metrics/events.jsonl` keeps growing
+
+**Cause**: `spec-gate` and `subagent-retro` each append one line per gate decision, `.specs/index.md` lifecycle transition, or subagent-stop check. Each line is small (roughly 120 bytes). The log is bounded by `hooks.metrics.maxSizeKb` (default `1024` = ~1 MB): when the live file reaches the cap, the next write rolls it to `events.jsonl.1` and starts fresh, keeping at most one previous generation. If you see the *live* file far past 1 MB, either `maxSizeKb` is set to `0` (rotation disabled), or every roll is failing silently - most likely a read-only `_metrics/` directory or the file being held open, both of which degrade to "keep appending" by design.
+
+**Fix**: no action needed for normal growth - it rotates itself. To change the cap, set `hooks.metrics.maxSizeKb` (in KB) in `.claude/project-config.json`; set it to `0` to disable rotation entirely. To stop all writes instead:
+```json
+"hooks": {
+  "metrics": { "enabled": false }
+}
+```
+Existing lines are left untouched; only future writes stop. Note that the consumer of the metrics log, `/sd:status`, reads only the live `events.jsonl` - `events.jsonl.1` is a grace buffer and a generation may be discarded on the next roll, so do not rely on `.1` for a complete history.
+
+### Is it safe to commit or share `.specs/_metrics/events.jsonl`?
+
+**Yes, by design.** Every line is metadata only: a timestamp, a spec ID, a lifecycle phase, an event kind and decision, and (for code-edit gates) a lowercased file extension. It never contains a file path, a file name, or any code content - see `docs/architecture.md`'s event log schema for the exact field list.
+
+Whether to actually commit it is still your call, not the engine's. If you'd rather keep it purely local, add `.specs/_metrics/` to the project's `.gitignore` yourself - specwright does not add this entry automatically.
+
+---
+
 ## MCP issues
 
 ### Atlassian: "Failed to fetch ticket"
@@ -274,7 +297,7 @@ Set `hooks.specGate.mode` to `"off"` in `.claude/project-config.json`. Don't for
 
 **Fix**: trigger a re-index from the GitNexus client. While indexing, code-explorer falls back to grep with a noted caveat.
 
-### MSSQL: "Cannot execute UPDATE / DELETE / INSERT"
+### Database: "Cannot execute UPDATE / DELETE / INSERT"
 
 **Cause**: this is the intended behavior. The debugger has read-only access by constitution.
 

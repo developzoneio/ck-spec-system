@@ -9,6 +9,7 @@ per-file-type guidelines, and how to test changes locally.
 
 - [Project goals and non-goals](#project-goals-and-non-goals)
 - [Repo layout](#repo-layout)
+- [The manifest](#the-manifest)
 - [PR process](#pr-process)
 - [Per-file-type guidelines](#per-file-type-guidelines)
   - [Commands (`commands/*.md`)](#commands-commandsmd)
@@ -40,7 +41,7 @@ per-file-type guidelines, and how to test changes locally.
 
 ```
 specwright/
-  commands/         # 11 slash commands (markdown with frontmatter)
+  commands/         # 13 slash commands (markdown with frontmatter)
   agents/           # 6 subagent definitions (markdown with frontmatter)
   hooks/
     powershell/     # 3 PowerShell hooks
@@ -51,6 +52,51 @@ specwright/
   docs/             # architecture, usage, walkthrough, troubleshooting
   examples/         # demo references
 ```
+
+---
+
+## The manifest
+
+`specwright.manifest.json` is the canonical inventory contract. Check 7 of
+`scripts/validate.{ps1,sh}` reads it and fails the build when a number published in the docs
+disagrees with what is actually on disk. A discipline tool that misdescribes itself has no
+standing to lecture anyone about specs.
+
+The manifest **stores no counts**. It declares where assets live (`areas`, each with a `glob` or
+an explicit `files` list) and where the docs make claims about them (`docClaims`); the numbers are
+derived from disk at runtime. That is deliberate - a manifest holding hardcoded counts would be a
+third place to update on every change and would reintroduce exactly the drift it exists to prevent.
+
+What this means in practice:
+
+- **Adding a command, agent, skill, or template**: add the file. Nothing else. The count follows.
+- **Publishing a number in the docs**: add a `docClaims` entry - `file`, a `pattern` with exactly
+  one capture group around the number, and the `equals` quantity it must match. A number with no
+  entry fails the build as an *undeclared claim*, so this is not optional.
+- **Rewording a sentence that carries a number**: update its `pattern` too. A pattern that matches
+  nothing fails as a *vacuous claim* rather than passing quietly - otherwise a reword would turn
+  the check into a no-op that still reports green.
+- **Writing intentionally historical docs** (superseded counts as a past-state record): put the
+  path in `historicalExclusions`. `docs/history/`, `docs/superpowers/` and `CHANGELOG.md` are
+  already excluded. Never "fix" their numbers to match today's disk state.
+
+Two constraints on `pattern`: it must be valid in **both** POSIX ERE (bash `[[ =~ ]]`) and .NET
+(PowerShell), so use `[0-9]` rather than `\d` and avoid lookarounds; and it is matched
+**case-sensitively** on both platforms.
+
+`scripts/selftest-docs.{ps1,sh}` proves Check 7 still bites, by corrupting a throwaway copy of the
+repo and asserting the validator catches it. CI runs it on all three OSes.
+
+`tests/hooks/run-conformance.ps1` (single cross-platform pwsh script by design - it must run BOTH
+hook implementations in one process, so a bash twin would itself be a drift risk) pipes every
+golden fixture under `tests/hooks/fixtures/` into the bash and PowerShell implementation of each
+hook and fails if their normalized decisions diverge from each other or from the golden. Add a
+fixture case whenever you add hook behavior; `-SelfTest` proves the harness still detects
+divergence.
+
+Check 7 needs `jq` on Unix and **fails loudly without it**. This is the opposite of the hook rule
+below (hooks exit `0` silently when `jq` is missing so they never block a user on their own bugs) -
+a validator that skipped itself for a missing tool would turn CI green while checking nothing.
 
 ---
 
@@ -71,8 +117,9 @@ specwright/
 
 4. **Run the validator** before opening the PR: `scripts/validate.ps1` (Windows) or
    `scripts/validate.sh` (Unix) runs every engine-invariant check at once (ASCII, hook-pair parity,
-   model aliases, install-target counts, changelog gate). CI runs the same on Windows + Ubuntu.
-   See also the [Local install test](#local-install-test) for a manual install smoke test.
+   model aliases, install-target counts, changelog gate, docs consistency). CI runs the same on
+   Windows + Ubuntu. See also the [Local install test](#local-install-test) for a manual install
+   smoke test, and [The manifest](#the-manifest) for what Check 7 enforces.
 
 5. **Update the changelog.** Add a line under `## [Unreleased]` in `CHANGELOG.md`.
 

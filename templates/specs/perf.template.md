@@ -4,6 +4,7 @@ type: perf
 status: draft
 target_metric: <<latency-p95|throughput|memory|cpu|cold-start|other>>
 created: <<YYYY-MM-DD>>
+linked_specs: []
 ---
 
 # <<Short imperative title - what is being optimized>>
@@ -13,7 +14,7 @@ created: <<YYYY-MM-DD>>
 | Field | Value |
 |---|---|
 | **Metric** | <<e.g. p95 latency on GET /api/search>> |
-| **Current observed** | <<EMPTY - filled in Phase 2 baseline. Do NOT pre-fill from memory.>> |
+| **Current observed** | <<PHASE-2: measured baseline - do NOT pre-fill from memory>> |
 | **Goal (SLA)** | <<e.g. p95 < 200ms under 50 RPS load>> |
 | **Environment** | <<e.g. staging, single-instance, 2 vCPU / 4 GB RAM, SQL Server 8 vCPU / 16 GB>> |
 | **Load profile** | <<e.g. 50 RPS sustained, 100 concurrent users, synthetic queries from tests/perf/queries.json>> |
@@ -57,7 +58,7 @@ created: <<YYYY-MM-DD>>
 
 **Status**: TBD - filled by Phase 3 hotspot analysis.
 
-<<hypothesis tree>>
+<<PHASE-3: hypothesis tree>>
 
 ## Results log
 
@@ -77,7 +78,7 @@ created: <<YYYY-MM-DD>>
 
 **Status**: TBD - filled at close-out.
 
-- <<trade-off 1, e.g. "Added in-memory LRU cache (1000 entries) in the read path. Trade-off: search result freshness window extended from real-time to up to 30s. Acceptable per product owner.">>
+- <<PHASE-6: trade-off 1, e.g. "Added in-memory LRU cache (1000 entries) in the read path. Trade-off: search result freshness window extended from real-time to up to 30s. Acceptable per product owner.">>
 
 ## Constitution check
 

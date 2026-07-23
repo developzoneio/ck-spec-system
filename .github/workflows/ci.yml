@@ -40,6 +40,82 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke-hooks.ps1
 
+      # --- Lesson privacy validator, both directions. The clean fixture passing
+      # proves the grammar is accepted; the leaky fixture FAILING is what proves
+      # the checks still fire. Only the second one catches a validator that has
+      # rotted into a no-op ---------------------------------------------------
+      - name: Lesson validator (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash scripts/validate-lessons.sh tests/lessons/fixtures/clean-lessons.md
+          if bash scripts/validate-lessons.sh tests/lessons/fixtures/leaky-lessons.md; then
+            echo "::error::leaky fixture passed the validator - checks are not firing"
+            exit 1
+          fi
+
+      - name: Lesson validator (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/clean-lessons.md
+          if ($LASTEXITCODE -ne 0) { throw "clean fixture failed the validator" }
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/leaky-lessons.md
+          if ($LASTEXITCODE -eq 0) { throw "leaky fixture passed the validator - checks are not firing" }
+          # The leaky fixture is EXPECTED to exit non-zero; without this reset, the
+          # implicit "exit $LASTEXITCODE" GitHub Actions appends to every pwsh step
+          # would fail the step on its own correctly-detecting assertion.
+          exit 0
+
+      # --- Lesson aggregator: pin the rendered output against a committed
+      # expected file, then assert idempotence via --check. Both implementations
+      # must land on the SAME bytes; the expected file is what makes a
+      # culture-aware sort or a CRLF write fail loudly instead of drifting -----
+      - name: Lesson aggregator (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash scripts/aggregate-lessons.sh \
+            --spec-dir tests/lessons/fixtures/corpus \
+            --out tests/lessons/fixtures/expected-lessons.md --check
+          bash scripts/validate-lessons.sh tests/lessons/fixtures/expected-lessons.md
+
+      - name: Lesson aggregator (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/aggregate-lessons.ps1 -SpecDir tests/lessons/fixtures/corpus `
+            -Out tests/lessons/fixtures/expected-lessons.md -Check
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell aggregator output differs from the expected fixture" }
+          ./scripts/validate-lessons.ps1 tests/lessons/fixtures/expected-lessons.md
+          if ($LASTEXITCODE -ne 0) { throw "generated lessons file failed the privacy validator" }
+
+      # --- Docs-consistency self-test: the validator above proves the docs are
+      # right; this proves the validator would NOTICE if they were wrong. Without
+      # it, a Check 7 that rotted into a no-op would still report green ---------
+      - name: Docs-consistency self-test (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/selftest-docs.sh
+
+      - name: Docs-consistency self-test (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/selftest-docs.ps1
+
+      # --- Cross-impl hook conformance: pipe each golden fixture into BOTH
+      # implementations (bash + pwsh); normalized decisions must match the
+      # golden and each other. Runs under pwsh on every OS: ubuntu/macos get
+      # bash natively + pwsh preinstalled, windows gets pwsh natively + Git
+      # Bash. A divergence in only one impl fails with a three-way diff ----
+      - name: Hook conformance (bash vs PowerShell)
+        shell: pwsh
+        run: ./tests/hooks/run-conformance.ps1
+
+      - name: Hook conformance self-test (divergence detection)
+        shell: pwsh
+        run: ./tests/hooks/run-conformance.ps1 -SelfTest
+
       # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
       - name: Install -> uninstall round-trip (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'

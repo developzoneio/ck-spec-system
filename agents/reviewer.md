@@ -32,7 +32,7 @@ Key reminders:
 - Every BLOCK / WARN cites `§N.M` or a spec acceptance criterion — no anchor = no BLOCK/WARN.
 - Every finding cites `file:line` (see **sd-evidence-citation** skill).
 - If a section has zero findings, write `_No findings._` — never omit the section.
-- Pattern findings (see **sd-pattern-discipline** skill): deviation from an explicit `Pattern refs` entry is WARN, anchored to the task block. Convention drift with no Pattern ref and no constitution anchor is SUGGEST. Never BLOCK solely because a task lacks a `Pattern refs` field.
+- Pattern findings (see **sd-pattern-discipline** skill): deviation from an explicit `Pattern refs` entry is WARN, anchored to the task block. Convention drift with no Pattern ref and no constitution anchor is SUGGEST. Never BLOCK solely because a task lacks a `Pattern refs` field — the field is required on every task, but a missing one is a spec-authoring defect that `/sd:spec validate` reports as `SL060` (WARN), not a defect in the code you are reviewing.
 
 ---
 
@@ -63,6 +63,9 @@ Checklist (in addition to per-task items applied across the union of changes):
 - [ ] Test coverage did not decrease (compare to Phase 3 measurement in spec).
 - [ ] No new constitution exceptions across the union.
 - [ ] New files follow the precedents cited in their tasks' `Pattern refs`; no new utility duplicates an existing one (cite both `file:line`).
+- [ ] Scenario/criterion coverage: every SC-<n> and AC-<n> ID in `00-spec.md` appears in at
+  least one task's `Covers` field in `02-tasks.md`, and each covering task's `Test` exists.
+  Report an uncovered ID as a 🔴 BLOCK finding citing the spec line.
 
 This is broader scope - look for emergent issues that per-task review missed.
 

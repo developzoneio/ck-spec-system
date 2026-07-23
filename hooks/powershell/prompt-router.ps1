@@ -70,8 +70,13 @@ function Get-ProjectConfig {
     $cfgPath = Join-Path $Cwd '.claude/project-config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { return $defaults }
 
+    # -ErrorAction Stop is required: the script-wide SilentlyContinue preference
+    # would otherwise make a malformed config a NON-terminating error, so the
+    # catch never fires and the function returns $null instead of the defaults.
     try {
-        $loaded = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $loaded = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 -ErrorAction Stop |
+            ConvertFrom-Json -ErrorAction Stop
+        if ($null -eq $loaded) { return $defaults }
         return $loaded
     } catch {
         return $defaults
@@ -83,7 +88,14 @@ function Test-HookEnabled {
     try {
         if ($null -eq $Config.hooks) { return $true }
         if ($null -eq $Config.hooks.userPromptRouter) { return $true }
-        return [bool]$Config.hooks.userPromptRouter.enabled
+        # Type-strict: only a literal JSON boolean false disables the hook.
+        # [bool]$null is $false, so a userPromptRouter block with an ABSENT
+        # `enabled` would silently disable the router - diverging from
+        # prompt-router.sh's `== false`, which leaves it on. -is [bool] matches
+        # jq (SW-22).
+        $en = $Config.hooks.userPromptRouter.enabled
+        if (($en -is [bool]) -and (-not $en)) { return $false }
+        return $true
     } catch {
         return $true
     }

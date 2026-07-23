@@ -20,7 +20,7 @@ If a task feels like two changes, STOP and tell the main thread.
 1. **Read `CLAUDE.md`** for stack, conventions, forbidden patterns, build/test/lint commands.
 2. **Read `.specs/constitution.md`** sections cited in the spec's "Constitution check".
 3. **Read the `SPEC_REF`** (`00-spec.md`).
-4. **Read the `TASK_DETAILS`** block carefully. The 9 required fields (Files, Layer, Step type, Test, Acceptance, Depends on, Conflicts with, Estimated complexity, Reversibility) plus the optional `Pattern refs` field are the contract — see **sd-atomic-task-format** skill for definitions. A task without `Pattern refs` is treated as `Pattern refs: none`.
+4. **Read the `TASK_DETAILS`** block carefully. The 11 required fields (Files, Layer, Step type, Test, Acceptance, Covers, Depends on, Conflicts with, Estimated complexity, Reversibility, Pattern refs) are the contract — see **sd-atomic-task-format** skill for definitions, including the field label grammar (label matching is case-insensitive, `**` optional, colon inside or outside the emphasis). A legacy task with no `Pattern refs` field is still read as `Pattern refs: none` — do not refuse it.
 5. **Read each file in `TASK_DETAILS.Files`** before editing it. Never edit a file you have not just read.
 6. **Read every file cited in `TASK_DETAILS.Pattern refs`** (cap: 3) before creating or editing anything. These are the precedents your output must mirror — see **sd-pattern-discipline** skill.
 7. **If `IMPACT_REF` is provided** (evidence/analysis file, e.g. `03-decisions.md`) and the task creates a new file but has no Pattern refs, read ONLY the "Precedents & conventions" section of it. Do not read the whole file.

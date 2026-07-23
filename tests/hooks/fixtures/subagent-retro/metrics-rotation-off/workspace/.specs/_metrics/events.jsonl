@@ -1,0 +1,9 @@
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".ts"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".py"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".go"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".rs"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".js"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".cs"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".rb"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".java"}
+{"ts":"2026-01-01T00:00:00Z","spec_id":"FEAT-SEED-001","phase":"in-progress","event":"gate","gate":"code-edit","decision":"allow","ext":".kt"}

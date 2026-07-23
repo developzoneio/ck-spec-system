@@ -123,13 +123,26 @@
       "enabled": true,
       "mode": "warn",
       "_modes": "block = refuse Edit/Write on code without in-progress spec; warn = log to stderr only; off = skip",
-      "_use": "Guard rail blocking code edits when no spec is in-progress"
+      "_use": "Guard rail blocking code edits when no spec is in-progress",
+      "verifyGate": true,
+      "_verifyGate_use": "Scoped to FEAT- (feature-spec) rows only - other types (bug, refactor, perf, rca) have no /sd:verify integration yet. true: a FEAT- row may transition to done only when <spec.dir>/<ID>/06-verify.md records 'result: pass' (written by /sd:verify); non-FEAT rows and any false setting keep index.md fully protected as before SW-6."
     },
     "subagentRetro": {
       "enabled": true,
       "retroStaleMinutes": 30,
       "debounceMinutes": 10,
-      "_use": "Reminder to update stale retros after subagent runs"
+      "_use": "Reminder to update stale retros after subagent runs",
+      "injectLessons": true,
+      "maxLessons": 3,
+      "_injectLessons_use": "Surface lessons from <spec.dir>/_lessons/lessons.md when a subagent finishes work on an in-progress spec. Selection is by workflow type - a FEAT- spec pulls feature-scoped lessons - so there is no ranking. Emitted regardless of retro staleness and of debounceMinutes, which gate only the stale-retro reminder.",
+      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder."
+    },
+    "metrics": {
+      "enabled": true,
+      "path": ".specs/_metrics/events.jsonl",
+      "maxSizeKb": 1024,
+      "_use": "Append-only, metadata-only event log (no code content, no file paths) consumed by the retro loop. Set enabled=false to opt out entirely.",
+      "_maxSizeKb_use": "Soft byte cap (KB) for events.jsonl. When the live file reaches the cap, the next write rolls it to events.jsonl.1 (single generation, previous roll overwritten) and starts a fresh log. Default 1024 (~1MB, a guess - not tuned against a measured corpus); absent key also means 1024, so pre-existing configs stay bounded. Set to 0 to disable rotation and let the log grow unbounded. Rotation is best-effort: any failure (locked file, read-only dir) is a silent no-op and the hook never stops appending. events.jsonl.1 is a grace buffer, not part of any read contract - a consumer reads the live file only."
     }
   }
 }
