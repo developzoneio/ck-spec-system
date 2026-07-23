@@ -437,6 +437,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   three new conformance fixtures: a relative `..` traversal into the protected constitution file,
   a trailing separator on the protected constitution file, and a benign relative `..` resolving to
   a non-protected code file, proving the fix does not over-block.
+- Extended `.gitattributes` with a repo-wide `* text=auto` default plus `*.sh` and `*.ps1` pinned to
+  `eol=lf`, so shell scripts no longer check out as CRLF on Windows, where a `#!/usr/bin/env bash`
+  line with a trailing CR fails with `bad interpreter` and heredocs / `[[ ... ]]` mis-parse (SW-21).
+  Folds the previously narrow, fixtures-only policy into a repo-wide one; the byte-comparison fixture
+  pins (`tests/**`) stay because `* text=auto` still yields a native CRLF checkout on Windows. The
+  first checkout after this lands renormalizes line endings in existing Windows working trees - a
+  one-time large diff, not a real change.
 
 ## [1.4.0] - 2026-07-05
 

@@ -1,3 +1,14 @@
+# Line-ending policy. Normalize all text to LF in the repo; check shell and PowerShell scripts out
+# as LF on every platform so shebangs and heredocs parse and cross-platform parity holds (SW-21).
+# PowerShell 5.1 reads either; pinning LF is cheap consistency and is unaffected by the pure-ASCII
+# rule for *.ps1 (CLAUDE.md). With core.autocrlf=true (the Git default on Windows and on the
+# windows-latest CI runner) an unpinned *.sh checks out CRLF, putting a trailing CR on the
+# `#!/usr/bin/env bash` shebang (bad interpreter) and mis-parsing heredocs and `[[ ... ]]`.
+* text=auto
+
+*.sh  text eol=lf
+*.ps1 text eol=lf
+
 # Byte-comparison fixtures must keep LF on every platform.
 #
 # scripts/aggregate-lessons.{ps1,sh} deliberately render LF and compare the
@@ -6,9 +17,8 @@
 # runner) that fixture would be checked out as CRLF, and the comparison would
 # fail for a reason that has nothing to do with the code under test.
 #
-# This covers the fixture trees only. The repo's shell scripts are also
-# checked out as CRLF on Windows today - see SW-21; that is a broader change
-# and is deliberately not folded in here.
+# The `* text=auto` default above normalizes to LF in the repo but still yields a
+# native (CRLF) checkout on Windows, so these fixture trees keep an explicit eol=lf pin.
 tests/lessons/** text eol=lf
 
 # tests/task-format/** are field-grammar fixtures (SW-11). They assert how a
