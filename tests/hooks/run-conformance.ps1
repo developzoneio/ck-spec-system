@@ -133,8 +133,14 @@ function Invoke-HookProcess {
     $psi.RedirectStandardError  = $true
     $psi.UseShellExecute        = $false
     $proc = [System.Diagnostics.Process]::Start($psi)
-    $proc.StandardInput.Write($Payload)
-    $proc.StandardInput.Close()
+    try {
+        $proc.StandardInput.Write($Payload)
+        $proc.StandardInput.Close()
+    } catch [System.IO.IOException] {
+        # Child exited without reading stdin (e.g. the self-test's always-allow
+        # stub, which never touches its input) - a broken pipe here just means
+        # the child didn't need the payload, not a harness failure.
+    }
     # Hook output is tiny (well under pipe buffer size), so sequential
     # reads cannot deadlock.
     $stdout = $proc.StandardOutput.ReadToEnd()

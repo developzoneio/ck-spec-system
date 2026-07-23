@@ -62,6 +62,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "clean fixture failed the validator" }
           ./scripts/validate-lessons.ps1 tests/lessons/fixtures/leaky-lessons.md
           if ($LASTEXITCODE -eq 0) { throw "leaky fixture passed the validator - checks are not firing" }
+          # The leaky fixture is EXPECTED to exit non-zero; without this reset, the
+          # implicit "exit $LASTEXITCODE" GitHub Actions appends to every pwsh step
+          # would fail the step on its own correctly-detecting assertion.
+          exit 0
 
       # --- Lesson aggregator: pin the rendered output against a committed
       # expected file, then assert idempotence via --check. Both implementations

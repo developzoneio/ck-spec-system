@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Three CI-only failures surfaced by PR #23, none reachable from a real install. (1)
+  `scripts/validate.sh` Check 7 used `declare -A` (bash 4+), which crashes on macOS's stock
+  `/bin/bash` 3.2 with `declare: -A: invalid option` - rewritten as plain indexed arrays with
+  linear-scan `q_get`/`q_set`/`fp_get`/`fp_append` lookup helpers, no behavior change. (2) The
+  "Lesson validator (PowerShell)" CI step asserts the leaky fixture correctly FAILS validation,
+  but GitHub Actions appends an implicit `exit $LASTEXITCODE` to every pwsh step, so the
+  intentional non-zero exit code from the leaky-fixture check failed the step even though the
+  assertion itself passed - fixed with an explicit `exit 0` after the assertion. (3)
+  `tests/hooks/run-conformance.ps1`'s `-SelfTest` stub bash script exits immediately without
+  reading stdin, and writing the JSON payload to its now-closed pipe raised an unhandled
+  `IOException: Broken pipe` on Linux runners - `Invoke-HookProcess` now wraps the
+  `StandardInput.Write`/`Close` pair in a try/catch, since a child that never reads its input is
+  not a harness failure.
+
 ### Added
 - `/sd:status` - a read-only reader for the metrics log (SW-16). SW-10 has been accumulating
   `.specs/_metrics/events.jsonl` with no consumer; the data existed and was invisible. The new

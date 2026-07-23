@@ -223,8 +223,53 @@ elif ! command -v jq >/dev/null 2>&1; then
     add_failure "docs: jq not installed"
 else
     docs_bad=0
-    declare -A quantities=()
-    declare -A file_patterns=()
+    # Plain (non-associative) arrays + linear-scan lookup functions, not `declare -A`:
+    # macOS ships /bin/bash 3.2 (no associative arrays), and this script must run there.
+    quantity_names=()
+    quantity_values=()
+    q_set() { # name value
+        local name="$1" value="$2" i
+        for i in "${!quantity_names[@]}"; do
+            if [[ "${quantity_names[$i]}" == "$name" ]]; then
+                quantity_values[$i]="$value"
+                return
+            fi
+        done
+        quantity_names+=("$name")
+        quantity_values+=("$value")
+    }
+    q_get() { # name -> stdout value, empty if unset
+        local name="$1" i
+        for i in "${!quantity_names[@]}"; do
+            if [[ "${quantity_names[$i]}" == "$name" ]]; then
+                printf '%s' "${quantity_values[$i]}"
+                return
+            fi
+        done
+    }
+
+    file_pattern_names=()
+    file_pattern_values=()
+    fp_append() { # file pattern
+        local file="$1" pattern="$2" i
+        for i in "${!file_pattern_names[@]}"; do
+            if [[ "${file_pattern_names[$i]}" == "$file" ]]; then
+                file_pattern_values[$i]="${file_pattern_values[$i]}${pattern}"$'\n'
+                return
+            fi
+        done
+        file_pattern_names+=("$file")
+        file_pattern_values+=("${pattern}"$'\n')
+    }
+    fp_get() { # file -> stdout newline-joined patterns, empty if none
+        local file="$1" i
+        for i in "${!file_pattern_names[@]}"; do
+            if [[ "${file_pattern_names[$i]}" == "$file" ]]; then
+                printf '%s' "${file_pattern_values[$i]}"
+                return
+            fi
+        done
+    }
 
     # Some jq builds (notably jq.exe on Windows) emit CRLF. An unstripped \r rides on the
     # last field of every record and silently breaks glob matches, array keys and prefix
@@ -255,20 +300,21 @@ else
             add_failure "docs: area $area_name derived 0"
             docs_bad=$((docs_bad + 1))
         fi
-        quantities["$area_name"]=$area_count
+        q_set "$area_name" "$area_count"
     done < <(mjq '.areas | to_entries[] | "\(.key)\t\(if .value.glob then "glob" else "files" end)\t\(.value.glob // (.value.files | join(" ")))"')
     shopt -u nullglob
 
     while IFS=$'\t' read -r der_name der_parts; do
         der_total=0
         for part in $der_parts; do
-            der_total=$((der_total + ${quantities["$part"]:-0}))
+            part_val="$(q_get "$part")"
+            der_total=$((der_total + ${part_val:-0}))
         done
-        quantities["$der_name"]=$der_total
+        q_set "$der_name" "$der_total"
     done < <(mjq '.derived | to_entries[] | "\(.key)\t\(.value | join(" "))"')
 
     while IFS=$'\t' read -r c_file c_pattern c_equals; do
-        file_patterns["$c_file"]="${file_patterns["$c_file"]:-}${c_pattern}"$'\n'
+        fp_append "$c_file" "$c_pattern"
 
         target="$repo_root/$c_file"
         if [[ ! -f "$target" ]]; then
@@ -277,7 +323,7 @@ else
             docs_bad=$((docs_bad + 1))
             continue
         fi
-        expected="${quantities["$c_equals"]:-}"
+        expected="$(q_get "$c_equals")"
         if [[ -z "$expected" ]]; then
             fail "$c_file : claim references unknown quantity '$c_equals'"
             add_failure "docs: unknown quantity $c_equals"
@@ -328,11 +374,12 @@ else
             lineno=$((lineno + 1))
             [[ "$line" =~ $phrases_re ]] || continue
             covered=0
-            if [[ -n "${file_patterns["$rel"]:-}" ]]; then
+            fp_val="$(fp_get "$rel")"
+            if [[ -n "$fp_val" ]]; then
                 while IFS= read -r pat; do
                     [[ -z "$pat" ]] && continue
                     if [[ "$line" =~ $pat ]]; then covered=1; break; fi
-                done <<< "${file_patterns["$rel"]}"
+                done <<< "$fp_val"
             fi
             if [[ $covered -eq 0 ]]; then
                 fail "$rel:$lineno : undeclared inventory claim (add a docClaims entry or an exclusion)"
