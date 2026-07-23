@@ -359,7 +359,11 @@ else
     # covered by a docClaims entry. This is what keeps the manifest canonical - a new
     # doc cannot publish a number that nothing checks.
     phrases_re="$(mjq '.claimPhrases | join("|")')"
-    mapfile -t exclusions < <(mjq '.historicalExclusions[]')
+    # Not `mapfile` (bash 4+, absent from macOS's stock /bin/bash 3.2).
+    exclusions=()
+    while IFS= read -r ex; do
+        exclusions+=("$ex")
+    done < <(mjq '.historicalExclusions[]')
 
     while IFS= read -r -d '' f; do
         rel="${f#"$repo_root"/}"

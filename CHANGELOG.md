@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Three CI-only failures surfaced by PR #23, none reachable from a real install. (1)
-  `scripts/validate.sh` Check 7 used `declare -A` (bash 4+), which crashes on macOS's stock
-  `/bin/bash` 3.2 with `declare: -A: invalid option` - rewritten as plain indexed arrays with
-  linear-scan `q_get`/`q_set`/`fp_get`/`fp_append` lookup helpers, no behavior change. (2) The
+  `scripts/validate.sh` Check 7 used `declare -A` and `mapfile` (both bash 4+), which crash on
+  macOS's stock `/bin/bash` 3.2 (`declare: -A: invalid option`, then `mapfile: command not found`
+  once the first was fixed) - rewritten as plain indexed arrays with linear-scan
+  `q_get`/`q_set`/`fp_get`/`fp_append` lookup helpers and a `while read` loop in place of
+  `mapfile`, no behavior change. (2) The
   "Lesson validator (PowerShell)" CI step asserts the leaky fixture correctly FAILS validation,
   but GitHub Actions appends an implicit `exit $LASTEXITCODE` to every pwsh step, so the
   intentional non-zero exit code from the leaky-fixture check failed the step even though the
