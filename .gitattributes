@@ -1,0 +1,7 @@
+# Normalize line endings. Shell scripts MUST be LF so shebangs and heredocs parse on every
+# platform (see SW-21). PowerShell scripts pinned to LF for cross-platform parity; PS 5.1 reads
+# either, and consistency is cheap. Pure-ASCII rule for *.ps1 (CLAUDE.md) is unaffected by eol.
+* text=auto
+
+*.sh  text eol=lf
+*.ps1 text eol=lf

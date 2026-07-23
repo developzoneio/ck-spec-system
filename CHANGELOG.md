@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `.gitattributes` pinning `*.sh` and `*.ps1` to `eol=lf` (plus a `* text=auto` default) so shell
+  scripts no longer check out as CRLF on Windows, where a `#!/usr/bin/env bash` line with a trailing
+  CR fails with `bad interpreter` and heredocs / `[[ ... ]]` mis-parse (SW-21). The first checkout
+  after this lands renormalizes line endings in existing Windows working trees - a one-time large
+  diff, not a real change.
+
 ## [1.4.0] - 2026-07-05
 
 ### Added
