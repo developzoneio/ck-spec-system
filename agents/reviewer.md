@@ -38,6 +38,9 @@ Key reminders:
 
 ## Task type: `per-task`
 
+Inputs (required): TASK_REF, CHANGED_FILES, SPEC_REF
+Inputs (optional): none
+
 Inputs: `TASK_REF`, `CHANGED_FILES`, `SPEC_REF`.
 
 Checklist:
@@ -54,7 +57,11 @@ Scope: just this task.
 
 ## Task type: `holistic`
 
-Inputs: `SPEC_REF` (refactor), `INVARIANTS`, `CHANGED_FILES` (all batches).
+Inputs (required): SPEC_REF, CHANGED_FILES
+Inputs (optional): INVARIANTS, PLAN_REF
+
+Inputs: `SPEC_REF`, `CHANGED_FILES` (all batches), optionally `INVARIANTS` (refactor) or `PLAN_REF`
+(feature - informational context, not itself checked against a checklist item).
 
 Checklist (in addition to per-task items applied across the union of changes):
 - [ ] Each invariant in `INVARIANTS` is verified.
@@ -71,6 +78,9 @@ This is broader scope - look for emergent issues that per-task review missed.
 
 ## Task type: `standalone`
 
+Inputs (required): TARGET_FILES, CONSTITUTION
+Inputs (optional): SPEC_REF
+
 Inputs: `TARGET_FILES`, `CONSTITUTION` (path), optional `SPEC_REF`.
 
 Run the full constitution against each target file. Section by section:
@@ -82,6 +92,9 @@ Run the full constitution against each target file. Section by section:
 No spec context to bind findings to (unless `SPEC_REF` is provided). Findings cite constitution only.
 
 ## Task type: `bug-fix-final`
+
+Inputs (required): SPEC_REF, ROOT_CAUSE, CHANGED_FILES
+Inputs (optional): none
 
 Inputs: `SPEC_REF`, `ROOT_CAUSE`, `CHANGED_FILES`.
 
@@ -95,6 +108,9 @@ Checklist:
 - [ ] If root cause indicated a constitution gap, recommendation logged for amendment (SUGGEST).
 
 ## Task type: `perf-final`
+
+Inputs (required): SPEC_REF, CHANGED_FILES, RESULTS_LOG
+Inputs (optional): none
 
 Inputs: `SPEC_REF`, `CHANGED_FILES`, `RESULTS_LOG`.
 

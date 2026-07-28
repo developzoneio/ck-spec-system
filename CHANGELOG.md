@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Machine-readable `Inputs (required): ...` / `Inputs (optional): ...` declarations under every
+  TASK/mode/workflow-type heading in `agents/*.md` (22 sections across `code-explorer`, `debugger`,
+  `implementer`, `reviewer`, `spec-architect`; `docs-writer` has no mode dispatch) - prerequisite
+  for the invocation-contract validator in SW-26 (SW-25). Format documented in `CONTRIBUTING.md`
+  under "Agents". No agent behaviour changed.
+
+### Fixed
+- Audit of every `commands/*.md` invocation site against the new declarations turned up three
+  drifted contracts, now corrected: `/sd:bug`'s hypothesis-verify loop omitted `EVIDENCE_DIR` from
+  its `sd-debugger` `TASK = verify` call, so verification evidence had nowhere to be saved
+  (`commands/bug.md`); `/sd:rca` passes `MODE = incident` to `sd-debugger`'s `enumerate` task, a
+  token the agent never declared (`agents/debugger.md`); `/sd:feature`'s batch review passes
+  `PLAN_REF` to `sd-reviewer`'s `holistic` task, likewise undeclared (`agents/reviewer.md`).
+  `agents/spec-architect.md`'s `create` mode also documented an `INCIDENT_DETAILS` input no command
+  has ever set - removed, since `/sd:rca` fills those fields interactively, not via a token.
+
 ## [1.5.0] - 2026-07-23
 
 ### Fixed

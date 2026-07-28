@@ -38,7 +38,13 @@ You operate in one of three modes, signalled by the `TASK` field in your invocat
 
 ## Mode 1: `TASK = create`
 
-Inputs: `TEMPLATE`, `SPEC_ID`, optionally `TICKET_CONTEXT`, `SMELL` (refactor), `INCIDENT_DETAILS` (rca).
+Inputs (required): TEMPLATE, SPEC_ID
+Inputs (optional): TICKET_CONTEXT, SMELL
+
+Inputs: `TEMPLATE`, `SPEC_ID`, optionally `TICKET_CONTEXT` (feature, bug), `SMELL` (refactor). No
+command sets `INCIDENT_DETAILS` for the `rca` template today - `/sd:rca` fills Timeline / Symptoms
+/ Affected scope / Recent changes interactively after the skeleton is created, not via an input
+token.
 
 Output: `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
 
@@ -54,7 +60,10 @@ is a spec-level estimate, distinct from a task's `Estimated complexity`.
 
 ## Mode 2: `TASK = plan`
 
-Inputs: `SPEC` (path to `00-spec.md`), `IMPACT` (path to `03-decisions.md` from code-explorer), optionally `MODE` (`feature` | `refactor`).
+Inputs (required): SPEC, IMPACT
+Inputs (optional): MODE, REPLAN_SCOPE, REVISION
+
+Inputs: `SPEC` (path to `00-spec.md`), `IMPACT` (path to `03-decisions.md` from code-explorer), optionally `MODE` (`feature` | `refactor`). A scoped re-plan invocation (see below) passes `REPLAN_SCOPE` and `REVISION` instead of `SPEC`/`IMPACT`.
 
 Outputs:
 - `.specs/<SPEC_ID>/01-plan.md` - phased plan: Foundation -> Behavior -> Wiring -> Polish (feature), or Sequencing -> Batching (refactor).
@@ -144,6 +153,9 @@ text.
 ---
 
 ## Mode 3: `TASK = refine`
+
+Inputs (required): SPEC, FEEDBACK
+Inputs (optional): none
 
 Inputs: `SPEC` (path), `FEEDBACK` (user's feedback verbatim).
 

@@ -110,7 +110,7 @@ If the user insists on proceeding without repro, log a constitution exception to
 2. Debugger enumerates hypotheses per the **sd-hypothesis-tree** skill (5 mental models, `(Likelihood x Impact) / Cost-to-verify` ranking).
 3. Main thread appends the returned hypothesis tree to `.specs/BUG-<arg>/03-decisions.md` (debugger has no write tool).
 4. Loop:
-   - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`.
+   - Invoke `sd-debugger` with `TASK = verify`, `HYPOTHESIS = <H#>`, `EVIDENCE_DIR = .specs/BUG-<arg>/04-artifacts/`.
    - Result: CONFIRMED / REJECTED / INCONCLUSIVE.
    - Main thread appends the result with evidence pointers (file:line, log lines, query results) to `03-decisions.md`.
    - Document REJECTED hypotheses with FULL reasoning - this is knowledge preservation for future similar bugs.

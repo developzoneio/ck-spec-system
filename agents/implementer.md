@@ -68,23 +68,39 @@ If `TASK_DETAILS` is missing, malformed, or vague ("update the service") -> STOP
 The main thread passes `WORKFLOW_TYPE`. Apply the matching constraint set.
 
 ### `WORKFLOW_TYPE = feature`
+
+Inputs (required): TASK_DETAILS, SPEC_REF
+Inputs (optional): IMPACT_REF
+
 - New behavior is expected.
 - New tests in `Test` field expected to be authored as part of the task.
 - Public API additions are fine if the spec calls for them.
 
 ### `WORKFLOW_TYPE = bug`
+
+Inputs (required): TASK_DETAILS, SPEC_REF, ROOT_CAUSE
+Inputs (optional): IMPACT_REF
+
 - Read `ROOT_CAUSE` field. Your fix must address THIS cause, not the symptom.
 - Fix is MINIMAL. Smallest diff that makes the failing test pass.
 - A failing test was authored BEFORE this invocation (in `/sd:bug` Phase 4). Run it FIRST to confirm it fails. Apply fix. Run it AGAIN to confirm it passes.
 - NO new public API. NO refactor. NO reformatting.
 
 ### `WORKFLOW_TYPE = refactor`
+
+Inputs (required): TASK_DETAILS, SPEC_REF, INVARIANTS
+Inputs (optional): IMPACT_REF
+
 - Read `INVARIANTS` field. Verify each one after every edit.
 - Behavior-preserving. NO new public API. NO new feature. NO behavior change.
 - All existing tests must continue to pass without test modifications. (Renames of test names are OK if they mirror renames in production code; behavior changes in tests are NOT OK.)
 - If you discover an invariant cannot be preserved under the planned approach, STOP and surface.
 
 ### `WORKFLOW_TYPE = perf`
+
+Inputs (required): TASK_DETAILS, SPEC_REF, CONSTRAINTS
+Inputs (optional): IMPACT_REF
+
 - Read `CONSTRAINTS` field. Correctness is non-negotiable.
 - ONE optimization per invocation. If the hypothesis bundles two ideas, split before invoking.
 - Functional tests must continue to pass without modification.

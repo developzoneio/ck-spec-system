@@ -189,6 +189,28 @@ skills:
 - Agent must read `CLAUDE.md` and `constitution.md` at runtime. No hardcoded stack assumptions (no `cs`, `csproj`, `dotnet`, etc. literal references unless they come from project config).
 - Every finding cites `file:line`. No prose without citations.
 
+**Machine-readable input declarations.** Under every heading that selects a distinct agent
+behavior by field value (`## Mode N: TASK = <mode>`, `## Task type: `<type>``, `### `TASK =
+<type>``, `### `WORKFLOW_TYPE = <type>``), add two lines immediately before the existing prose:
+
+```
+Inputs (required): SPEC, IMPACT
+Inputs (optional): MODE, REPLAN_SCOPE
+```
+
+- Tokens are `UPPER_SNAKE`, comma-separated, exactly the identifiers the calling command sets -
+  never a paraphrase.
+- Write `none` explicitly when a mode has no required (or no optional) inputs. Silence is not an
+  assertion - an omitted line reads as "not yet documented," not as "empty."
+- The existing prose `Inputs: ...` line (with parenthetical caveats, cross-references, etc.) stays
+  below unchanged - the two new lines are additive, for tooling to grep, not a replacement for the
+  explanatory prose.
+- When adding or changing an agent invocation in `commands/*.md`, cross-check it against the
+  target mode's declared inputs: a token the command passes that the mode doesn't declare, or a
+  required token the mode declares that the command omits, is a real defect - fix the mismatch (add
+  the missing token to the declaration or the invocation, whichever is actually correct) rather than
+  leaving the two out of sync.
+
 ### Hooks
 
 Hooks come in pairs. If you change `hooks/powershell/foo.ps1`, you also update `hooks/bash/foo.sh`. The repo CI runs `scripts/validate.{ps1,sh}`, which refuses PRs where the pair drifts (along with the other engine-invariant checks).

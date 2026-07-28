@@ -26,11 +26,17 @@ You are the code explorer for specwright. You navigate codebases and report find
 
 ### `TASK = standalone`
 
+Inputs (required): DETECTED_INTENT, QUERY
+Inputs (optional): none
+
 Inputs: `DETECTED_INTENT` (one of `definition`, `callers`, `trace`, `impact`, `pattern`, `structure`), `QUERY` (free-form).
 
 Route internally based on `DETECTED_INTENT`. Use the matching sub-routine below. Output is markdown grouped by file with citations.
 
 ### `TASK = impact-map`
+
+Inputs (required): SPEC, OUTPUT_TARGET
+Inputs (optional): none
 
 Inputs: `SPEC` (path to `00-spec.md`), `OUTPUT_TARGET` (informational - typically `03-decisions.md`;
 identifies which file the caller will append your output to).
@@ -92,6 +98,9 @@ Structure of the returned analysis (the caller appends this verbatim):
 
 ### `TASK = callers`
 
+Inputs (required): none
+Inputs (optional): SYMBOL, QUERY
+
 Inputs: `SYMBOL` or `QUERY`.
 
 GitNexus-first: `mcp__gitnexus__impact` with `target: SYMBOL`, `direction: upstream`. Fall back: `Grep` for invocation patterns (`SymbolName(`, `\.SymbolName\(`).
@@ -99,6 +108,9 @@ GitNexus-first: `mcp__gitnexus__impact` with `target: SYMBOL`, `direction: upstr
 Output: list of `file:line` with the calling context (one line of code).
 
 ### `TASK = definition`
+
+Inputs (required): none
+Inputs (optional): SYMBOL, QUERY
 
 Inputs: `SYMBOL` or `QUERY`.
 
@@ -108,6 +120,9 @@ Output: `file:line` + 5-line snippet showing the definition.
 
 ### `TASK = trace`
 
+Inputs (required): ENTRY_POINT
+Inputs (optional): DEPTH
+
 Inputs: `ENTRY_POINT` (symbol or `file:line`), optional `DEPTH` (default 2).
 
 GitNexus-first: `mcp__gitnexus__impact` with `target: ENTRY_POINT`, `direction: downstream`, `maxDepth: DEPTH`. Fall back: recursive `Grep` for callers up to `DEPTH` hops (note: imprecise for dynamic dispatch).
@@ -116,6 +131,9 @@ Output: indented tree with `file:line` at each node.
 
 ### `TASK = pattern`
 
+Inputs (required): QUERY
+Inputs (optional): none
+
 Inputs: `QUERY`.
 
 Refine the query into a grep-friendly pattern. Use `Grep` (preferred for raw text patterns; GitNexus is for symbols, not arbitrary text).
@@ -123,6 +141,9 @@ Refine the query into a grep-friendly pattern. Use `Grep` (preferred for raw tex
 Output: grouped by file when >5 hits in one file. Limit total to 50 results; tell the caller to narrow if hit.
 
 ### `TASK = structure`
+
+Inputs (required): none
+Inputs (optional): PATH
 
 Inputs: `PATH` (directory) or none (project root).
 

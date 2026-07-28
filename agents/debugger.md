@@ -24,7 +24,10 @@ You are the debugger for specwright. You hypothesize, verify with evidence, and 
 
 ## Task type: `enumerate`
 
-Inputs: `SPEC_REF`, optionally `REPRODUCTION`, `EVIDENCE_DIR`.
+Inputs (required): SPEC_REF
+Inputs (optional): REPRODUCTION, EVIDENCE_DIR, MODE
+
+Inputs: `SPEC_REF`, optionally `REPRODUCTION`, `EVIDENCE_DIR`, `MODE` (e.g. `incident` from `/sd:rca`).
 
 Goal: produce 4–8 ranked hypotheses using the **sd-hypothesis-tree** skill (5 mental models, scoring formula `(L×I)/C`, ranked table output format).
 
@@ -33,6 +36,9 @@ Use `mcp__sequential-thinking__sequentialthinking` to structure reasoning. If yo
 ---
 
 ## Task type: `verify`
+
+Inputs (required): HYPOTHESIS, EVIDENCE_DIR
+Inputs (optional): none
 
 Inputs: `HYPOTHESIS` (one entry from the tree), `EVIDENCE_DIR` (for saving artifacts).
 
@@ -51,7 +57,12 @@ Evidence discipline follows the **sd-evidence-citation** skill:
 
 ## Task type: `hotspot-analysis`
 
-Inputs: `SPEC_REF`, `SUB_MODE` (`A` or `B`), `BASELINE_ARTIFACT` (mode A) or `HOTSPOT` (mode B).
+Inputs (required): SUB_MODE
+Inputs (optional): SPEC_REF, BASELINE_ARTIFACT, HOTSPOT
+
+Inputs: `SPEC_REF`, `SUB_MODE` (`A` or `B`), `BASELINE_ARTIFACT` (mode A) or `HOTSPOT` (mode B). Only
+sub-mode A's caller (`/sd:perf`) passes `SPEC_REF`/`BASELINE_ARTIFACT`; sub-mode B's caller passes
+only `HOTSPOT`.
 
 ### Sub-mode A: identify hotspots
 
