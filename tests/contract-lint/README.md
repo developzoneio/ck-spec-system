@@ -57,6 +57,10 @@ wording can improve in one commit while a divergence still fails.
 | `cl102-invocation-omits-required-input` | CL102 |
 | `cl103-invocation-passes-undeclared-input` | CL103 |
 | `cl104-duplicate-agent-name` | CL104 |
+| `cl200-agent-instructed-to-write` | CL200 |
+| `cl201-readonly-agent-declares-write-tool` | CL201 |
+| `cl202-unknown-mcp-tool-name` | CL202 |
+| `cl203-declared-tool-never-mentioned` | CL203 |
 | `cl300-gate-without-stop` | CL300 |
 | `cl301-gate-without-options` | CL301 |
 | `cl302-gate-count-disagrees` | CL302 |
@@ -79,6 +83,7 @@ These are not decoration. They are the only thing stopping a future tightening o
 | `fp-bold-pseudo-gate` | bold `Gate Complexity (HARD)` text is not a heading | `commands/feature.md` |
 | `fp-substep-before-parent` | a conditional sub-gate authored before its parent | `commands/bug.md` |
 | `fp-hard-gate-prose-escape` | a HARD gate whose PROSE mentions an override | `commands/bug.md`, `commands/release.md` |
+| `fp-negated-write-verb` | a negated ("Do not write") or third-person ("The caller will Create") use of a CL200 verb | `agents/code-explorer.md` |
 
 ## The case that must still BITE
 

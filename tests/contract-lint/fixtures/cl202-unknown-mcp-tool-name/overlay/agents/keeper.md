@@ -18,10 +18,7 @@ Inputs (optional): none
 `Grep` for any existing draft first. Read `templates/sd/demo.template.md` and return
 the drafted body. The main thread writes `00-spec.md`; you have no write tool.
 
-<!-- SEEDED: unused-mode - no command in this fixture tree ever sets TASK = archive -->
-## `TASK = archive`
+Consult `mcp__demo__known-tool` for prior art.
 
-Inputs (required): none
-Inputs (optional): none
-
-Archive the current draft. Nothing in this fixture tree invokes this mode.
+<!-- SEEDED: unknown-mcp-tool - the next line names an mcp tool this manifest does not recognize -->
+Do not consult `mcp__demo__unknown-tool`; this manifest does not recognize it.

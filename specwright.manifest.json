@@ -313,6 +313,11 @@
       { "id": "CL103", "severity": "WARN",  "wave": 2, "summary": "invocation passes an input token the declared mode declares nowhere" },
       { "id": "CL104", "severity": "BLOCK", "wave": 2, "summary": "two agent files share a frontmatter name:" },
 
+      { "id": "CL200", "severity": "WARN",  "wave": 3, "summary": "agent with no write tool is instructed to write, append or create (ships WARN, promotes to BLOCK in a follow-up)" },
+      { "id": "CL201", "severity": "BLOCK", "wave": 3, "summary": "agent listed in contractLint.readOnlyAgents declares a write tool" },
+      { "id": "CL202", "severity": "WARN",  "wave": 3, "summary": "mcp__* name absent from contractLint.knownMcpTools" },
+      { "id": "CL203", "severity": "WARN",  "wave": 3, "summary": "agent frontmatter declares a tool never mentioned in its own body" },
+
       { "id": "CL300", "severity": "BLOCK", "wave": 1, "summary": "gate block containing no literal STOP" },
       { "id": "CL301", "severity": "BLOCK", "wave": 1, "summary": "gate block offering no option set" },
       { "id": "CL302", "severity": "BLOCK", "wave": 1, "summary": "hard gate count on disk disagrees with gates.<file>.hard" },
@@ -359,6 +364,48 @@
       "sd-retro-lessons": "scripts/validate-lessons.{ps1,sh}, scripts/aggregate-lessons.{ps1,sh}"
     },
 
-    "overrideOptionTokens": ["skip", "override", "proceed anyway", "bypass", "force", "ignore"]
+    "overrideOptionTokens": ["skip", "override", "proceed anyway", "bypass", "force", "ignore"],
+
+    "readOnlyAgents": ["sd-code-explorer", "sd-reviewer", "sd-debugger"],
+
+    "$readOnlyAgentsComment": [
+      "A DECLARED promise, not a derived fact: these three agents are architecturally",
+      "committed to staying read-only, and CL201 is the only rule that reads this list -",
+      "it fires the moment one of them grows Write/Edit/MultiEdit in its own tools: line.",
+      "CL200 does NOT consult this list. CL200 asks 'does THIS agent's frontmatter carry a",
+      "write tool right now', straight off disk, for every agent - so a new read-only agent",
+      "is protected on day one even if nobody remembers to add it here. This list exists so",
+      "the THREE AGENTS ABOVE SPECIFICALLY can never quietly gain a write tool, the same",
+      "declared-vs-disk shape CL304 already uses for conditional gates."
+    ],
+
+    "knownMcpTools": [
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__gitnexus__context",
+      "mcp__gitnexus__impact",
+      "mcp__gitnexus__query",
+      "mcp__gitnexus__list_repos",
+      "mcp__tavily__tavily_search",
+      "mcp__context7__query-docs",
+      "mcp__context7__resolve-library-id",
+      "mcp__atlassian__getJiraIssue",
+      "mcp__atlassian__searchJiraIssuesUsingJql",
+      "mcp__atlassian__getJiraIssueRemoteIssueLinks",
+      "mcp__atlassian__getConfluencePage"
+    ],
+
+    "$knownMcpToolsComment": [
+      "Hand-maintained on purpose, not derived: nothing on disk is a second source for",
+      "which mcp__* tool names are real, since that comes from runtime MCP server",
+      "configuration this repo cannot see. That fails the manifest's own derivability",
+      "test (see $contractLintComment above), so it belongs here, written down, same",
+      "category as overrideOptionTokens and skillConsumers.",
+      "",
+      "THE DELIBERATE FAILURE MODE: this list goes stale the moment a new MCP tool is",
+      "wired into an agent and this file is not updated in the same PR. CL202 stays WARN",
+      "forever (see contractLint.rules above) specifically because of that risk - a stale",
+      "allowlist must never be able to block CI. Treat a CL202 hit as 'update this list or",
+      "explain why not', never as 'suppress and move on'."
+    ]
   }
 }

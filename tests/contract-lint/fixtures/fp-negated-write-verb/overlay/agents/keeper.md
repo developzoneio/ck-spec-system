@@ -18,10 +18,5 @@ Inputs (optional): none
 `Grep` for any existing draft first. Read `templates/sd/demo.template.md` and return
 the drafted body. The main thread writes `00-spec.md`; you have no write tool.
 
-<!-- SEEDED: unused-mode - no command in this fixture tree ever sets TASK = archive -->
-## `TASK = archive`
-
-Inputs (required): none
-Inputs (optional): none
-
-Archive the current draft. Nothing in this fixture tree invokes this mode.
+Do not write, append, or create files yourself - describe the change and let the
+main thread apply it. The caller will Create `00-spec.md` from what you return.

@@ -175,6 +175,23 @@ RE_NUMSTEP='^[[:blank:]]*[0-9]+\.[[:blank:]]'
 # Byte range 0x80-0xFF in the C locale = any non-ASCII byte. Built at runtime so
 # this file itself stays pure ASCII, exactly as scripts/validate.sh:45 does.
 non_ascii_re="$(printf '[\200-\377]')"
+# CL2xx role and tool integrity. tools: is a single comma-joined frontmatter
+# line (never a nested list like skills:), so one capture group holds every
+# declared tool name for a comma-split.
+RE_TOOLSKEY='^tools:[[:blank:]]*(.*)$'
+# An mcp__* token is always mcp__<server>__<tool>, and both segments may embed
+# their own underscores/hyphens (mcp__sequential-thinking__sequentialthinking,
+# mcp__context7__resolve-library-id), so the class below is intentionally wide
+# and greedy - it stops at the first character that cannot be part of a tool
+# name (backtick, comma, space, closing paren).
+RE_MCPTOOL='mcp__[A-Za-z0-9_-]+'
+# CL200's imperative-verb scan. Line-initial only (after an optional bullet or
+# numbered-step marker) is load-bearing: it is what lets
+# 'Do not attempt to write files' (negated), 'The calling command appends your
+# output' (third-person subject) and 'write `_No findings._`' (mid-sentence,
+# after a comma) all pass, with no exclusion list, the same way
+# classify_heading needs none for '## Gate activity'.
+RE_WRITEVERB='^[[:blank:]]*(-[[:blank:]]+|[0-9]+\.[[:blank:]]+)?(Write|Append|Create)[[:blank:]]'
 
 # ---- Phase A: index ---------------------------------------------------------
 
@@ -211,6 +228,10 @@ CL101
 CL102
 CL103
 CL104
+CL200
+CL201
+CL202
+CL203
 CL300
 CL301
 CL302
@@ -255,6 +276,26 @@ OVERRIDE_TOKENS=""
 while IFS= read -r _t; do
     [[ -n "$_t" ]] && set_add OVERRIDE_TOKENS "$_t"
 done < <(mjq '.contractLint.overrideOptionTokens[]?')
+
+READONLY_AGENTS=""
+while IFS= read -r _a; do
+    [[ -n "$_a" ]] && set_add READONLY_AGENTS "$_a"
+done < <(mjq '.contractLint.readOnlyAgents[]?')
+
+KNOWN_MCP_TOOLS=""
+while IFS= read -r _t; do
+    [[ -n "$_t" ]] && set_add KNOWN_MCP_TOOLS "$_t"
+done < <(mjq '.contractLint.knownMcpTools[]?')
+
+# Write/Edit/MultiEdit, and nothing else - matches docs/architecture.md's own
+# definition of a read-only agent. Bash CAN write a file, but that is a
+# different, harder problem, deliberately out of scope for CL200/CL201.
+is_write_tool() { # tool_name -> 0 if it is one of Write/Edit/MultiEdit
+    case "$1" in
+        Write|Edit|MultiEdit) return 0 ;;
+    esac
+    return 1
+}
 
 # gates: file <TAB> hard <TAB> conditional-labels-joined-by-comma
 GATE_DECL_TABLE=""
@@ -394,7 +435,8 @@ collect_refs() {
         [[ -z "$_rel" ]] && continue
         load_file "$_rel"
         for _pat in "sdref:$RE_SDREF" "commandRef:$RE_CMDREF" \
-                    "templatePath:$RE_TPLPATH" "specArtifact:$RE_ARTIFACT"; do
+                    "templatePath:$RE_TPLPATH" "specArtifact:$RE_ARTIFACT" \
+                    "mcpTool:$RE_MCPTOOL"; do
             _kind="${_pat%%:*}"
             # grep -o once per (file, pattern) - 4 forks per file, never one per
             # line. A subshell inside a per-line loop is ~12k forks on this tree
@@ -455,6 +497,57 @@ collect_agent_skills() {
 }
 
 collect_agent_skills
+
+# ---- agent `tools:` frontmatter index (CL2xx) ------------------------------
+#
+# tools: is one comma-joined line, never a nested list like skills:, so this is
+# one line lookup per agent rather than a multi-line list walk.
+
+AGENT_TOOL_REFS=""     # agent \x1f tool \x1f file \x1f line
+# agent \x1f 1-based first body line (line right after the closing ---), so
+# CL203 can search the agent's BODY for a tool mention without a frontmatter
+# field (e.g. description:) counting as "the body uses it".
+AGENT_BODY_START=""
+
+collect_agent_tools() {
+    local _name _file _i _line _in_fm=0 _body_start _tool _rest
+    while IFS=$'\x1f' read -r _name _file; do
+        [[ -z "$_name" ]] && continue
+        load_file "$_file"
+        _in_fm=0
+        _body_start=$((CUR_N + 1))
+        for ((_i = 0; _i < CUR_N; _i++)); do
+            _line="${CUR_LINES[$_i]}"
+            if [[ "$_line" == "---" ]]; then
+                if [[ $_in_fm -eq 0 ]]; then _in_fm=1; continue; else
+                    _body_start=$((_i + 2)); break
+                fi
+            fi
+            [[ $_in_fm -eq 1 ]] || continue
+            if [[ "$_line" =~ $RE_TOOLSKEY ]]; then
+                _rest="${BASH_REMATCH[1]}"
+                while IFS= read -r _tool; do
+                    # Tool names never carry internal whitespace, so a blanket
+                    # strip is safe here - the same technique normalize_tokens
+                    # already uses for CL1xx's required/optional CSV pieces.
+                    _tool="$(printf '%s' "$_tool" | tr -d ' \t')"
+                    [[ -z "$_tool" ]] && continue
+                    AGENT_TOOL_REFS="${AGENT_TOOL_REFS}${_name}"$'\x1f'"${_tool}"$'\x1f'"${_file}"$'\x1f'"$((_i + 1))"$'\n'
+                done <<< "$(printf '%s' "$_rest" | tr ',' '\n')"
+            fi
+        done
+        AGENT_BODY_START="${AGENT_BODY_START}${_name}"$'\x1f'"${_body_start}"$'\n'
+    done <<< "$AGENT_NAME_FILE_TABLE"
+}
+
+collect_agent_tools
+
+body_start_of() { # agent_name -> stdout 1-based first body line
+    local _n="$1" _an _al
+    while IFS=$'\x1f' read -r _an _al; do
+        [[ "$_an" == "$_n" ]] && { printf '%s' "$_al"; return; }
+    done <<< "$AGENT_BODY_START"
+}
 
 # ---- mode declaration index (CL1xx) -----------------------------------------
 #
@@ -881,6 +974,74 @@ rule_CL101() {
     done <<< "$MODE_DECLS"
 }
 
+# CL200 - disk-only, no manifest input. Any agent whose OWN tools: line carries
+# none of Write/Edit/MultiEdit is a candidate; its body is then scanned for a
+# line-initial Write/Append/Create, which is what lets every negated,
+# third-person or mid-sentence use of those words pass untouched.
+rule_CL200() {
+    local _name _file _has_write _at _atool _afile _aline _i _verb
+    while IFS=$'\x1f' read -r _name _file; do
+        [[ -z "$_name" ]] && continue
+        _has_write=0
+        while IFS=$'\x1f' read -r _at _atool _afile _aline; do
+            [[ "$_at" == "$_name" ]] || continue
+            if is_write_tool "$_atool"; then _has_write=1; break; fi
+        done <<< "$AGENT_TOOL_REFS"
+        [[ $_has_write -eq 1 ]] && continue
+        load_file "$_file"
+        for ((_i = 0; _i < CUR_N; _i++)); do
+            [[ "${CUR_FENCE[$_i]}" == "1" ]] && continue
+            [[ "${CUR_LINES[$_i]}" =~ $RE_WRITEVERB ]] || continue
+            _verb="${BASH_REMATCH[2]}"
+            add_finding CL200 "$_file" "$((_i + 1))" "agent '$_name' has no write tool but this line instructs it to $_verb"
+        done
+    done <<< "$AGENT_NAME_FILE_TABLE"
+}
+
+# CL201 - the declared-vs-disk half: an agent this manifest promises will stay
+# read-only, but whose own tools: line has grown a write tool since.
+rule_CL201() {
+    local _a _tool _f _l
+    while IFS=$'\x1f' read -r _a _tool _f _l; do
+        [[ -z "$_a" ]] && continue
+        set_has READONLY_AGENTS "$_a" || continue
+        is_write_tool "$_tool" || continue
+        add_finding CL201 "$_f" "$_l" "agent '$_a' is declared read-only in contractLint.readOnlyAgents but its tools: line includes write tool '$_tool'"
+    done <<< "$AGENT_TOOL_REFS"
+}
+
+# CL202 - every mcp__* token anywhere in scan scope (frontmatter tools: lines
+# included, which is exactly where the historical typo'd tool name lived)
+# against the hand-maintained allowlist.
+rule_CL202() {
+    local _k _t _f _l
+    while IFS=$'\x1f' read -r _k _t _f _l; do
+        [[ "$_k" == "mcpTool" ]] || continue
+        set_has KNOWN_MCP_TOOLS "$_t" && continue
+        add_finding CL202 "$_f" "$_l" "mcp tool name '$_t' is absent from contractLint.knownMcpTools"
+    done <<< "$REFS"
+}
+
+# CL203 - a tool this agent's own frontmatter declares, that its own body
+# (everything after the closing ---) never mentions by name.
+rule_CL203() {
+    local _a _tool _f _l _start _i _used
+    while IFS=$'\x1f' read -r _a _tool _f _l; do
+        [[ -z "$_a" ]] && continue
+        load_file "$_f"
+        _start="$(body_start_of "$_a")"
+        _used=0
+        for ((_i = _start - 1; _i < CUR_N; _i++)); do
+            case "${CUR_LINES[$_i]}" in
+                *"$_tool"*) _used=1; break ;;
+            esac
+        done
+        if [[ $_used -eq 0 ]]; then
+            add_finding CL203 "$_f" "$_l" "agent '$_a' declares tool '$_tool' but its body never mentions it"
+        fi
+    done <<< "$AGENT_TOOL_REFS"
+}
+
 # Collect a gate block's selectable OPTIONS: the slash-separated tokens of a
 # parenthetical, plus the backticked leading token of each top-level bullet.
 # Sets OPT_TOKENS (newline-delimited "line<US>token" records) and OPT_HAS_SET.
@@ -1051,6 +1212,10 @@ rule_CL007
 rule_CL008
 rule_CL100_CL102_CL103
 rule_CL101
+rule_CL200
+rule_CL201
+rule_CL202
+rule_CL203
 rule_CL300_CL301_CL305
 rule_CL302_CL303_CL304
 

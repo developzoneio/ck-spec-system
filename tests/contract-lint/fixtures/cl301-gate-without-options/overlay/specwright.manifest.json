@@ -95,6 +95,30 @@
         "summary": "two agent files share a frontmatter name:"
       },
       {
+        "id": "CL200",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "agent with no write tool is instructed to write, append or create (ships WARN, promotes to BLOCK in a follow-up)"
+      },
+      {
+        "id": "CL201",
+        "severity": "BLOCK",
+        "wave": 3,
+        "summary": "agent listed in contractLint.readOnlyAgents declares a write tool"
+      },
+      {
+        "id": "CL202",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "mcp__* name absent from contractLint.knownMcpTools"
+      },
+      {
+        "id": "CL203",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "agent frontmatter declares a tool never mentioned in its own body"
+      },
+      {
         "id": "CL300",
         "severity": "BLOCK",
         "wave": 1,

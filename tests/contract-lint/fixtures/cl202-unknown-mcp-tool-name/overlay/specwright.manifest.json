@@ -177,9 +177,7 @@
       "commands/alpha.md": {
         "quantity": null,
         "hard": 2,
-        "conditional": [
-          "1a"
-        ]
+        "conditional": []
       },
       "commands/beta.md": {
         "quantity": null,
@@ -200,6 +198,8 @@
       "bypass",
       "force",
       "ignore"
-    ]
+    ],
+    "readOnlyAgents": [],
+    "knownMcpTools": ["mcp__demo__known-tool"]
   }
 }

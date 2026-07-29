@@ -115,6 +115,23 @@ $RE_NUMSTEP   = '^[ \t]*[0-9]+\.[ \t]'
 # here, and both land on the identical ASCII remainder. Nothing downstream ever
 # reports a column offset, so the difference is unobservable.
 $RE_NONASCII  = '^[\u0080-\uFFFF]+'
+# CL2xx role and tool integrity. tools: is a single comma-joined frontmatter
+# line (never a nested list like skills:), so one capture group holds every
+# declared tool name for a comma-split.
+$RE_TOOLSKEY  = '^tools:[ \t]*(.*)$'
+# An mcp__* token is always mcp__<server>__<tool>, and both segments may embed
+# their own underscores/hyphens (mcp__sequential-thinking__sequentialthinking,
+# mcp__context7__resolve-library-id), so the class below is intentionally wide
+# and greedy - it stops at the first character that cannot be part of a tool
+# name (backtick, comma, space, closing paren).
+$RE_MCPTOOL   = 'mcp__[A-Za-z0-9_-]+'
+# CL200's imperative-verb scan. Line-initial only (after an optional bullet or
+# numbered-step marker) is load-bearing: it is what lets
+# 'Do not attempt to write files' (negated), 'The calling command appends your
+# output' (third-person subject) and 'write `_No findings._`' (mid-sentence,
+# after a comma) all pass, with no exclusion list, the same way
+# Get-GateClassification needs none for '## Gate activity'.
+$RE_WRITEVERB = '^[ \t]*(-[ \t]+|[0-9]+\.[ \t]+)?(Write|Append|Create)[ \t]'
 
 function Write-Err([string]$Message) {
     [Console]::Error.WriteLine($Message)
@@ -185,6 +202,7 @@ foreach ($r in $cl.rules) {
 $dispatchIds = @(
     'CL001', 'CL002', 'CL003', 'CL004', 'CL005', 'CL006', 'CL007', 'CL008',
     'CL100', 'CL101', 'CL102', 'CL103', 'CL104',
+    'CL200', 'CL201', 'CL202', 'CL203',
     'CL300', 'CL301', 'CL302', 'CL303', 'CL304', 'CL305',
     'CL900', 'CL901', 'CL902'
 )
@@ -223,6 +241,22 @@ $overrideTokens = New-OrdinalSet
 if ($cl.PSObject.Properties.Name.Contains('overrideOptionTokens')) {
     foreach ($t in $cl.overrideOptionTokens) { [void]$overrideTokens.Add([string]$t) }
 }
+
+$readOnlyAgents = New-OrdinalSet
+if ($cl.PSObject.Properties.Name.Contains('readOnlyAgents')) {
+    foreach ($a in $cl.readOnlyAgents) { [void]$readOnlyAgents.Add([string]$a) }
+}
+
+$knownMcpTools = New-OrdinalSet
+if ($cl.PSObject.Properties.Name.Contains('knownMcpTools')) {
+    foreach ($t in $cl.knownMcpTools) { [void]$knownMcpTools.Add([string]$t) }
+}
+
+# Write/Edit/MultiEdit, and nothing else - matches docs/architecture.md's own
+# definition of a read-only agent. Bash CAN write a file, but that is a
+# different, harder problem, deliberately out of scope for CL200/CL201.
+$writeTools = New-OrdinalSet
+foreach ($t in @('Write', 'Edit', 'MultiEdit')) { [void]$writeTools.Add($t) }
 
 # Declared gate contracts. Ordinal dictionaries throughout - NEVER an @{} literal,
 # whose keys are case-insensitive and would silently diverge from bash's `case`.
@@ -389,7 +423,8 @@ $refPatterns = @(
     @{ Kind = 'sdref';        Pattern = $RE_SDREF },
     @{ Kind = 'commandRef';   Pattern = $RE_CMDREF },
     @{ Kind = 'templatePath'; Pattern = $RE_TPLPATH },
-    @{ Kind = 'specArtifact'; Pattern = $RE_ARTIFACT }
+    @{ Kind = 'specArtifact'; Pattern = $RE_ARTIFACT },
+    @{ Kind = 'mcpTool';      Pattern = $RE_MCPTOOL }
 )
 
 foreach ($rel in $scanFiles) {
@@ -440,6 +475,40 @@ foreach ($name in $agentOrder) {
             $inSkills = $false
         }
     }
+}
+
+# ---- agent `tools:` frontmatter index (CL2xx) ------------------------------
+#
+# tools: is one comma-joined line, never a nested list like skills:, so this is
+# one line lookup per agent rather than a multi-line list walk.
+
+# agentBodyStart is the 0-based index of the first line AFTER the closing ---,
+# so CL203 can search the agent's BODY for a tool mention without a frontmatter
+# field (e.g. description:) counting as "the body uses it".
+$agentToolRefs = New-Object 'System.Collections.Generic.List[object]'
+$agentBodyStart = New-Object 'System.Collections.Generic.Dictionary[string,int]' ([StringComparer]::Ordinal)
+foreach ($name in $agentOrder) {
+    $rel = $agentFileOf[$name]
+    $lines = $fileLines[$rel]
+    $inFm = $false
+    $bodyStart = $lines.Length
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        $line = $lines[$i]
+        if ($line -ceq '---') {
+            if (-not $inFm) { $inFm = $true; continue } else { $bodyStart = $i + 1; break }
+        }
+        if (-not $inFm) { continue }
+        $mt = [regex]::Match($line, $RE_TOOLSKEY)
+        if (-not $mt.Success) { continue }
+        foreach ($piece in $mt.Groups[1].Value.Split(',')) {
+            $tool = $piece.Trim()
+            if ($tool.Length -eq 0) { continue }
+            [void]$agentToolRefs.Add([PSCustomObject]@{
+                Agent = $name; Tool = $tool; File = $rel; Line = ($i + 1)
+            })
+        }
+    }
+    $agentBodyStart[$name] = $bodyStart
 }
 
 # ---- mode declaration index (CL1xx) -----------------------------------------
@@ -796,6 +865,60 @@ foreach ($d in $modeDecls) {
     }
     if (-not $seen) {
         Add-Finding 'CL101' $d.File $d.Line "agent '$($d.Agent)' declares mode $($d.Key) = $($d.Value) that no command ever invokes"
+    }
+}
+
+# CL200 - disk-only, no manifest input. Any agent whose OWN tools: line carries
+# none of Write/Edit/MultiEdit is a candidate; its body is then scanned for a
+# line-initial Write/Append/Create, which is what lets every negated,
+# third-person or mid-sentence use of those words pass untouched.
+foreach ($name in $agentOrder) {
+    $hasWriteTool = $false
+    foreach ($t in $agentToolRefs) {
+        if ($t.Agent -cne $name) { continue }
+        if ($writeTools.Contains($t.Tool)) { $hasWriteTool = $true; break }
+    }
+    if ($hasWriteTool) { continue }
+    $rel = $agentFileOf[$name]
+    $lines = $fileLines[$rel]
+    $fence = $fileFence[$rel]
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($fence[$i]) { continue }
+        $mv = [regex]::Match($lines[$i], $RE_WRITEVERB)
+        if (-not $mv.Success) { continue }
+        $verb = $mv.Groups[2].Value
+        Add-Finding 'CL200' $rel ($i + 1) "agent '$name' has no write tool but this line instructs it to $verb"
+    }
+}
+
+# CL201 - the declared-vs-disk half: an agent this manifest promises will stay
+# read-only, but whose own tools: line has grown a write tool since.
+foreach ($t in $agentToolRefs) {
+    if (-not $readOnlyAgents.Contains($t.Agent)) { continue }
+    if (-not $writeTools.Contains($t.Tool)) { continue }
+    Add-Finding 'CL201' $t.File $t.Line "agent '$($t.Agent)' is declared read-only in contractLint.readOnlyAgents but its tools: line includes write tool '$($t.Tool)'"
+}
+
+# CL202 - every mcp__* token anywhere in scan scope (frontmatter tools: lines
+# included, which is exactly where the historical typo'd tool name lived)
+# against the hand-maintained allowlist.
+foreach ($r in $refs) {
+    if ($r.Kind -cne 'mcpTool') { continue }
+    if ($knownMcpTools.Contains($r.Target)) { continue }
+    Add-Finding 'CL202' $r.File $r.Line "mcp tool name '$($r.Target)' is absent from contractLint.knownMcpTools"
+}
+
+# CL203 - a tool this agent's own frontmatter declares, that its own body
+# (everything after the closing ---) never mentions by name.
+foreach ($t in $agentToolRefs) {
+    $lines = $fileLines[$t.File]
+    $start = $agentBodyStart[$t.Agent]
+    $used = $false
+    for ($i = $start; $i -lt $lines.Length; $i++) {
+        if ($lines[$i].IndexOf($t.Tool, [System.StringComparison]::Ordinal) -ge 0) { $used = $true; break }
+    }
+    if (-not $used) {
+        Add-Finding 'CL203' $t.File $t.Line "agent '$($t.Agent)' declares tool '$($t.Tool)' but its body never mentions it"
     }
 }
 

@@ -74,6 +74,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of the mode's `SPEC`/`IMPACT` - suppressed with `CL102` reasons citing the "Scoped
   re-plan" sub-path in `agents/spec-architect.md`, since the declaration has no syntax for an
   either/or required set.
+- **Check 8 wave 3a: `CL2xx` role and tool integrity** (SW-33), four rules over the agent role
+  contract: `CL200` (WARN, promotes to BLOCK in a follow-up commit) an agent with no write tool is
+  instructed to write, append or create; `CL201` (BLOCK) an agent listed in the new
+  `contractLint.readOnlyAgents` declares a write tool anyway; `CL202` (WARN) an `mcp__*` name in
+  scan scope is absent from the new `contractLint.knownMcpTools`; `CL203` (WARN) an agent's own
+  frontmatter declares a tool its own body never mentions. A write tool is exactly
+  `Write`/`Edit`/`MultiEdit` - `Bash` deliberately does not count, a scope decision recorded in
+  `docs/contract-lint.md`. Two new indices in both linters: a per-agent `tools:` frontmatter table
+  (feeds `CL200`/`CL201`/`CL203`) and an `mcp__*` token scan across scan scope (feeds `CL202`).
+  `readOnlyAgents` seeded with the three agents already lacking a write tool
+  (`sd-code-explorer`/`sd-reviewer`/`sd-debugger`); `knownMcpTools` seeded with the twelve real
+  `mcp__*` names currently declared across `agents/*.md`. Five new fixture cases (one per rule plus
+  a false-positive guard proving `CL200` ignores negated and third-person uses of its verbs) plus a
+  row each in `tests/contract-lint/README.md` and `docs/contract-lint.md`.
+
+### Fixed
+- `tests/contract-lint/fixtures/_base/agents/keeper.md` declared `Grep` in its `tools:` line but
+  never mentioned it in its own body - would have tripped `CL203` on the fixture suite's own base
+  tree the moment the rule shipped. Five older fixture overlays (`cl002`, `cl007`, `cl101`, `cl102`,
+  `cl103`) had the same latent gap in their own copies of the demo agent, found the same way.
 
 ## [1.5.0] - 2026-07-23
 

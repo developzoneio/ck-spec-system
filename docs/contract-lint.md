@@ -92,6 +92,41 @@ one problem, one message. CL104 is independent of the other four: it fires while
 agent inventory is built, the same way CL900/CL901 fire while the suppression index is built,
 rather than in a later Phase B pass.
 
+### CL2xx -- role and tool integrity
+
+Tool allowlists enforce agent roles *structurally* -- the reviewer has no write tool, so it
+cannot auto-fix. That guarantee is only as good as the prompt text agreeing with the frontmatter.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL200` | WARN (promotes to BLOCK in a follow-up commit) | an agent with no write tool is instructed to write, append or create |
+| `CL201` | BLOCK | an agent listed in `contractLint.readOnlyAgents` declares a write tool |
+| `CL202` | WARN | an `mcp__*` name in scan scope is absent from `contractLint.knownMcpTools` |
+| `CL203` | WARN | an agent's own frontmatter declares a tool its own body never mentions |
+
+A **write tool** is exactly `Write`, `Edit` or `MultiEdit` -- never `Bash`, which technically can
+write a file but is a different, harder problem, deliberately out of scope here.
+
+`CL200` and `CL201` answer two different questions and read two different sources. `CL200` reads
+**disk only**: any agent whose own `tools:` line lacks a write tool is a candidate, full stop, so a
+brand-new read-only agent is protected on day one even if nobody remembers to list it anywhere.
+`CL201` reads the **declared promise**: `contractLint.readOnlyAgents` names agents architecturally
+committed to staying read-only, and `CL201` is the only rule that fires when one of them grows a
+write tool in its own frontmatter -- the same declared-vs-disk shape `CL304` already uses for
+conditional gates.
+
+`CL200`'s imperative-verb scan is line-initial only (after an optional bullet or numbered-step
+marker), which is what lets a negated instruction ("Do not attempt to write files"), a third-person
+subject ("The calling command appends your output") and a mid-sentence use ("write `` `_No
+findings._` ``, after a comma) all pass untouched, with no exclusion list -- the same shape
+`Get-GateClassification`/`classify_heading` already uses for `## Gate activity`. It is the only
+rule in this band that reads prose intent rather than pure structure, which is why it ships WARN
+first: **CL200 promotes to BLOCK in a follow-up commit once it has run clean for a release.**
+
+`CL203` searches an agent's own **body** -- everything after its closing `---` -- for the declared
+tool's exact name. A tool mentioned only inside the `tools:` line itself (its own declaration) does
+not count as "used."
+
 ### CL3xx -- gate integrity
 
 A **gate block** runs from its heading to the next heading of any level, or end of file. That
@@ -158,6 +193,8 @@ and never touch `areas`, `derived` or `docClaims`.
 | `specArtifacts` | the numbered artifact filenames CL008 accepts |
 | `skillConsumers` | skills whose only consumers live outside scan scope, with the reason |
 | `overrideOptionTokens` | the vocabulary CL305 treats as an escape hatch |
+| `readOnlyAgents` | agent names CL201 checks for a write tool gained since being declared read-only |
+| `knownMcpTools` | the `mcp__*` allowlist CL202 checks scan-scope tokens against |
 
 `scanScope` is load-bearing. `CLAUDE.md` and `CONTRIBUTING.md` use `sd-test` as a sandbox path and
 `docs/architecture.md` carries a `name: sd-debugger` frontmatter example, so widening the scope to
@@ -190,10 +227,11 @@ implementation, one fixture, one row in the tables above.
 |---|---|---|
 | 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
 | 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
-| 3 | CL2xx role and tool integrity, CL4xx stack-agnostic prose, CL306 | planned, WARN first |
+| 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, WARN first (CL201 BLOCK) |
+| 3b | CL4xx stack-agnostic prose, CL306 | planned |
 | 4 | CL5xx file budgets | planned, stays WARN |
 
-Three scope decisions were made deliberately and are recorded here so they read as decisions
+Four scope decisions were made deliberately and are recorded here so they read as decisions
 rather than oversights:
 
 - **CL007 is still loose.** "Invoked by" means any mention of the agent name in a command body.
@@ -207,6 +245,11 @@ rather than oversights:
   the ones actually on disk. An invocation that sets none of them (`sd-docs-writer`'s flat
   `ADR_NUMBER`/`ADR_PATH`/... contract, which has no modes at all) is invisible to CL100-CL103 by
   design, not by omission.
+- **`knownMcpTools` is hand-maintained, not derived**, and that is a deliberate acceptance of
+  staleness risk: nothing on disk is a second source for which `mcp__*` tool names are real, since
+  that comes from runtime MCP server configuration this repo cannot see. `CL202` stays WARN
+  forever precisely because of this -- a stale allowlist must never be able to block CI. A `CL202`
+  hit means "update this list or explain why not," never "suppress and move on."
 
 ## Testing it
 

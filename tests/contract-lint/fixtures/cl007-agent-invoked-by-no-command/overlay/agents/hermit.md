@@ -9,4 +9,4 @@ skills:
   - sd-demo-rule
 ---
 
-You are never called.
+You are never called. You would `Read` `templates/sd/demo.template.md` if anyone did.
