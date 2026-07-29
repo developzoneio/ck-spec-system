@@ -68,6 +68,30 @@ code, so a BLOCK/WARN divergence between the two implementations is structurally
 CL001 and CL003 split on whether the offending line mentions a skill; both BLOCK, so the split is
 about the message a reader gets, not about severity.
 
+### CL1xx -- invocation contract
+
+An **invocation** is a `commands/*.md` line mentioning "Invoke"/"invoke" next to a backticked
+`sd-<agent>` token. From there its **token span** runs forward through every backticked
+`` `KEY = value` `` pair -- covering a bullet block, a same-line inline list, and a wrapped
+multi-line inline list alike -- until the next heading, the next invocation, or the next top-level
+numbered step, whichever comes first. A **mode declaration** is an `agents/*.md` heading carrying
+the same kind of `` `KEY = value` `` pair (or, for the `` Task type: `value` `` heading grammar,
+a key named by the agent's own "Read the `KEY` field" prose) immediately followed by
+`Inputs (required):` then `Inputs (optional):` lines.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL100` | BLOCK | an invocation sets `TASK`/`WORKFLOW_TYPE`/`TASK_TYPE` to a mode the target agent does not declare |
+| `CL101` | WARN | an agent declares a mode no command ever invokes |
+| `CL102` | BLOCK | an invocation omits an input the declared mode marks required |
+| `CL103` | WARN | an invocation passes an input token the declared mode declares nowhere |
+| `CL104` | BLOCK | two agent files share a frontmatter `name:` |
+
+CL100/CL102/CL103 skip an invocation whose target agent CL001 already flagged as unresolved --
+one problem, one message. CL104 is independent of the other four: it fires while the disk-derived
+agent inventory is built, the same way CL900/CL901 fire while the suppression index is built,
+rather than in a later Phase B pass.
+
 ### CL3xx -- gate integrity
 
 A **gate block** runs from its heading to the next heading of any level, or end of file. That
@@ -165,18 +189,24 @@ implementation, one fixture, one row in the tables above.
 | Wave | Band | Status |
 |---|---|---|
 | 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
-| 2 | CL1xx invocation contract (agent input declarations) | planned |
+| 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
 | 3 | CL2xx role and tool integrity, CL4xx stack-agnostic prose, CL306 | planned, WARN first |
 | 4 | CL5xx file budgets | planned, stays WARN |
 
-Two scope decisions were made deliberately in wave 1 and are recorded here so they read as
-decisions rather than oversights:
+Three scope decisions were made deliberately and are recorded here so they read as decisions
+rather than oversights:
 
-- **CL007 is loose.** "Invoked by" means any mention of the agent name in a command body.
-  Tightening it to a real invocation construct is CL1xx's job; doing it now would duplicate wave-2
-  parsing.
-- **CL006 does not scan `hooks/`,** although `/sd:` references live there. That is a wave-2 scope
-  extension.
+- **CL007 is still loose.** "Invoked by" means any mention of the agent name in a command body.
+  CL100-CL104 added a real invocation-token parser but did not fold it back into CL007 -- CL007
+  answers "is this agent mentioned at all", CL1xx answers "does a specific mode match", and
+  merging them would make CL007 depend on the mode-selector convention (`TASK`/`WORKFLOW_TYPE`/
+  `TASK_TYPE`) instead of a plain name match.
+- **CL006 does not scan `hooks/`,** although `/sd:` references live there. That remains a future
+  scope extension.
+- **CL1xx recognizes exactly three mode-selector keys** (`TASK`, `WORKFLOW_TYPE`, `TASK_TYPE`) --
+  the ones actually on disk. An invocation that sets none of them (`sd-docs-writer`'s flat
+  `ADR_NUMBER`/`ADR_PATH`/... contract, which has no modes at all) is invisible to CL100-CL103 by
+  design, not by omission.
 
 ## Testing it
 

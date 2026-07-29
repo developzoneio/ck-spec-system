@@ -17,3 +17,10 @@ Inputs (optional): none
 
 Read `templates/sd/demo.template.md` and return the drafted body. The main thread
 writes `00-spec.md`; you have no write tool.
+
+## `TASK = archive`
+
+Inputs (required): none
+Inputs (optional): none
+
+Archive the current draft. Takes no inputs beyond the mode selector itself.

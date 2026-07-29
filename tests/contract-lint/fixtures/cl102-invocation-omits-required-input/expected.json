@@ -1,0 +1,6 @@
+{
+  "note": "TASK = archive marks REASON required; the invocation never passes it",
+  "findings": [
+    { "rule": "CL102", "severity": "BLOCK", "file": "commands/alpha.md", "anchor": "seed", "seed": "missing-required" }
+  ]
+}

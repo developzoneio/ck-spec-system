@@ -109,7 +109,7 @@ STOP. Compare measured vs threshold.
 
 If user picks (1), enter the characterization sub-loop:
 1. Identify uncovered branches via coverage report.
-2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor` per uncovered area.
+2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor`, `INVARIANTS = <invariants list from spec>` per uncovered area.
 3. Each new test must FAIL FAST if current behavior changes - characterization tests pin the CURRENT behavior, correct or not.
 4. Re-measure coverage.
 
@@ -178,6 +178,7 @@ as planned) **and** Phase 6 (a holistic-review finding that the plan itself is w
 
    > Re-plan REF-<slug>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
 
+<!-- contract-lint: allow CL102 - scoped re-plan passes REPLAN_SCOPE/REVISION instead of SPEC/IMPACT, per the Scoped re-plan sub-path documented in agents/spec-architect.md -->
 2. `approve` -> invoke `sd-spec-architect` with `TASK = plan`, `MODE = refactor`,
    `REPLAN_SCOPE = <affected task IDs>`, `REVISION = R<n>`. It appends the `## Revisions` entry to
    `01-plan.md` (append-only; original plan prose untouched), regenerates ONLY the affected task

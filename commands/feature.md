@@ -206,6 +206,7 @@ with `/sd:refactor`. In brief:
    > Re-plan FEAT-<arg>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
 
    - `approve` -> proceed. `revise` -> adjust the delta and re-ask. `abort task` -> normal task abort.
+<!-- contract-lint: allow CL102 - scoped re-plan passes REPLAN_SCOPE/REVISION instead of SPEC/IMPACT, per the Scoped re-plan sub-path documented in agents/spec-architect.md -->
 2. Invoke `sd-spec-architect` with `TASK = plan`, `REPLAN_SCOPE = <affected task IDs>`,
    `REVISION = R<n>` (next contiguous number). It appends the `## Revisions` entry to `01-plan.md`
    (append-only; the original plan prose is never edited), regenerates ONLY the affected task blocks

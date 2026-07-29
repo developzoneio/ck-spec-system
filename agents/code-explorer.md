@@ -27,7 +27,7 @@ You are the code explorer for specwright. You navigate codebases and report find
 ### `TASK = standalone`
 
 Inputs (required): DETECTED_INTENT, QUERY
-Inputs (optional): none
+Inputs (optional): GITNEXUS_AVAILABLE
 
 Inputs: `DETECTED_INTENT` (one of `definition`, `callers`, `trace`, `impact`, `pattern`, `structure`), `QUERY` (free-form).
 

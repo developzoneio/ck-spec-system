@@ -51,6 +51,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PLAN_REF` to `sd-reviewer`'s `holistic` task, likewise undeclared (`agents/reviewer.md`).
   `agents/spec-architect.md`'s `create` mode also documented an `INCIDENT_DETAILS` input no command
   has ever set - removed, since `/sd:rca` fills those fields interactively, not via a token.
+- **Check 8 wave 2: `CL1xx` invocation contract** (SW-26 wave 2 / SW-32), making the SW-25 `Inputs
+  (required|optional):` declarations load-bearing. Five rules: `CL100` (BLOCK) an invocation sets
+  `TASK`/`WORKFLOW_TYPE`/`TASK_TYPE` to a mode the target agent never declared; `CL101` (WARN) an
+  agent declares a mode no command ever invokes; `CL102` (BLOCK) an invocation omits a required
+  input; `CL103` (WARN) an invocation passes a token the mode declares nowhere; `CL104` (BLOCK) two
+  agent files share a frontmatter `name:`. Two new indices in both linters - a mode-declaration
+  table built from `agents/*.md` mode headings, and an invocation-token table built by scanning each
+  `commands/*.md` invocation forward to the next heading, the next invocation, or the next
+  top-level numbered step, whichever comes first. Five new fixture cases plus a row each in
+  `tests/contract-lint/README.md` and `docs/contract-lint.md`.
+
+### Fixed
+- `commands/refactor.md`'s characterization-test sub-loop invoked `sd-implementer` with
+  `WORKFLOW_TYPE = refactor` but never passed `INVARIANTS`, the one field that mode's constraint set
+  actually reads - a live instance of the exact defect class `CL1xx` exists to catch (found while
+  building it, per SW-32).
+- `agents/code-explorer.md`'s `TASK = standalone` mode never declared the `GITNEXUS_AVAILABLE` input
+  its own "Always do first" step reads and `/sd:explore` always passes.
+- Two documented `sd-spec-architect` `TASK = plan` scoped-re-plan invocations
+  (`commands/feature.md`, `commands/refactor.md`) legitimately pass `REPLAN_SCOPE`/`REVISION`
+  instead of the mode's `SPEC`/`IMPACT` - suppressed with `CL102` reasons citing the "Scoped
+  re-plan" sub-path in `agents/spec-architect.md`, since the declaration has no syntax for an
+  either/or required set.
 
 ## [1.5.0] - 2026-07-23
 

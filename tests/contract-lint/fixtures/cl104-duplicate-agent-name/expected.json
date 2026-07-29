@@ -1,0 +1,6 @@
+{
+  "note": "agents/keeper.md and agents/twin.md both declare `name: sd-keeper`; keeper.md sorts first and stays canonical",
+  "findings": [
+    { "rule": "CL104", "severity": "BLOCK", "file": "agents/twin.md", "anchor": "seed", "seed": "reused-name" }
+  ]
+}

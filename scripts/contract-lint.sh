@@ -118,6 +118,23 @@ set_add() { # set_var_name value
     fi
 }
 
+# CL1xx token sets: comma-joined, never newline-delimited (a mode's token set is
+# small and always inline in one record-table field). "none" (the literal the
+# Inputs (optional): line uses for an empty set) normalizes to the empty string.
+normalize_tokens() { # raw "A, B, C" or "none" -> stdout "A,B,C"
+    local _raw="$1"
+    [[ "$_raw" == "none" ]] && return
+    printf '%s' "$_raw" | tr -d ' \t'
+}
+
+csv_has() { # csv value -> 0 if present
+    local _csv="$1" _val="$2"
+    case ",$_csv," in
+        *",$_val,"*) return 0 ;;
+    esac
+    return 1
+}
+
 # ---- regex constants --------------------------------------------------------
 #
 # Every pattern below must behave identically in POSIX ERE (here) and .NET
@@ -135,6 +152,26 @@ RE_ARTIFACT='(^|[^0-9A-Za-z_.-])[0-9][0-9]-[a-z0-9-]+\.md'
 RE_SUPPRESS='<!--[[:blank:]]*contract-lint:[[:blank:]]*allow[[:blank:]]+CL[0-9][0-9][0-9]'
 # An option set: a slash-separated parenthetical carrying no nested parens.
 RE_OPTPAREN='\(([^()/]+/)+[^()]+\)'
+# CL1xx invocation contract. A mode heading carries its selector as a backticked
+# `KEY = value` pair (Mode N: `TASK = create`, `WORKFLOW_TYPE = feature`), except
+# the reviewer/debugger `Task type: `value`` grammar, whose selector key is the
+# established convention TASK_TYPE, never present in the heading text itself.
+RE_KV='`([A-Z][A-Z0-9_]*) = ([^`]*)`'
+RE_TASKTYPE='^Task type: `([a-z][a-z0-9-]*)`$'
+RE_INPUT_REQ='^Inputs \(required\):[[:blank:]]*(.*)$'
+RE_INPUT_OPT='^Inputs \(optional\):[[:blank:]]*(.*)$'
+# The `Task type: `value`` heading grammar names no key of its own - reviewer.md
+# reads it as TASK_TYPE, debugger.md as TASK. Both say so once, in prose, in
+# their own "Always do first" section ("Read the `TASK_TYPE` field." /
+# "Read the `TASK` field."), which is the only disambiguating signal on disk.
+RE_FIELD_KEY='Read the `([A-Z][A-Z0-9_]*)` field'
+# An invocation's token span runs from its anchor line to the next heading, the
+# next anchor, or the next top-level numbered step - whichever comes first. The
+# numbered-step boundary is load-bearing: without it, a span like
+# 'Invoke ... with `TASK = plan`, ...' followed by unrelated prose two numbered
+# steps later ('returns ... `STATUS = needs-input`', commands/feature.md) would
+# read STATUS as a passed token that was never actually part of the invocation.
+RE_NUMSTEP='^[[:blank:]]*[0-9]+\.[[:blank:]]'
 # Byte range 0x80-0xFF in the C locale = any non-ASCII byte. Built at runtime so
 # this file itself stays pure ASCII, exactly as scripts/validate.sh:45 does.
 non_ascii_re="$(printf '[\200-\377]')"
@@ -169,6 +206,11 @@ CL005
 CL006
 CL007
 CL008
+CL100
+CL101
+CL102
+CL103
+CL104
 CL300
 CL301
 CL302
@@ -246,6 +288,30 @@ if [[ -z "$SCAN_FILES" ]]; then
     exit 2
 fi
 
+# ---- finding + suppression stores ------------------------------------------
+#
+# Defined before the disk-derived inventory below because CL104 (duplicate
+# agent frontmatter name) is detected while that inventory is built, not in
+# Phase B - the same precedent CL900/CL901 set for the suppression index.
+
+F_N=0
+f_rule=(); f_file=(); f_line=(); f_msg=()
+
+add_finding() { # rule file line message
+    f_rule[$F_N]="$1"
+    f_file[$F_N]="$2"
+    f_line[$F_N]="$3"
+    # Sanitised at emit-time source, not at print-time: a tab or CR inside a
+    # message silently corrupts the consumer's `IFS=$'\t' read`.
+    f_msg[$F_N]="$(printf '%s' "$4" | tr -d '\r\t')"
+    F_N=$((F_N + 1))
+}
+
+S_N=0
+s_file=(); s_line=(); s_rule=(); s_used=(); s_bad=()
+
+# ---- disk-derived inventory -------------------------------------------------
+#
 # Agents, skills and commands come from disk, never from the manifest - they are
 # inventory, and the manifest's charter says inventory is derived.
 AGENT_NAMES=""
@@ -255,6 +321,15 @@ for _p in "$ROOT"/agents/*.md; do
     _rel="${_p#"$ROOT"/}"
     _name="$(sed -n '1,20{s/^name:[[:space:]]*//p;}' "$_p" | head -n1 | tr -d '\r')"
     [[ -z "$_name" ]] && continue
+    if set_has AGENT_NAMES "$_name"; then
+        _nameln="$(sed -n '1,20{/^name:/=;}' "$_p" | head -n1)"
+        _origfile=""
+        while IFS=$'\x1f' read -r _oa _of; do
+            [[ "$_oa" == "$_name" ]] && _origfile="$_of"
+        done <<< "$AGENT_NAME_FILE_TABLE"
+        add_finding CL104 "$_rel" "$_nameln" "agent name '$_name' is also declared by $_origfile"
+        continue
+    fi
     set_add AGENT_NAMES "$_name"
     AGENT_NAME_FILE_TABLE="${AGENT_NAME_FILE_TABLE}${_name}"$'\x1f'"${_rel}"$'\n'
 done
@@ -276,24 +351,6 @@ for _p in "$ROOT"/commands/*.md; do
     set_add COMMAND_NAMES "${_base%.md}"
 done
 shopt -u nullglob
-
-# ---- finding + suppression stores ------------------------------------------
-
-F_N=0
-f_rule=(); f_file=(); f_line=(); f_msg=()
-
-add_finding() { # rule file line message
-    f_rule[$F_N]="$1"
-    f_file[$F_N]="$2"
-    f_line[$F_N]="$3"
-    # Sanitised at emit-time source, not at print-time: a tab or CR inside a
-    # message silently corrupts the consumer's `IFS=$'\t' read`.
-    f_msg[$F_N]="$(printf '%s' "$4" | tr -d '\r\t')"
-    F_N=$((F_N + 1))
-}
-
-S_N=0
-s_file=(); s_line=(); s_rule=(); s_used=(); s_bad=()
 
 # ---- per-file line + fence cache -------------------------------------------
 #
@@ -398,6 +455,137 @@ collect_agent_skills() {
 }
 
 collect_agent_skills
+
+# ---- mode declaration index (CL1xx) -----------------------------------------
+#
+# A mode heading carries a selector as a backticked `KEY = value` pair, except
+# the `Task type: `value`` grammar (reviewer, debugger) whose selector key is
+# never in the heading text - TASK_TYPE is the established convention. Either
+# way, the heading is a real modeDecl only if it is immediately followed (within
+# a small window, allowing blank lines) by 'Inputs (required):' then
+# 'Inputs (optional):' - that gate is what lets 'Scoped re-plan (`TASK = plan`
+# with `REPLAN_SCOPE`)' (agents/spec-architect.md) coexist with Mode 2 itself:
+# it repeats the same backticked pair but has no Inputs lines of its own, so it
+# never registers as a second declaration of `TASK = plan`.
+
+MODE_DECLS=""   # agent \x1f key \x1f value \x1f file \x1f line \x1f requiredCsv \x1f optionalCsv
+
+collect_mode_decls() {
+    local _name _file _i _j _limit _headtext _key _value _reqidx _reqraw _optraw
+    local _defaultkey
+    while IFS=$'\x1f' read -r _name _file; do
+        [[ -z "$_name" ]] && continue
+        load_file "$_file"
+        _defaultkey="TASK_TYPE"
+        for ((_i = 0; _i < CUR_N; _i++)); do
+            [[ "${CUR_FENCE[$_i]}" == "1" ]] && continue
+            if [[ "${CUR_LINES[$_i]}" =~ $RE_FIELD_KEY ]]; then
+                _defaultkey="${BASH_REMATCH[1]}"; break
+            fi
+        done
+        for ((_i = 0; _i < CUR_N; _i++)); do
+            [[ "${CUR_FENCE[$_i]}" == "1" ]] && continue
+            [[ "${CUR_LINES[$_i]}" =~ $RE_HEADING ]] || continue
+            _headtext="${BASH_REMATCH[2]}"
+            _key=""; _value=""
+            if [[ "$_headtext" =~ $RE_KV ]]; then
+                _key="${BASH_REMATCH[1]}"; _value="${BASH_REMATCH[2]}"
+            elif [[ "$_headtext" =~ $RE_TASKTYPE ]]; then
+                _key="$_defaultkey"; _value="${BASH_REMATCH[1]}"
+            else
+                continue
+            fi
+            _reqidx=-1
+            _limit=$((_i + 3))
+            [[ $_limit -ge $CUR_N ]] && _limit=$((CUR_N - 1))
+            for ((_j = _i + 1; _j <= _limit; _j++)); do
+                [[ "${CUR_FENCE[$_j]}" == "1" ]] && continue
+                if [[ "${CUR_LINES[$_j]}" =~ $RE_INPUT_REQ ]]; then
+                    _reqidx=$_j; _reqraw="${BASH_REMATCH[1]}"; break
+                fi
+            done
+            [[ $_reqidx -lt 0 ]] && continue
+            (( _reqidx + 1 >= CUR_N )) && continue
+            [[ "${CUR_FENCE[$((_reqidx + 1))]}" == "1" ]] && continue
+            [[ "${CUR_LINES[$((_reqidx + 1))]}" =~ $RE_INPUT_OPT ]] || continue
+            _optraw="${BASH_REMATCH[1]}"
+            MODE_DECLS="${MODE_DECLS}${_name}"$'\x1f'"${_key}"$'\x1f'"${_value}"$'\x1f'"${_file}"$'\x1f'"$((_i + 1))"$'\x1f'"$(normalize_tokens "$_reqraw")"$'\x1f'"$(normalize_tokens "$_optraw")"$'\n'
+        done
+    done <<< "$AGENT_NAME_FILE_TABLE"
+}
+
+collect_mode_decls
+
+# ---- invocation index (CL1xx) ------------------------------------------------
+#
+# An invocation ANCHOR is any commands/*.md line already indexed as an sdref
+# whose raw text mentions "nvoke" (catches Invoke/invoke, and a heading like
+# '## Phase 2 - Invoke `sd-reviewer`'). From the anchor, tokens are collected
+# forward through every `KEY = value` pair up to the next heading or the next
+# anchor - whichever comes first - which is what lets a bullet-block
+# ('Invoke X with:' then '- `A = b`'), a same-line inline form, and a wrapped
+# multi-line inline form (a continuation that itself starts with a backtick)
+# all resolve the same way, and what keeps two invocations in one un-headed
+# section (bug.md's enumerate then its verify loop) from bleeding into each
+# other's token set.
+
+ANCHOR_LINES=""     # SET of "file:line"
+ANCHORS=""          # agent \x1f file \x1f line
+
+collect_anchors() {
+    local _k _t _f _l
+    while IFS=$'\x1f' read -r _k _t _f _l; do
+        [[ "$_k" == "sdref" ]] || continue
+        case "$_f" in commands/*) ;; *) continue ;; esac
+        if [[ "$CUR_REL" != "$_f" ]]; then load_file "$_f"; fi
+        case "${CUR_LINES[$((_l - 1))]}" in
+            *nvoke*) ;;
+            *) continue ;;
+        esac
+        ANCHORS="${ANCHORS}${_t}"$'\x1f'"${_f}"$'\x1f'"${_l}"$'\n'
+        set_add ANCHOR_LINES "${_f}:${_l}"
+    done <<< "$REFS"
+}
+
+collect_anchors
+
+INVOCATIONS=""   # agent \x1f key \x1f value \x1f file \x1f line \x1f tokensCsv
+
+collect_invocations() {
+    local _agent _file _line _start _j _tokens _modekey _modeval _k _v _m
+    while IFS=$'\x1f' read -r _agent _file _line; do
+        [[ -z "$_agent" ]] && continue
+        if [[ "$CUR_REL" != "$_file" ]]; then load_file "$_file"; fi
+        _tokens=""
+        _modekey=""; _modeval=""
+        _start=$((_line - 1))
+        for ((_j = _start; _j < CUR_N; _j++)); do
+            [[ "${CUR_FENCE[$_j]}" == "1" ]] && continue
+            if [[ $_j -gt $_start ]]; then
+                [[ "${CUR_LINES[$_j]}" =~ $RE_HEADING ]] && break
+                [[ "${CUR_LINES[$_j]}" =~ $RE_NUMSTEP ]] && break
+                set_has ANCHOR_LINES "${_file}:$((_j + 1))" && break
+            fi
+            _m="${CUR_LINES[$_j]}"
+            while [[ "$_m" =~ $RE_KV ]]; do
+                _k="${BASH_REMATCH[1]}"; _v="${BASH_REMATCH[2]}"
+                if ! csv_has "$_tokens" "$_k"; then
+                    if [[ -z "$_tokens" ]]; then _tokens="$_k"; else _tokens="${_tokens},${_k}"; fi
+                fi
+                if [[ -z "$_modekey" ]]; then
+                    case "$_k" in
+                        TASK|WORKFLOW_TYPE|TASK_TYPE) _modekey="$_k"; _modeval="$_v" ;;
+                    esac
+                fi
+                _m="${_m/"${BASH_REMATCH[0]}"/}"
+            done
+        done
+        [[ -z "$_modekey" ]] && continue
+        INVOCATIONS="${INVOCATIONS}${_agent}"$'\x1f'"${_modekey}"$'\x1f'"${_modeval}"$'\x1f'"${_file}"$'\x1f'"${_line}"$'\x1f'"${_tokens}"$'\n'
+    done <<< "$ANCHORS"
+}
+
+collect_invocations
 
 # ---- gate index -------------------------------------------------------------
 #
@@ -639,6 +827,60 @@ rule_CL008() {
     done <<< "$REFS"
 }
 
+# CL100 / CL102 / CL103 - each invocation against the mode it names. A target
+# agent that CL001 already flagged as unresolved gets no CL100 pile-on.
+rule_CL100_CL102_CL103() {
+    local _ia _ik _iv _if _il _itok _da _dk _dv _df _dl _dreq _dopt
+    local _found _t _k
+    while IFS=$'\x1f' read -r _ia _ik _iv _if _il _itok; do
+        [[ -z "$_ia" ]] && continue
+        set_has AGENT_NAMES "$_ia" || continue
+        _found=0
+        while IFS=$'\x1f' read -r _da _dk _dv _df _dl _dreq _dopt; do
+            [[ "$_da" == "$_ia" && "$_dk" == "$_ik" && "$_dv" == "$_iv" ]] || continue
+            _found=1
+            break
+        done <<< "$MODE_DECLS"
+        if [[ $_found -eq 0 ]]; then
+            add_finding CL100 "$_if" "$_il" "invocation sets $_ik = $_iv but agent '$_ia' declares no such mode"
+            continue
+        fi
+        if [[ -n "$_dreq" ]]; then
+            while IFS= read -r _t; do
+                [[ -z "$_t" ]] && continue
+                csv_has "$_itok" "$_t" && continue
+                add_finding CL102 "$_if" "$_il" "invocation of '$_ia' ($_ik = $_iv) omits required input '$_t'"
+            done <<< "$(printf '%s' "$_dreq" | tr ',' '\n')"
+        fi
+        if [[ -n "$_itok" ]]; then
+            while IFS= read -r _k; do
+                [[ -z "$_k" ]] && continue
+                [[ "$_k" == "$_ik" ]] && continue
+                csv_has "$_dreq" "$_k" && continue
+                csv_has "$_dopt" "$_k" && continue
+                add_finding CL103 "$_if" "$_il" "invocation of '$_ia' ($_ik = $_iv) passes undeclared input '$_k'"
+            done <<< "$(printf '%s' "$_itok" | tr ',' '\n')"
+        fi
+    done <<< "$INVOCATIONS"
+}
+
+# CL101 - the inverse of CL100: a declared mode nobody ever selects.
+rule_CL101() {
+    local _da _dk _dv _df _dl _dreq _dopt _seen
+    local _ia _ik _iv _iif _iil _iitok
+    while IFS=$'\x1f' read -r _da _dk _dv _df _dl _dreq _dopt; do
+        [[ -z "$_da" ]] && continue
+        _seen=0
+        while IFS=$'\x1f' read -r _ia _ik _iv _iif _iil _iitok; do
+            [[ "$_ia" == "$_da" && "$_ik" == "$_dk" && "$_iv" == "$_dv" ]] || continue
+            _seen=1; break
+        done <<< "$INVOCATIONS"
+        if [[ $_seen -eq 0 ]]; then
+            add_finding CL101 "$_df" "$_dl" "agent '$_da' declares mode $_dk = $_dv that no command ever invokes"
+        fi
+    done <<< "$MODE_DECLS"
+}
+
 # Collect a gate block's selectable OPTIONS: the slash-separated tokens of a
 # parenthetical, plus the backticked leading token of each top-level bullet.
 # Sets OPT_TOKENS (newline-delimited "line<US>token" records) and OPT_HAS_SET.
@@ -807,6 +1049,8 @@ rule_CL005
 rule_CL006
 rule_CL007
 rule_CL008
+rule_CL100_CL102_CL103
+rule_CL101
 rule_CL300_CL301_CL305
 rule_CL302_CL303_CL304
 

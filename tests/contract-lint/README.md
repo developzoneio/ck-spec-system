@@ -52,6 +52,11 @@ wording can improve in one commit while a divergence still fails.
 | `cl006-unknown-command-reference` | CL006 |
 | `cl007-agent-invoked-by-no-command` | CL007 |
 | `cl008-unknown-spec-artifact` | CL008 |
+| `cl100-invocation-sets-undeclared-mode` | CL100 |
+| `cl101-mode-invoked-by-nobody` | CL101 |
+| `cl102-invocation-omits-required-input` | CL102 |
+| `cl103-invocation-passes-undeclared-input` | CL103 |
+| `cl104-duplicate-agent-name` | CL104 |
 | `cl300-gate-without-stop` | CL300 |
 | `cl301-gate-without-options` | CL301 |
 | `cl302-gate-count-disagrees` | CL302 |

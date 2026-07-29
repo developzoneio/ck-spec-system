@@ -17,3 +17,10 @@ Inputs (optional): none
 
 Read `templates/sd/demo.template.md` and return the drafted body. The main thread
 writes `00-spec.md`; you have no write tool.
+
+## `TASK = archive`
+
+Inputs (required): REASON
+Inputs (optional): none
+
+Archive the current draft. `REASON` explains why the draft is being archived.

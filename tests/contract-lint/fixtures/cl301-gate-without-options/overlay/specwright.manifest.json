@@ -65,6 +65,36 @@
         "summary": "numbered .specs artifact filename absent from specArtifacts"
       },
       {
+        "id": "CL100",
+        "severity": "BLOCK",
+        "wave": 2,
+        "summary": "invocation sets TASK/WORKFLOW_TYPE/TASK_TYPE to a mode the target agent does not declare"
+      },
+      {
+        "id": "CL101",
+        "severity": "WARN",
+        "wave": 2,
+        "summary": "agent declares a mode no command ever invokes"
+      },
+      {
+        "id": "CL102",
+        "severity": "BLOCK",
+        "wave": 2,
+        "summary": "invocation omits an input the declared mode marks required"
+      },
+      {
+        "id": "CL103",
+        "severity": "WARN",
+        "wave": 2,
+        "summary": "invocation passes an input token the declared mode declares nowhere"
+      },
+      {
+        "id": "CL104",
+        "severity": "BLOCK",
+        "wave": 2,
+        "summary": "two agent files share a frontmatter name:"
+      },
+      {
         "id": "CL300",
         "severity": "BLOCK",
         "wave": 1,

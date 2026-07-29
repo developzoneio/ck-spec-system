@@ -259,6 +259,10 @@ Inputs (optional): MODE, REPLAN_SCOPE
   required token the mode declares that the command omits, is a real defect - fix the mismatch (add
   the missing token to the declaration or the invocation, whichever is actually correct) rather than
   leaving the two out of sync.
+- This cross-check is machine-enforced: Check 8's `CL100`-`CL104` rules (`docs/contract-lint.md`)
+  parse both sides and BLOCK on a mode mismatch or a missing required input. A legitimate mismatch
+  the declaration can't express (an either/or required set, for example) gets a
+  `<!-- contract-lint: allow CLxxx - <reason> -->` suppression, not a silent gap.
 
 ### Hooks
 

@@ -89,6 +89,26 @@ $RE_GATE_REPL = '^ (Re-plan)([^A-Za-z0-9].*)?$'
 $RE_GATE_UNN  = '^ ?[-([]'
 $RE_SKILLSKEY = '^skills:[ \t]*$'
 $RE_SKILLITEM = '^[ \t]+-[ \t]+(.+)$'
+# CL1xx invocation contract. A mode heading carries its selector as a backticked
+# `KEY = value` pair (Mode N: `TASK = create`, `WORKFLOW_TYPE = feature`), except
+# the reviewer/debugger `Task type: `value`` grammar, whose selector key is the
+# established convention TASK_TYPE, never present in the heading text itself.
+$RE_KV        = '`([A-Z][A-Z0-9_]*) = ([^`]*)`'
+$RE_TASKTYPE  = '^Task type: `([a-z][a-z0-9-]*)`$'
+$RE_INPUT_REQ = '^Inputs \(required\):[ \t]*(.*)$'
+$RE_INPUT_OPT = '^Inputs \(optional\):[ \t]*(.*)$'
+# The `Task type: `value`` heading grammar names no key of its own - reviewer.md
+# reads it as TASK_TYPE, debugger.md as TASK. Both say so once, in prose, in
+# their own "Always do first" section ("Read the `TASK_TYPE` field." /
+# "Read the `TASK` field."), which is the only disambiguating signal on disk.
+$RE_FIELD_KEY = 'Read the `([A-Z][A-Z0-9_]*)` field'
+# An invocation's token span runs from its anchor line to the next heading, the
+# next anchor, or the next top-level numbered step - whichever comes first. The
+# numbered-step boundary is load-bearing: without it, a span like
+# 'Invoke ... with `TASK = plan`, ...' followed by unrelated prose two numbered
+# steps later ('returns ... `STATUS = needs-input`', commands/feature.md) would
+# read STATUS as a passed token that was never actually part of the invocation.
+$RE_NUMSTEP   = '^[ \t]*[0-9]+\.[ \t]'
 # Written as an ASCII escape sequence, never as the literal character: this file
 # must survive Check 1's pure-ASCII scan. bash peels the same run as BYTES under
 # LC_ALL=C while .NET peels it as UTF-16 chars - three bytes there, one char
@@ -164,6 +184,7 @@ foreach ($r in $cl.rules) {
 # in the manifest, the docs or the fixtures without landing here too.
 $dispatchIds = @(
     'CL001', 'CL002', 'CL003', 'CL004', 'CL005', 'CL006', 'CL007', 'CL008',
+    'CL100', 'CL101', 'CL102', 'CL103', 'CL104',
     'CL300', 'CL301', 'CL302', 'CL303', 'CL304', 'CL305',
     'CL900', 'CL901', 'CL902'
 )
@@ -281,6 +302,25 @@ function Read-FileLines([string]$Rel) {
 
 foreach ($rel in $scanFiles) { Read-FileLines $rel }
 
+# ---- finding + suppression stores ------------------------------------------
+#
+# Defined before the disk-derived inventory below because CL104 (duplicate
+# agent frontmatter name) is detected while that inventory is built, not in
+# Phase B - the same precedent CL900/CL901 set for the suppression index.
+
+$findings = New-Object 'System.Collections.Generic.List[object]'
+
+function Add-Finding([string]$RuleId, [string]$File, [int]$Line, [string]$Message) {
+    # Sanitised at the source, not at print time: a tab or CR inside a message
+    # silently corrupts the consumer's tab-delimited read.
+    $clean = $Message.Replace([string][char]9, '').Replace([string][char]13, '')
+    [void]$findings.Add([PSCustomObject]@{
+        Rule = $RuleId; File = $File; Line = $Line; Message = $clean
+    })
+}
+
+$suppressions = New-Object 'System.Collections.Generic.List[object]'
+
 # ---- disk-derived inventory -------------------------------------------------
 #
 # Agents, skills and commands come from disk, never from the manifest - they are
@@ -304,6 +344,10 @@ if (Test-Path -LiteralPath $agentDir -PathType Container) {
             if ($m.Success) { $name = $m.Groups[1].Value.Trim(); break }
         }
         if ($name.Length -eq 0) { continue }
+        if ($agentNames.Contains($name)) {
+            Add-Finding 'CL104' $rel ($i + 1) "agent name '$name' is also declared by $($agentFileOf[$name])"
+            continue
+        }
         [void]$agentNames.Add($name)
         $agentFileOf[$name] = $rel
         [void]$agentOrder.Add($name)
@@ -333,21 +377,6 @@ if (Test-Path -LiteralPath $commandsDir -PathType Container) {
         [void]$commandNames.Add([System.IO.Path]::GetFileNameWithoutExtension($p.Name))
     }
 }
-
-# ---- finding + suppression stores ------------------------------------------
-
-$findings = New-Object 'System.Collections.Generic.List[object]'
-
-function Add-Finding([string]$RuleId, [string]$File, [int]$Line, [string]$Message) {
-    # Sanitised at the source, not at print time: a tab or CR inside a message
-    # silently corrupts the consumer's tab-delimited read.
-    $clean = $Message.Replace([string][char]9, '').Replace([string][char]13, '')
-    [void]$findings.Add([PSCustomObject]@{
-        Rule = $RuleId; File = $File; Line = $Line; Message = $clean
-    })
-}
-
-$suppressions = New-Object 'System.Collections.Generic.List[object]'
 
 # ---- reference index --------------------------------------------------------
 #
@@ -411,6 +440,136 @@ foreach ($name in $agentOrder) {
             $inSkills = $false
         }
     }
+}
+
+# ---- mode declaration index (CL1xx) -----------------------------------------
+#
+# A mode heading carries a selector as a backticked `KEY = value` pair, except
+# the `Task type: `value`` grammar (reviewer, debugger) whose selector key is
+# never in the heading text - TASK_TYPE is the established convention. Either
+# way, the heading is a real modeDecl only if it is immediately followed (within
+# a small window, allowing blank lines) by 'Inputs (required):' then
+# 'Inputs (optional):' - that gate is what lets 'Scoped re-plan (`TASK = plan`
+# with `REPLAN_SCOPE`)' (agents/spec-architect.md) coexist with Mode 2 itself:
+# it repeats the same backticked pair but has no Inputs lines of its own, so it
+# never registers as a second declaration of `TASK = plan`.
+
+function Get-TokenSet([string]$Raw) {
+    $set = New-OrdinalSet
+    if ($Raw -cne 'none') {
+        foreach ($piece in $Raw.Split(',')) {
+            $t = $piece.Trim()
+            if ($t.Length -gt 0) { [void]$set.Add($t) }
+        }
+    }
+    # The comma operator is load-bearing: 'return $set' on an EMPTY HashSet
+    # enumerates it onto the pipeline (zero objects), and the caller's property
+    # assignment then captures $null instead of the empty set. Wrapping forces
+    # exactly one output object regardless of how many elements $set holds.
+    return ,$set
+}
+
+$modeDecls = New-Object 'System.Collections.Generic.List[object]'
+foreach ($name in $agentOrder) {
+    $rel = $agentFileOf[$name]
+    $lines = $fileLines[$rel]
+    $fence = $fileFence[$rel]
+
+    $defaultKey = 'TASK_TYPE'
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($fence[$i]) { continue }
+        $mf = [regex]::Match($lines[$i], $RE_FIELD_KEY)
+        if ($mf.Success) { $defaultKey = $mf.Groups[1].Value; break }
+    }
+
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($fence[$i]) { continue }
+        $mh = [regex]::Match($lines[$i], $RE_HEADING)
+        if (-not $mh.Success) { continue }
+        $headText = $mh.Groups[2].Value
+        $key = ''
+        $value = ''
+        $mk = [regex]::Match($headText, $RE_KV)
+        if ($mk.Success) {
+            $key = $mk.Groups[1].Value
+            $value = $mk.Groups[2].Value
+        } else {
+            $mt = [regex]::Match($headText, $RE_TASKTYPE)
+            if ($mt.Success) { $key = $defaultKey; $value = $mt.Groups[1].Value }
+        }
+        if ($key.Length -eq 0) { continue }
+
+        $reqLine = -1
+        $limit = [Math]::Min($i + 3, $lines.Length - 1)
+        for ($j = $i + 1; $j -le $limit; $j++) {
+            if ($fence[$j]) { continue }
+            if ([regex]::IsMatch($lines[$j], $RE_INPUT_REQ)) { $reqLine = $j; break }
+        }
+        if ($reqLine -lt 0) { continue }
+        if ($reqLine + 1 -ge $lines.Length -or $fence[$reqLine + 1]) { continue }
+        $mo = [regex]::Match($lines[$reqLine + 1], $RE_INPUT_OPT)
+        if (-not $mo.Success) { continue }
+        $mr = [regex]::Match($lines[$reqLine], $RE_INPUT_REQ)
+
+        [void]$modeDecls.Add([PSCustomObject]@{
+            Agent = $name; Key = $key; Value = $value; File = $rel; Line = ($i + 1)
+            Required = (Get-TokenSet $mr.Groups[1].Value.Trim())
+            Optional = (Get-TokenSet $mo.Groups[1].Value.Trim())
+        })
+    }
+}
+
+# ---- invocation index (CL1xx) ------------------------------------------------
+#
+# An invocation ANCHOR is any commands/*.md line already indexed as an sdref
+# whose raw text mentions "nvoke" (catches Invoke/invoke, and a heading like
+# '## Phase 2 - Invoke `sd-reviewer`'). From the anchor, tokens are collected
+# forward through every `KEY = value` pair up to the next heading or the next
+# anchor - whichever comes first - which is what lets a bullet-block
+# ('Invoke X with:' then '- `A = b`'), a same-line inline form, and a wrapped
+# multi-line inline form (a continuation that itself starts with a backtick)
+# all resolve the same way, and what keeps two invocations in one un-headed
+# section (bug.md's enumerate then its verify loop) from bleeding into each
+# other's token set.
+
+$anchorLines = New-OrdinalSet
+$anchors = New-Object 'System.Collections.Generic.List[object]'
+foreach ($r in $refs) {
+    if ($r.Kind -cne 'sdref') { continue }
+    if (-not $r.File.StartsWith('commands/', [System.StringComparison]::Ordinal)) { continue }
+    if (-not $fileLines[$r.File][$r.Line - 1].Contains('nvoke')) { continue }
+    [void]$anchors.Add([PSCustomObject]@{ Agent = $r.Target; File = $r.File; Line = $r.Line })
+    [void]$anchorLines.Add($r.File + ':' + $r.Line)
+}
+
+$invocations = New-Object 'System.Collections.Generic.List[object]'
+foreach ($a in $anchors) {
+    $lines = $fileLines[$a.File]
+    $fence = $fileFence[$a.File]
+    $tokens = New-OrdinalSet
+    $modeKey = ''
+    $modeValue = ''
+    $startIdx = $a.Line - 1
+    for ($j = $startIdx; $j -lt $lines.Length; $j++) {
+        if ($fence[$j]) { continue }
+        if ($j -gt $startIdx) {
+            if ([regex]::IsMatch($lines[$j], $RE_HEADING)) { break }
+            if ([regex]::IsMatch($lines[$j], $RE_NUMSTEP)) { break }
+            if ($anchorLines.Contains($a.File + ':' + ($j + 1))) { break }
+        }
+        foreach ($m in [regex]::Matches($lines[$j], $RE_KV)) {
+            $k = $m.Groups[1].Value
+            [void]$tokens.Add($k)
+            if ($modeKey.Length -eq 0 -and ($k -ceq 'TASK' -or $k -ceq 'WORKFLOW_TYPE' -or $k -ceq 'TASK_TYPE')) {
+                $modeKey = $k
+                $modeValue = $m.Groups[2].Value
+            }
+        }
+    }
+    if ($modeKey.Length -eq 0) { continue }
+    [void]$invocations.Add([PSCustomObject]@{
+        Agent = $a.Agent; Key = $modeKey; Value = $modeValue; File = $a.File; Line = $a.Line; Tokens = $tokens
+    })
 }
 
 # ---- gate index -------------------------------------------------------------
@@ -598,6 +757,46 @@ foreach ($r in $refs) {
     if ($r.Kind -cne 'specArtifact') { continue }
     if ($specArtifacts.Contains($r.Target)) { continue }
     Add-Finding 'CL008' $r.File $r.Line "unknown spec artifact filename '$($r.Target)'"
+}
+
+# CL100 / CL102 / CL103 - each invocation against the mode it names. A target
+# agent that CL001 already flagged as unresolved gets no CL100 pile-on.
+foreach ($inv in $invocations) {
+    if (-not $agentNames.Contains($inv.Agent)) { continue }
+    $md = $null
+    foreach ($d in $modeDecls) {
+        if ($d.Agent -cne $inv.Agent) { continue }
+        if ($d.Key -cne $inv.Key) { continue }
+        if ($d.Value -cne $inv.Value) { continue }
+        $md = $d; break
+    }
+    if ($null -eq $md) {
+        Add-Finding 'CL100' $inv.File $inv.Line "invocation sets $($inv.Key) = $($inv.Value) but agent '$($inv.Agent)' declares no such mode"
+        continue
+    }
+    foreach ($t in $md.Required) {
+        if ($inv.Tokens.Contains($t)) { continue }
+        Add-Finding 'CL102' $inv.File $inv.Line "invocation of '$($inv.Agent)' ($($inv.Key) = $($inv.Value)) omits required input '$t'"
+    }
+    foreach ($t in $inv.Tokens) {
+        if ($t -ceq $inv.Key) { continue }
+        if ($md.Required.Contains($t) -or $md.Optional.Contains($t)) { continue }
+        Add-Finding 'CL103' $inv.File $inv.Line "invocation of '$($inv.Agent)' ($($inv.Key) = $($inv.Value)) passes undeclared input '$t'"
+    }
+}
+
+# CL101 - the inverse of CL100: a declared mode nobody ever selects.
+foreach ($d in $modeDecls) {
+    $seen = $false
+    foreach ($inv in $invocations) {
+        if ($inv.Agent -cne $d.Agent) { continue }
+        if ($inv.Key -cne $d.Key) { continue }
+        if ($inv.Value -cne $d.Value) { continue }
+        $seen = $true; break
+    }
+    if (-not $seen) {
+        Add-Finding 'CL101' $d.File $d.Line "agent '$($d.Agent)' declares mode $($d.Key) = $($d.Value) that no command ever invokes"
+    }
 }
 
 # The seven steps below are a CONTRACT with contract-lint.sh's normalize_option.

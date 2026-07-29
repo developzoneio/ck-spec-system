@@ -1,0 +1,6 @@
+{
+  "note": "sd-keeper declares TASK = archive but no command in the fixture tree ever sets it",
+  "findings": [
+    { "rule": "CL101", "severity": "WARN", "file": "agents/keeper.md", "anchor": "seed", "seed": "unused-mode" }
+  ]
+}
