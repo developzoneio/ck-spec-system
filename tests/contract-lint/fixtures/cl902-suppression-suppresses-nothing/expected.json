@@ -1,0 +1,12 @@
+{
+  "note": "the anti-rot rule: a suppression that outlived the finding it was written for",
+  "findings": [
+    {
+      "rule": "CL902",
+      "severity": "WARN",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "vacuous-suppression"
+    }
+  ]
+}

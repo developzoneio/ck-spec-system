@@ -1,0 +1,12 @@
+{
+  "note": "a sd- token that resolves to nothing, on a line that never says \"skill\"",
+  "findings": [
+    {
+      "rule": "CL001",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unresolved-agent"
+    }
+  ]
+}

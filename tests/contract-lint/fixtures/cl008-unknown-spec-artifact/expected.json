@@ -1,0 +1,12 @@
+{
+  "note": "a numbered spec-artifact filename absent from specArtifacts",
+  "findings": [
+    {
+      "rule": "CL008",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unknown-artifact"
+    }
+  ]
+}

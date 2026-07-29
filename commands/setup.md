@@ -121,8 +121,8 @@ and continue (in `complete` -> clean early exit; in `partial` -> continue fillin
 Otherwise print ONE table grouped by file (each line showing exact before -> after with a
 HIGH/MED/LOW tag), then STOP for explicit approval:
 
-> Reply "go" to apply (each file backed up first), "skip" to leave `.claude/*` untouched, or name
-> specific lines to exclude (e.g. "skip the models lines").
+> Reply to apply every change (each file backed up first), leave `.claude/*` untouched, or name the
+> specific lines to exclude, e.g. "skip the models lines". (go / skip / <lines to exclude>)
 
 This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
 
@@ -186,7 +186,7 @@ constitution rules.
 
 ### Gate - confirm detected facts (one batch confirmation, not a question)
 
-Print a single table of detected facts and ask the user to confirm before writing:
+Print a single table of detected facts, then STOP for explicit approval before writing:
 
 ```
 Detected (edit any before I write, or say "go"):
@@ -196,7 +196,8 @@ Detected (edit any before I write, or say "go"):
   Commands build/test/lint/run/coverage : <values or "<<placeholder>>">
 ```
 
-> Review these. Reply with corrections (e.g. "tests = test, drop the Infrastructure layer") or "go".
+> Review these. Reply to accept them as-is, or send corrections such as "tests = test, drop the
+> Infrastructure layer". (go / <corrections>)
 
 This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
 Anything the user does not correct is used as-is; anything still unknown stays `<<placeholder>>`.

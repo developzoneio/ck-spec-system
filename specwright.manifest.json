@@ -111,7 +111,8 @@
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (setup|spec) templates",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) templates",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?skills",
-    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?rule packs"
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?rule packs",
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) hard gates?"
   ],
 
   "$claimPhrasesComment": [
@@ -219,6 +220,139 @@
     { "file": "commands/setup.md", "pattern": "commands/sd/ +\\(([0-9]+) workflow commands\\)", "equals": "commands" },
     { "file": "commands/setup.md", "pattern": "agents/sd/ +\\(([0-9]+) specialist agents\\)", "equals": "agents" },
     { "file": "commands/setup.md", "pattern": "hooks/sd/ +\\(([0-9]+) hooks\\)", "equals": "hooksPowerShell" },
-    { "file": "commands/setup.md", "pattern": "skills/sd/ +\\(([0-9]+) skills:", "equals": "skills" }
-  ]
+    { "file": "commands/setup.md", "pattern": "skills/sd/ +\\(([0-9]+) skills:", "equals": "skills" },
+
+    { "file": "README.md", "pattern": "^\\| `/sd:feature [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesFeature" },
+    { "file": "README.md", "pattern": "^\\| `/sd:bug [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesBug" },
+    { "file": "README.md", "pattern": "^\\| `/sd:rca [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRca" },
+    { "file": "README.md", "pattern": "^\\| `/sd:refactor [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
+    { "file": "README.md", "pattern": "^\\| `/sd:perf [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+    { "file": "README.md", "pattern": "^\\| `/sd:setup` \\| Utility \\| ([0-9]+) \\|", "equals": "gatesSetup" },
+    { "file": "README.md", "pattern": "^\\| `/sd:release [^|]*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesRelease" },
+    { "file": "README.md", "pattern": "^\\| `/sd:adr .*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesAdr" },
+
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:feature` \\| ([0-9]+) \\|", "equals": "gatesFeature" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:bug` \\| ([0-9]+) \\|", "equals": "gatesBug" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:rca` \\| ([0-9]+) \\|", "equals": "gatesRca" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:refactor` \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:perf` \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+
+    { "file": "commands/feature.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
+    { "file": "commands/bug.md", "pattern": "([0-9]+) hard gates", "equals": "gatesBug" },
+    { "file": "commands/rca.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRca" },
+    { "file": "commands/refactor.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRefactor" },
+    { "file": "commands/perf.md", "pattern": "([0-9]+) hard gates", "equals": "gatesPerf" },
+    { "file": "commands/adr.md", "pattern": "([0-9]+) hard gate", "equals": "gatesAdr" },
+
+    { "file": "docs/usage.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
+    { "file": "docs/adr/0003-adaptive-replan-loop.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" }
+  ],
+
+  "$contractLintComment": [
+    "Contract contract for specwright's PRODUCT (commands/agents/skills), read by",
+    "scripts/contract-lint.ps1 and scripts/contract-lint.sh (Check 8: cross-file contract lint).",
+    "Where 'areas' above governs INVENTORY (how many files exist), this subtree governs the",
+    "RELATIONSHIPS between those files - which agent a command invokes, which skill an agent",
+    "loads, how many hard gates a workflow declares.",
+    "",
+    "THE COUNTS QUESTION. The manifest's charter at the top says it stores no counts, and",
+    "'gates.<command>.hard' is a literal number. That is deliberate, and the two are not in",
+    "conflict, because the charter governs inventory. The test is:",
+    "",
+    "  Can a script count it from disk with no judgement calls?",
+    "    YES -> it is inventory. It belongs in 'areas' and must be derived.",
+    "    NO  -> it is a declared design contract. It belongs here, written down.",
+    "",
+    "'How many command files exist' passes that test, so hardcoding it is pure liability.",
+    "'How many hard gates /sd:feature declares' does NOT: nothing on disk is a second source",
+    "for it. If it were derived, CL302 would compare disk against itself and pass vacuously",
+    "forever - exactly the rot Check 7's vacuous-claim rule exists to catch. The number's job",
+    "is to make deleting a '### Gate 4' heading a deliberate two-file edit that shows up in",
+    "review. Feeding these into Check 7 as quantities gives README <- manifest <- disk, hence",
+    "transitively README == disk, with no gate parser duplicated into validate.",
+    "",
+    "FOUR FALSE POSITIVES the gate parser handles WITHOUT an exclusion list. Do not re-add one:",
+    "  1. 'commands/status.md' - '## Gate activity' is a report section, not a gate. Rejected",
+    "     because 'Gate' followed by a lowercase word is never a gate heading.",
+    "  2. 'commands/feature.md' - '**Face B - Gate Complexity (HARD)**' is bold text, not a",
+    "     heading. Rejected because a gate must match '^#{2,3} '.",
+    "  3. 'commands/bug.md' - 'Gate 3a' is authored BEFORE 'Gate 3'. CL303 compares SETS, never",
+    "     file order.",
+    "  4. The ~20 literal STOPs in Phase 0 bootstrap error paths. CL300 only looks inside a gate",
+    "     block, which ends at the next heading of any level.",
+    "",
+    "SCAN SCOPE IS LOAD-BEARING. It is commands/ agents/ skills/ and nothing else on purpose.",
+    "CLAUDE.md and CONTRIBUTING.md use 'sd-test' as a sandbox path and docs/architecture.md",
+    "carries a 'name: sd-debugger' frontmatter example - adding docs/** here produces ~18 CL001",
+    "false positives on day one.",
+    "",
+    "SEVERITY LIVES HERE, NEVER IN A RULE. Both linters look severity up from rules[] below, so",
+    "a BLOCK/WARN divergence between the PowerShell and bash twins is structurally impossible.",
+    "A registry parity guard inside each linter asserts that the set of ids below equals the set",
+    "of rules it dispatches, and exits 2 if not - so adding a wave-2 rule cannot be half-done."
+  ],
+
+  "contractLint": {
+    "scanScope": ["commands/*.md", "agents/*.md", "skills/*/SKILL.md"],
+
+    "installNamespaceSegment": "sd",
+
+    "rules": [
+      { "id": "CL001", "severity": "BLOCK", "wave": 1, "summary": "sd- reference resolving to no agent and no skill" },
+      { "id": "CL002", "severity": "BLOCK", "wave": 1, "summary": "skills: frontmatter entry with no matching SKILL.md" },
+      { "id": "CL003", "severity": "BLOCK", "wave": 1, "summary": "unresolved sd- reference on a skill-decorated line" },
+      { "id": "CL004", "severity": "WARN",  "wave": 1, "summary": "skill referenced by nobody in scan scope and not declared in skillConsumers" },
+      { "id": "CL005", "severity": "BLOCK", "wave": 1, "summary": "templates/ path that does not exist on disk" },
+      { "id": "CL006", "severity": "BLOCK", "wave": 1, "summary": "/sd:<name> reference with no matching command file" },
+      { "id": "CL007", "severity": "WARN",  "wave": 1, "summary": "agent mentioned by no command body" },
+      { "id": "CL008", "severity": "BLOCK", "wave": 1, "summary": "numbered .specs artifact filename absent from specArtifacts" },
+
+      { "id": "CL300", "severity": "BLOCK", "wave": 1, "summary": "gate block containing no literal STOP" },
+      { "id": "CL301", "severity": "BLOCK", "wave": 1, "summary": "gate block offering no option set" },
+      { "id": "CL302", "severity": "BLOCK", "wave": 1, "summary": "hard gate count on disk disagrees with gates.<file>.hard" },
+      { "id": "CL303", "severity": "WARN",  "wave": 1, "summary": "hard gate numbering is not exactly 1..N without duplicates" },
+      { "id": "CL304", "severity": "BLOCK", "wave": 1, "summary": "conditional gate on disk undeclared, or declared and absent" },
+      { "id": "CL305", "severity": "BLOCK", "wave": 1, "summary": "HARD gate listing an override token as a selectable option" },
+
+      { "id": "CL900", "severity": "BLOCK", "wave": 1, "summary": "suppression comment carrying no usable reason" },
+      { "id": "CL901", "severity": "BLOCK", "wave": 1, "summary": "suppression naming a rule id absent from this registry" },
+      { "id": "CL902", "severity": "WARN",  "wave": 1, "summary": "suppression that suppressed no finding" }
+    ],
+
+    "gates": {
+      "commands/feature.md":  { "quantity": "gatesFeature",  "hard": 3, "conditional": ["Re-plan"] },
+      "commands/bug.md":      { "quantity": "gatesBug",      "hard": 5, "conditional": ["3a"] },
+      "commands/rca.md":      { "quantity": "gatesRca",      "hard": 3, "conditional": [] },
+      "commands/refactor.md": { "quantity": "gatesRefactor", "hard": 6, "conditional": ["Re-plan"] },
+      "commands/perf.md":     { "quantity": "gatesPerf",     "hard": 8, "conditional": [] },
+      "commands/setup.md":    { "quantity": "gatesSetup",    "hard": 2, "conditional": [] },
+      "commands/release.md":  { "quantity": "gatesRelease",  "hard": 1, "conditional": [] },
+      "commands/adr.md":      { "quantity": "gatesAdr",      "hard": 1, "conditional": [] },
+
+      "skills/sd-replan-loop/SKILL.md": { "quantity": null, "hard": 0, "conditional": ["Re-plan"] }
+    },
+
+    "$gatesComment": [
+      "quantity is the Check 7 name this gate count is published under. null means the gate",
+      "block is real but nothing in the docs cites a number for it - the Re-plan protocol is",
+      "defined once in the skill and reached from commands/feature.md and commands/refactor.md,",
+      "so its count belongs to those workflows, not to the skill. Check 7's seeding loop skips",
+      "null quantities; CL302 and CL304 do not care either way."
+    ],
+
+    "specArtifacts": [
+      "00-spec.md",
+      "01-plan.md",
+      "02-tasks.md",
+      "03-decisions.md",
+      "05-retro.md",
+      "06-verify.md"
+    ],
+
+    "skillConsumers": {
+      "sd-retro-lessons": "scripts/validate-lessons.{ps1,sh}, scripts/aggregate-lessons.{ps1,sh}"
+    },
+
+    "overrideOptionTokens": ["skip", "override", "proceed anyway", "bypass", "force", "ignore"]
+  }
 }

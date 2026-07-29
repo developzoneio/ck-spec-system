@@ -98,6 +98,55 @@ Check 7 needs `jq` on Unix and **fails loudly without it**. This is the opposite
 below (hooks exit `0` silently when `jq` is missing so they never block a user on their own bugs) -
 a validator that skipped itself for a missing tool would turn CI green while checking nothing.
 
+### Contract lint (Check 8)
+
+Where Check 7 guards *inventory*, Check 8 guards the **relationships between** the prompt files:
+which agent a command invokes, which skill an agent loads, which template a prompt reads, how many
+hard gates a workflow declares. It is a script, not a prompt - `scripts/contract-lint.{ps1,sh}`,
+configured entirely from the manifest's `contractLint` subtree. Full rule catalogue and rationale:
+[`docs/contract-lint.md`](docs/contract-lint.md).
+
+Run it directly while iterating:
+
+```bash
+bash scripts/contract-lint.sh --root .
+```
+```powershell
+.\scripts\contract-lint.ps1 -Root .
+```
+
+Exit `0` means no BLOCK findings, `1` means at least one, and **`2` means it could not run at all**
+(missing manifest, missing `jq`, or the registry parity guard tripped). Check 8 treats `2` as a
+failure for the same reason Check 7 refuses to skip itself.
+
+**Suppressing a finding.** Rarely, a violation is correct on purpose. Put a comment on the offending
+line or the line above it, naming the rule and giving a real reason:
+
+```text
+<!-- contract-lint: allow CL305 - the option here buys a logged constitution exception rather than a way past the requirement -->
+```
+
+Three things constrain that escape hatch, and all three are enforced:
+
+- **The reason is mandatory.** Under ten non-separator characters fails as CL900. "`- x`" is not a
+  reason.
+- **The rule id must exist.** A typo fails as CL901 rather than silently suppressing nothing.
+- **It must actually suppress something.** A suppression that outlives the finding it was written
+  for fails as CL902 - the same anti-rot posture as Check 7's vacuous-claim rule.
+
+A suppression can never suppress CL900, CL901 or CL902; that would be a self-authorizing loophole.
+
+**Adding a rule** means four edits, and skipping any one of them fails CI: a `contractLint.rules`
+registry entry, a rule function in *both* implementations, a fixture case under
+`tests/contract-lint/` whose `expected.json` names the rule, and a row in `docs/contract-lint.md`.
+Each edge of that square is guarded by a different mechanism - the linters' own registry parity
+guard, and invariants C and D in `tests/contract-lint/run-selftest.ps1`.
+
+`tests/contract-lint/run-selftest.ps1` is the fixture suite. Like the hook conformance harness it is
+a single pwsh script by design: it runs both implementations in one process, so parity is asserted
+rather than inferred. `-SelfTest` swaps in a linter that reports nothing and asserts the harness
+notices.
+
 ---
 
 ## PR process

@@ -1,0 +1,11 @@
+{
+  "note": "an agent nothing invokes; reported at line 1 of its own file",
+  "findings": [
+    {
+      "rule": "CL007",
+      "severity": "WARN",
+      "file": "agents/hermit.md",
+      "anchor": "file"
+    }
+  ]
+}

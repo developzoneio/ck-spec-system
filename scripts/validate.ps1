@@ -15,6 +15,9 @@
       6. CHANGELOG gate: the [Unreleased] section is non-empty.
       7. Docs consistency: published numbers in the docs match disk, per
          specwright.manifest.json.
+      8. Cross-file contract lint: the relationships between commands, agents
+         and skills, per specwright.manifest.json's contractLint subtree.
+         Delegated to scripts/contract-lint.ps1 as a child process.
 
     Exit code 0 = all checks passed; 1 = at least one check failed.
 
@@ -121,7 +124,7 @@ Write-Host "  Repo root: $repoRoot"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-Write-Section 'Check 1/7: Pure-ASCII scan (*.ps1)'
+Write-Section 'Check 1/8: Pure-ASCII scan (*.ps1)'
 $ps1Files = Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
     Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 $asciiBad = 0
@@ -138,7 +141,7 @@ if ($asciiBad -eq 0) { Write-Ok "$($ps1Files.Count) .ps1 file(s) are pure ASCII"
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-Write-Section 'Check 2/7: bash -n syntax (*.sh)'
+Write-Section 'Check 2/8: bash -n syntax (*.sh)'
 $shFiles = @()
 foreach ($sub in @('hooks\bash', 'install', 'scripts')) {
     $dir = Join-Path $repoRoot $sub
@@ -166,7 +169,7 @@ if ($null -eq $bashExe) {
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-Write-Section 'Check 3/7: Hook-pair parity'
+Write-Section 'Check 3/8: Hook-pair parity'
 $psHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File |
     ForEach-Object { $_.BaseName }
 $shHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\bash') -Filter *.sh -File |
@@ -190,7 +193,7 @@ if ($parityBad -eq 0) { Write-Ok "$($psHooks.Count) hook pair(s) present on both
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-Write-Section 'Check 4/7: Agent model aliases'
+Write-Section 'Check 4/8: Agent model aliases'
 $agentFiles = Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File
 $modelBad = 0
 foreach ($f in $agentFiles) {
@@ -213,7 +216,7 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-Write-Section 'Check 5/7: Install-target counts'
+Write-Section 'Check 5/8: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
 $psExe = (Get-Process -Id $PID).Path
@@ -257,7 +260,7 @@ try {
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/7: CHANGELOG [Unreleased] gate'
+Write-Section 'Check 6/8: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -290,7 +293,7 @@ if ($start -lt 0) {
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-Write-Section 'Check 7/7: Docs consistency (published numbers vs disk)'
+Write-Section 'Check 7/8: Docs consistency (published numbers vs disk)'
 $manifestPath = Join-Path $repoRoot 'specwright.manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     Write-FailMsg 'specwright.manifest.json not found at repo root'
@@ -335,6 +338,20 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
             if ($quantities.ContainsKey($part)) { $derTotal += [int]$quantities[$part] }
         }
         $quantities[$derProp.Name] = $derTotal
+    }
+
+    # Gate quantities are DECLARED, not derived: nothing on disk is a second
+    # source for "how many hard gates /sd:feature has". Seeding them here gives
+    # the topology README <- manifest (this check) and manifest <- disk (Check
+    # 8's CL302), hence transitively README == disk, with zero duplication of the
+    # gate parser into this file. A null quantity means the gate block is real
+    # but no doc publishes a number for it.
+    if ($null -ne $manifest.contractLint -and $null -ne $manifest.contractLint.gates) {
+        foreach ($gateProp in $manifest.contractLint.gates.PSObject.Properties) {
+            $qName = $gateProp.Value.quantity
+            if ([string]::IsNullOrEmpty($qName)) { continue }
+            $quantities[$qName] = [int]$gateProp.Value.hard
+        }
     }
 
     foreach ($claim in $manifest.docClaims) {
@@ -419,6 +436,56 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 
     if ($docsBad -eq 0) {
         Write-Ok "$($manifest.docClaims.Count) published claim(s) match disk; no undeclared claims"
+    }
+}
+
+# ---- Check 8: cross-file contract lint --------------------------------------
+
+Write-Section 'Check 8/8: Cross-file contract lint (commands / agents / skills)'
+$lintPs1 = Join-Path $scriptDir 'contract-lint.ps1'
+if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
+    Write-FailMsg 'scripts/contract-lint.ps1 not found'
+    Add-Failure 'contract-lint: script missing'
+} else {
+    # Spawned as a CHILD PROCESS, never with '&': contract-lint.ps1 calls exit,
+    # and an inline '&' would terminate validate.ps1 outright - leaving a green
+    # Check 7 line already printed and no summary at all. Same pattern as the
+    # installer invocation in Check 5.
+    $lintArgs = @('-NoProfile')
+    if ($env:OS -eq 'Windows_NT') { $lintArgs += @('-ExecutionPolicy', 'Bypass') }
+    $lintArgs += @('-File', $lintPs1, '-Root', $repoRoot, '-Quiet')
+    $lintOut = & $psExe @lintArgs 2>$null
+    $lintExit = $LASTEXITCODE
+
+    # The linter is a dumb TSV emitter; all human formatting happens here, so
+    # both twins stay identical and neither learns about colours or [OK] tags.
+    $clBlocks = 0
+    $clWarns = 0
+    foreach ($row in @($lintOut)) {
+        if ([string]::IsNullOrWhiteSpace($row)) { continue }
+        $parts = $row.Split([char]9)
+        if ($parts.Count -lt 5) { continue }
+        $text = "$($parts[2]):$($parts[3]) $($parts[0]) - $($parts[4])"
+        if ($parts[1] -ceq 'BLOCK') {
+            Write-FailMsg $text
+            Add-Failure "contract-lint: $($parts[0]) $($parts[2]):$($parts[3])"
+            $clBlocks++
+        } else {
+            Write-WarnMsg $text
+            $clWarns++
+        }
+    }
+    if ($lintExit -ge 2) {
+        # Exit 2 means the linter could not run at all. Treating that as a pass
+        # is the failure mode this whole check exists to prevent.
+        Write-FailMsg "contract-lint could not run (exit $lintExit)"
+        Add-Failure "contract-lint: exit $lintExit"
+    } elseif ($clBlocks -eq 0) {
+        if ($clWarns -eq 0) {
+            Write-Ok 'no contract violations'
+        } else {
+            Write-Ok "no BLOCK violations ($clWarns warning(s) above)"
+        }
     }
 }
 

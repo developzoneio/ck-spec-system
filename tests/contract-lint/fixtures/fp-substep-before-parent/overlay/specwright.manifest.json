@@ -1,0 +1,151 @@
+{
+  "$comment": [
+    "Fixture manifest for the contract-lint self-test. Deliberately tiny:",
+    "the linter takes a root argument so a fixture tree configures itself",
+    "instead of the tests copying the real engine.",
+    "",
+    "rules[] must stay identical to the repo manifest (ids AND severities).",
+    "run-selftest.ps1 asserts that, so a wave-2 rule added to the repo",
+    "registry cannot be silently missing here."
+  ],
+  "contractLint": {
+    "scanScope": [
+      "commands/*.md",
+      "agents/*.md",
+      "skills/*/SKILL.md"
+    ],
+    "installNamespaceSegment": "sd",
+    "rules": [
+      {
+        "id": "CL001",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "sd- reference resolving to no agent and no skill"
+      },
+      {
+        "id": "CL002",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "skills: frontmatter entry with no matching SKILL.md"
+      },
+      {
+        "id": "CL003",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "unresolved sd- reference on a skill-decorated line"
+      },
+      {
+        "id": "CL004",
+        "severity": "WARN",
+        "wave": 1,
+        "summary": "skill referenced by nobody in scan scope and not declared in skillConsumers"
+      },
+      {
+        "id": "CL005",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "templates/ path that does not exist on disk"
+      },
+      {
+        "id": "CL006",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "/sd:<name> reference with no matching command file"
+      },
+      {
+        "id": "CL007",
+        "severity": "WARN",
+        "wave": 1,
+        "summary": "agent mentioned by no command body"
+      },
+      {
+        "id": "CL008",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "numbered .specs artifact filename absent from specArtifacts"
+      },
+      {
+        "id": "CL300",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "gate block containing no literal STOP"
+      },
+      {
+        "id": "CL301",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "gate block offering no option set"
+      },
+      {
+        "id": "CL302",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "hard gate count on disk disagrees with gates.<file>.hard"
+      },
+      {
+        "id": "CL303",
+        "severity": "WARN",
+        "wave": 1,
+        "summary": "hard gate numbering is not exactly 1..N without duplicates"
+      },
+      {
+        "id": "CL304",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "conditional gate on disk undeclared, or declared and absent"
+      },
+      {
+        "id": "CL305",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "HARD gate listing an override token as a selectable option"
+      },
+      {
+        "id": "CL900",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "suppression comment carrying no usable reason"
+      },
+      {
+        "id": "CL901",
+        "severity": "BLOCK",
+        "wave": 1,
+        "summary": "suppression naming a rule id absent from this registry"
+      },
+      {
+        "id": "CL902",
+        "severity": "WARN",
+        "wave": 1,
+        "summary": "suppression that suppressed no finding"
+      }
+    ],
+    "gates": {
+      "commands/alpha.md": {
+        "quantity": null,
+        "hard": 2,
+        "conditional": [
+          "1a"
+        ]
+      },
+      "commands/beta.md": {
+        "quantity": null,
+        "hard": 1,
+        "conditional": []
+      }
+    },
+    "specArtifacts": [
+      "00-spec.md",
+      "01-plan.md",
+      "02-tasks.md"
+    ],
+    "skillConsumers": {},
+    "overrideOptionTokens": [
+      "skip",
+      "override",
+      "proceed anyway",
+      "bypass",
+      "force",
+      "ignore"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "note": "a gate whose block contains no literal STOP; the Phase 0 STOPs must not rescue it",
+  "findings": [
+    {
+      "rule": "CL300",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "gate-without-stop"
+    }
+  ]
+}

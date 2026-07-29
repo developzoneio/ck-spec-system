@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Check 8: cross-file contract lint** (`scripts/contract-lint.ps1` / `scripts/contract-lint.sh`,
+  SW-26 wave 1). Where Check 7 guards inventory, Check 8 guards the relationships between commands,
+  agents and skills. 17 rules across three bands: `CL0xx` reference resolution, `CL3xx` gate
+  integrity, `CL9xx` suppression hygiene. Deterministic file ops, no subagent, TSV on stdout, exit
+  `2` when it cannot run. Wired into both validators and into CI on all three OSes.
+- `contractLint` subtree in `specwright.manifest.json`: scan scope, the rule registry (the single
+  source of every rule's severity, so a BLOCK/WARN divergence between the twins is structurally
+  impossible), declared gate contracts, spec artifact names, skill-consumer escapes and the CL305
+  override vocabulary. Each linter carries a registry parity guard that exits `2` when the rules it
+  dispatches and the registry disagree.
+- Gate counts are now published claims: `contractLint.gates.<file>.hard` seeds Check 7 quantities,
+  giving `README <- manifest` there and `manifest <- disk` in CL302, hence transitively
+  `README == disk`. 21 new `docClaims` plus a `N hard gates` claim phrase.
+- `tests/contract-lint/` fixture suite - a minimal valid mini-engine plus one overlay per rule, five
+  false-positive guards and one must-still-bite case. Goldens pin a seed marker, never a line
+  number. `run-selftest.ps1` drives both implementations in one process so parity is asserted, and
+  `-SelfTest` proves the harness detects a linter that reports nothing.
+- `docs/contract-lint.md` - rule catalogue, suppression syntax, manifest surface, and why a declared
+  gate count belongs in a manifest that otherwise stores no counts. `CONTRIBUTING.md` gained a
+  matching section.
 - Machine-readable `Inputs (required): ...` / `Inputs (optional): ...` declarations under every
   TASK/mode/workflow-type heading in `agents/*.md` (22 sections across `code-explorer`, `debugger`,
   `implementer`, `reviewer`, `spec-architect`; `docs-writer` has no mode dispatch) - prerequisite
@@ -17,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under "Agents". No agent behaviour changed.
 
 ### Fixed
+- `docs/architecture.md` listed four items against a gate count of three for `/sd:feature`, one of
+  them naming a per-task review gate removed when the workflow moved to batch review. Found by
+  writing CL302, fixed before the linter landed.
+- `commands/setup.md`'s detected-facts gate had no literal `STOP` (the nearest one belonged to the
+  migration gate above it), and neither setup gate offered a machine-readable option set. Both were
+  real CL300/CL301 violations on disk.
 - Audit of every `commands/*.md` invocation site against the new declarations turned up three
   drifted contracts, now corrected: `/sd:bug`'s hypothesis-verify loop omitted `EVIDENCE_DIR` from
   its `sd-debugger` `TASK = verify` call, so verification evidence had nowhere to be saved
