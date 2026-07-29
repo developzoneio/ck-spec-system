@@ -1,5 +1,5 @@
 ---
-description: Author an Architecture Decision Record (ADR) from a spec's decisions via sd-docs-writer. One hard gate before keeping the file.
+description: Author an Architecture Decision Record (ADR) from a spec's decisions via sd-docs-writer. 1 hard gate before keeping the file.
 argument-hint: <spec-ID | "decision title">
 ---
 
@@ -61,7 +61,7 @@ the ADR stays `proposed` until they change its status to `accepted`.
 ## Rules (hard constraints)
 
 - **Decisions come from the source, never invented.** Empty or absent decision content aborts the command.
-- **One hard gate.** Nothing is kept on disk without explicit approval.
+- **1 hard gate.** Nothing is kept on disk without explicit approval.
 - **ADRs are not specs.** No `.specs/index.md` lifecycle entry; ADRs live under `.specs/_adr/` with their
   own numbering.
 - **The constitution is never edited here.** Amending a rule is a separate `/sd:refactor` or a manual ADR

@@ -12,6 +12,9 @@
 #   6. CHANGELOG gate: the [Unreleased] section is non-empty.
 #   7. Docs consistency: published numbers in the docs match disk, per
 #      specwright.manifest.json.
+#   8. Cross-file contract lint: the relationships between commands, agents and
+#      skills, per the manifest's contractLint subtree. Delegated to
+#      scripts/contract-lint.sh as a child process.
 #
 # Exit 0 = all checks passed; 1 = at least one failed.
 
@@ -66,7 +69,7 @@ echo "  Repo root: $repo_root"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-section "Check 1/7: Pure-ASCII scan (*.ps1)"
+section "Check 1/8: Pure-ASCII scan (*.ps1)"
 ascii_bad=0
 ps1_count=0
 while IFS= read -r -d '' f; do
@@ -83,7 +86,7 @@ if [[ $ascii_bad -eq 0 ]]; then ok "$ps1_count .ps1 file(s) are pure ASCII"; fi
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-section "Check 2/7: bash -n syntax (*.sh)"
+section "Check 2/8: bash -n syntax (*.sh)"
 syn_bad=0
 sh_count=0
 while IFS= read -r -d '' f; do
@@ -100,7 +103,7 @@ if [[ $syn_bad -eq 0 ]]; then ok "$sh_count .sh file(s) pass bash -n"; fi
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-section "Check 3/7: Hook-pair parity"
+section "Check 3/8: Hook-pair parity"
 parity_bad=0
 ps_count=0
 for psf in "$repo_root"/hooks/powershell/*.ps1; do
@@ -126,7 +129,7 @@ if [[ $parity_bad -eq 0 ]]; then ok "$ps_count hook pair(s) present on both plat
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-section "Check 4/7: Agent model aliases"
+section "Check 4/8: Agent model aliases"
 model_bad=0
 agent_count=0
 for af in "$repo_root"/agents/*.md; do
@@ -154,7 +157,7 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-section "Check 5/7: Install-target counts"
+section "Check 5/8: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
 cleanup_tmp() { [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true; }
@@ -185,7 +188,7 @@ trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/7: CHANGELOG [Unreleased] gate"
+section "Check 6/8: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
@@ -210,7 +213,7 @@ fi
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-section "Check 7/7: Docs consistency (published numbers vs disk)"
+section "Check 7/8: Docs consistency (published numbers vs disk)"
 manifest="$repo_root/specwright.manifest.json"
 if [[ ! -f "$manifest" ]]; then
     fail "specwright.manifest.json not found at repo root"
@@ -313,6 +316,17 @@ else
         q_set "$der_name" "$der_total"
     done < <(mjq '.derived | to_entries[] | "\(.key)\t\(.value | join(" "))"')
 
+    # Gate quantities are DECLARED, not derived: nothing on disk is a second
+    # source for "how many hard gates /sd:feature has". Seeding them here gives
+    # the topology README <- manifest (this check) and manifest <- disk (Check
+    # 8's CL302), hence transitively README == disk, with zero duplication of the
+    # gate parser into this file. A null quantity means the gate block is real
+    # but no doc publishes a number for it.
+    while IFS=$'\t' read -r gate_q gate_hard; do
+        [[ -z "$gate_q" || "$gate_q" == "null" ]] && continue
+        q_set "$gate_q" "$gate_hard"
+    done < <(mjq '.contractLint.gates // {} | to_entries[] | "\(.value.quantity)\t\(.value.hard)"')
+
     while IFS=$'\t' read -r c_file c_pattern c_equals; do
         fp_append "$c_file" "$c_pattern"
 
@@ -396,6 +410,52 @@ else
     if [[ $docs_bad -eq 0 ]]; then
         claim_total="$(mjq '.docClaims | length')"
         ok "$claim_total published claim(s) match disk; no undeclared claims"
+    fi
+fi
+
+# ---- Check 8: cross-file contract lint -------------------------------------
+
+section "Check 8/8: Cross-file contract lint (commands / agents / skills)"
+lint_sh="$script_dir/contract-lint.sh"
+if [[ ! -f "$lint_sh" ]]; then
+    fail "scripts/contract-lint.sh not found"
+    add_failure "contract-lint: script missing"
+else
+    # Spawned as a CHILD PROCESS so its `exit` cannot terminate this validator,
+    # and so its stdout stays a clean machine-readable stream. All human
+    # formatting happens here; the linter stays a dumb TSV emitter and the two
+    # linter twins never learn about colours or [OK] tags.
+    lint_out=""
+    lint_exit=0
+    lint_out="$(bash "$lint_sh" --root "$repo_root" --quiet 2>/dev/null)" || lint_exit=$?
+
+    cl_blocks=0
+    cl_warns=0
+    if [[ -n "$lint_out" ]]; then
+        while IFS=$'\t' read -r cl_rule cl_sev cl_file cl_line cl_msg; do
+            [[ -z "$cl_rule" ]] && continue
+            if [[ "$cl_sev" == "BLOCK" ]]; then
+                fail "$cl_file:$cl_line $cl_rule - $cl_msg"
+                add_failure "contract-lint: $cl_rule $cl_file:$cl_line"
+                cl_blocks=$((cl_blocks + 1))
+            else
+                warn "$cl_file:$cl_line $cl_rule - $cl_msg"
+                cl_warns=$((cl_warns + 1))
+            fi
+        done <<< "$lint_out"
+    fi
+
+    if [[ $lint_exit -ge 2 ]]; then
+        # Exit 2 means the linter could not run at all. Treating that as a pass
+        # is the failure mode this whole check exists to prevent.
+        fail "contract-lint could not run (exit $lint_exit)"
+        add_failure "contract-lint: exit $lint_exit"
+    elif [[ $cl_blocks -eq 0 ]]; then
+        if [[ $cl_warns -eq 0 ]]; then
+            ok "no contract violations"
+        else
+            ok "no BLOCK violations ($cl_warns warning(s) above)"
+        fi
     fi
 fi
 

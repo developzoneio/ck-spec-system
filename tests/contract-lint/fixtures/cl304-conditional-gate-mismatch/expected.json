@@ -1,0 +1,18 @@
+{
+  "note": "both directions at once: 2a undeclared on disk, 2b declared and absent - the anti-rot half",
+  "findings": [
+    {
+      "rule": "CL304",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "undeclared-conditional"
+    },
+    {
+      "rule": "CL304",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "file"
+    }
+  ]
+}

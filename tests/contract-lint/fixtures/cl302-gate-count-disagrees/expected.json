@@ -1,0 +1,11 @@
+{
+  "note": "a gate added to disk without the deliberate second edit to the manifest",
+  "findings": [
+    {
+      "rule": "CL302",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "file"
+    }
+  ]
+}

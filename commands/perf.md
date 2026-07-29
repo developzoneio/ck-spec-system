@@ -86,9 +86,11 @@ STOP. Display Target + Methodology. Ask:
 STOP. Two cases:
 
 **Case A: baseline already meets SLA goal.**
+<!-- contract-lint: allow CL305 - Case A is the already-at-goal branch; 'proceed anyway' there buys a logged constitution exception, not a way past the baseline requirement, which stays unconditional -->
 > Baseline p95=<X> already meets SLA goal p95<<goal>. No optimization needed. Close PERF-<slug> as 'done' with no changes? (yes / proceed anyway / abort)
 - `yes` -> set status=`in-progress` (no hotspot work occurs, but the state machine has no
   approved -> done shortcut), then jump to Phase 6 close-out with summary "no work needed".
+<!-- contract-lint: allow CL305 - same exception as the option line above; the bullet only explains what selecting it costs -->
 - `proceed anyway` -> requires explicit constitution exception ("optimizing past SLA"). Log to retro.
 
 **Case B: baseline below SLA goal.**

@@ -1,0 +1,12 @@
+{
+  "note": "a skills: frontmatter entry with no folder behind it",
+  "findings": [
+    {
+      "rule": "CL002",
+      "severity": "BLOCK",
+      "file": "agents/keeper.md",
+      "anchor": "seed",
+      "seed": "missing-skill-md"
+    }
+  ]
+}

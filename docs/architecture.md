@@ -71,7 +71,7 @@ The 5 workflow commands have these gate counts:
 
 | Workflow | Gates | Why |
 |---|---|---|
-| `/sd:feature` | 3 | spec, plan, per-task review, integration |
+| `/sd:feature` | 3 | spec, plan, integration + review |
 | `/sd:bug` | 5 | symptom, reproduction (HARD), root cause, failing test, regression |
 | `/sd:rca` | 3 | evidence, hypotheses, root cause |
 | `/sd:refactor` | 6 | spec, coverage, post-test, plan, per-batch tests, holistic review |

@@ -1,0 +1,12 @@
+{
+  "note": "MUST STILL BITE: literal STOPs elsewhere in the file never satisfy a gate that has none",
+  "findings": [
+    {
+      "rule": "CL300",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "phase0-stop-does-not-rescue"
+    }
+  ]
+}

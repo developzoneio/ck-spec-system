@@ -1,0 +1,12 @@
+{
+  "note": "a gate that halts but offers the user nothing to choose between",
+  "findings": [
+    {
+      "rule": "CL301",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "gate-without-options"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "note": "an orphan skill; reported at line 1 of its own SKILL.md, not at a seed",
+  "findings": [
+    {
+      "rule": "CL004",
+      "severity": "WARN",
+      "file": "skills/sd-orphan-rule/SKILL.md",
+      "anchor": "file"
+    }
+  ]
+}

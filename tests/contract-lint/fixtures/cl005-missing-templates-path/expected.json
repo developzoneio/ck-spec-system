@@ -1,0 +1,12 @@
+{
+  "note": "a templates/ path that does not resolve once the install namespace is folded away",
+  "findings": [
+    {
+      "rule": "CL005",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "missing-template"
+    }
+  ]
+}
