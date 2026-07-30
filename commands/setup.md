@@ -18,7 +18,7 @@ Scaffolds a project to use `specwright`. Safe to re-run: detects existing state 
    - `~/.claude/skills/sd/`
    - If either is missing -> abort with: "specwright install incomplete — `<missing path>` not found. Run `install/install.ps1` (Windows) or `install/install.sh` (Unix) from the specwright repo first."
 2. Verify the current directory looks like a project root.
-   - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`).
+   - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`). <!-- contract-lint: allow CL400 - a multi-stack detection heuristic enumerating several ecosystems' manifest filenames, not an assumption that any one of them applies -->
    - If nothing found -> warn and ask: "This directory does not appear to be a project root. Continue anyway? (yes / no)".
 3. Read `~/.claude/templates/sd/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
 
@@ -61,7 +61,7 @@ is generic, so future renames and newly-introduced template fields are caught th
 **A. `.claude/settings.json`**
 
 1. **Hook command paths (HIGH).** Each hook command's script path must use the namespace dir of
-   the loaded `settings.template.json` (currently `.../hooks/sd/`). Flag any `/.claude/hooks/<other>/`
+   the loaded `settings.template.json` (currently `.../hooks/sd/`). Flag any `/.claude/hooks/<other>/` <!-- contract-lint: allow CL402 - describes a settings.json path PATTERN to detect drift in the TARGET project's config, not a filesystem path on this machine -->
    segment (e.g. `.../hooks/ck/`) and record the old -> new rewrite per hook
    (UserPromptSubmit/prompt-router, PreToolUse/spec-gate, SubagentStop/subagent-retro).
 2. **Missing top-level blocks.** Flag any template top-level key absent from the file - currently
@@ -149,12 +149,13 @@ Goal: extract stack info to pre-fill answers in Phase 3.
 
 1. Read existing `CLAUDE.md`.
 2. Try to extract:
-   - **Language**: from headers like "## Stack" -> "Language" or "Language:" patterns; from filenames present in root (e.g. `*.csproj` -> .NET / C#).
+   - **Language**: from headers like "## Stack" -> "Language" or "Language:" patterns; from filenames present in root (e.g. `*.csproj` -> .NET / C#). <!-- contract-lint: allow CL401 - illustrative example of the filename-heuristic pattern, not an assumed stack -->
    - **Framework**: similar.
    - **Database**: similar.
    - **Build / Test / Lint commands**: from "## Commands" or "## Scripts" sections.
 3. Store extracted values as defaults for Phase 3. Do not assume; only pre-fill if confidence is high.
 
+<!-- contract-lint: allow CL401 - multi-stack filename-heuristic examples, not an assumed stack -->
 If `CLAUDE.md` does not exist, defaults come from filename heuristics (`*.csproj` -> .NET; `package.json` -> Node; `pyproject.toml` -> Python; etc.).
 
 ---
@@ -173,6 +174,7 @@ constitution rules.
 2. Detect and record:
    - **Stack** (language / framework / db): extend the Phase 2 filename heuristics with a content peek
      at the dominant package manifest (`package.json`, `*.csproj`, `pyproject.toml`, `go.mod`,
+     <!-- contract-lint: allow CL400 - same multi-stack manifest-filename enumeration as Phase 0, not a single-stack assumption -->
      `Cargo.toml`, `pom.xml`, `build.gradle`).
    - **Paths**: `src`, `tests`, `docs` from the directory layout.
    - **Commands** (`build` / `test` / `lint` / `run` / `coverage`): read ONLY what the dominant
@@ -342,7 +344,7 @@ Next steps:
 
 - **Idempotent.** Safe to re-run. Never overwrites without a timestamped backup.
 - **Migrates drift, never silently.** Phase 1.5 detects content drift in existing `.claude/*` (renamed engine paths/URLs/command names, newly-introduced template fields, pinned model IDs) via rule-based checks against the loaded templates - never a raw line-diff, so `<<placeholder>>` and project-specific values are preserved. Every change is previewed in one batch gate, each file is backed up first, and every hook `command` path is verified to resolve on disk.
-- **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`.
+- **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`. <!-- contract-lint: allow CL401 - this line IS the stack-agnostic rule statement; the names are forbidden-example illustration -->
 - **Scan detects facts, never rules.** Phase 2.5 may pre-fill stack, paths, commands, and
   `paths.layers` only. It never writes `.specs/constitution.md` rules - those stay `<<placeholder>>`
   for the user to author explicitly.

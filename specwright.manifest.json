@@ -324,6 +324,11 @@
       { "id": "CL303", "severity": "WARN",  "wave": 1, "summary": "hard gate numbering is not exactly 1..N without duplicates" },
       { "id": "CL304", "severity": "BLOCK", "wave": 1, "summary": "conditional gate on disk undeclared, or declared and absent" },
       { "id": "CL305", "severity": "BLOCK", "wave": 1, "summary": "HARD gate listing an override token as a selectable option" },
+      { "id": "CL306", "severity": "WARN",  "wave": 3, "summary": "HARD gate prose describes an escape hatch with no contract-lint: allow suppression (ships WARN, promotes to BLOCK in a follow-up)" },
+
+      { "id": "CL400", "severity": "WARN",  "wave": 3, "summary": "hardcoded stack command token outside a <<placeholder>>, fenced example or suppression comment (ships WARN, promotes to BLOCK in a follow-up)" },
+      { "id": "CL401", "severity": "WARN",  "wave": 3, "summary": "hardcoded language/framework name in the same contexts (stays WARN permanently - often legitimate in prose)" },
+      { "id": "CL402", "severity": "BLOCK", "wave": 3, "summary": "hardcoded absolute filesystem path (Windows drive letter or POSIX multi-segment) in scan scope" },
 
       { "id": "CL900", "severity": "BLOCK", "wave": 1, "summary": "suppression comment carrying no usable reason" },
       { "id": "CL901", "severity": "BLOCK", "wave": 1, "summary": "suppression naming a rule id absent from this registry" },
@@ -365,6 +370,33 @@
     },
 
     "overrideOptionTokens": ["skip", "override", "proceed anyway", "bypass", "force", "ignore"],
+
+    "gateProseEscapeTokens": ["insists on", "may override", "proceed anyway", "bypass this gate"],
+
+    "$gateProseEscapeTokensComment": [
+      "CL306's vocabulary, scoped to HARD gate blocks only. Deliberately narrow to control the",
+      "false-positive band this rule occupies (see docs/contract-lint.md) - it does not try to",
+      "catch every conceivable escape hatch, only the phrasings already proven to appear in",
+      "commands/bug.md and commands/release.md. A HARD gate whose prose matches one of these",
+      "phrases needs a '<!-- contract-lint: allow CL306 - <reason> -->' comment, the same",
+      "suppression convention CL305 already uses on commands/perf.md - there is no separate",
+      "per-gate declared-exception surface, on purpose."
+    ],
+
+    "stackTokens": {
+      "commands": ["dotnet", "npm", "npx", "yarn", "pnpm", "pytest", "mvn", "gradle", "cargo", "go test", "rake", "bundle exec", "composer"],
+      "languages": ["C#", ".NET", "TypeScript", "JavaScript", "Python", "Java", "Go", "Rust", "Ruby", "PHP", "MSSQL", "SQL Server", "PostgreSQL", "MySQL", "MongoDB"]
+    },
+
+    "$stackTokensComment": [
+      "Hand-maintained, same category as overrideOptionTokens and knownMcpTools - nothing on",
+      "disk is a second source for 'which tokens count as a hardcoded stack assumption'.",
+      "commands.* is CL400's vocabulary (WARN, promotes to BLOCK once a release runs clean);",
+      "languages.* is CL401's (permanent WARN - a language name in prose is often legitimate,",
+      "e.g. an 'or the project's equivalent' example list). Both rules skip text inside",
+      "<<...>> placeholders, fenced code blocks, and lines covered by a",
+      "'<!-- contract-lint: allow CL40x - <reason> -->' comment."
+    ],
 
     "readOnlyAgents": ["sd-code-explorer", "sd-reviewer", "sd-debugger"],
 

@@ -67,6 +67,10 @@ wording can improve in one commit while a divergence still fails.
 | `cl303-gate-numbering-gap` | CL303 |
 | `cl304-conditional-gate-mismatch` | CL304, both directions |
 | `cl305-hard-gate-offers-override` | CL305 |
+| `cl306-hard-gate-prose-escape-unsuppressed` | CL306 |
+| `cl400-hardcoded-npm-test` | CL400 |
+| `cl401-hardcoded-typescript` | CL401 |
+| `cl402-hardcoded-absolute-path` | CL402 |
 | `cl900-suppression-without-reason` | CL900 |
 | `cl901-suppression-unknown-rule` | CL901 |
 | `cl902-suppression-suppresses-nothing` | CL902 |
@@ -82,8 +86,11 @@ These are not decoration. They are the only thing stopping a future tightening o
 | `fp-gate-activity-heading` | `## Gate activity` is a report section | `commands/status.md` |
 | `fp-bold-pseudo-gate` | bold `Gate Complexity (HARD)` text is not a heading | `commands/feature.md` |
 | `fp-substep-before-parent` | a conditional sub-gate authored before its parent | `commands/bug.md` |
-| `fp-hard-gate-prose-escape` | a HARD gate whose PROSE mentions an override | `commands/bug.md`, `commands/release.md` |
+| `fp-hard-gate-prose-escape` | a HARD gate whose PROSE mentions an override, annotated for both CL305 and CL306 | `commands/bug.md`, `commands/release.md` |
 | `fp-negated-write-verb` | a negated ("Do not write") or third-person ("The caller will Create") use of a CL200 verb | `agents/code-explorer.md` |
+| `fp-cl400-placeholder-and-fenced-example` | a stack command token inside a `<<placeholder>>` and inside a fenced example | `commands/perf.md`, `commands/verify.md` |
+| `fp-cl401-placeholder-and-fenced-example` | a language name inside a `<<placeholder>>` and inside a fenced example | `commands/setup.md`, `agents/spec-architect.md` |
+| `fp-cl402-slash-command-reference` | `/sd:<name>` references and `~/.claude/...` install-target paths, not filesystem paths | throughout `commands/`, `agents/` |
 
 ## The case that must still BITE
 

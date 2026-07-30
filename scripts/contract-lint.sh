@@ -135,6 +135,30 @@ csv_has() { # csv value -> 0 if present
     return 1
 }
 
+# ERE-escape a hand-maintained vocabulary token before it is spliced into a
+# built regex. A plain bash character loop, never sed: GNU sed's bracket
+# expression treats a LEADING '.' right after '[' as the start of a
+# '[.symbol.]' collating construct, not a literal dot, which silently
+# corrupts the escape for '.NET' specifically. This loop has no such
+# ambiguity, and - critically - callers must invoke it ONCE per token and
+# cache the result: `$(ere_escape ...)` forks a subshell, and CL400/CL401
+# test every token against every scanScope line, so calling it from inside
+# that per-line loop turned a few dozen forks into ~135k and blew the
+# runtime past two minutes on the Windows runner.
+ere_escape() { # raw_token -> stdout ERE-escaped
+    local _s="$1" _out="" _c _i
+    for ((_i = 0; _i < ${#_s}; _i++)); do
+        _c="${_s:_i:1}"
+        case "$_c" in
+            '.'|'\'|'*'|'^'|'$'|'['|']'|'('|')'|'+'|'?'|'{'|'}'|'|'|'/')
+                _out="${_out}\\${_c}" ;;
+            *)
+                _out="${_out}${_c}" ;;
+        esac
+    done
+    printf '%s' "$_out"
+}
+
 # ---- regex constants --------------------------------------------------------
 #
 # Every pattern below must behave identically in POSIX ERE (here) and .NET
@@ -152,6 +176,7 @@ RE_ARTIFACT='(^|[^0-9A-Za-z_.-])[0-9][0-9]-[a-z0-9-]+\.md'
 RE_SUPPRESS='<!--[[:blank:]]*contract-lint:[[:blank:]]*allow[[:blank:]]+CL[0-9][0-9][0-9]'
 # An option set: a slash-separated parenthetical carrying no nested parens.
 RE_OPTPAREN='\(([^()/]+/)+[^()]+\)'
+RE_BULLETTOK='^-[[:blank:]]+`([^`]+)`'
 # CL1xx invocation contract. A mode heading carries its selector as a backticked
 # `KEY = value` pair (Mode N: `TASK = create`, `WORKFLOW_TYPE = feature`), except
 # the reviewer/debugger `Task type: `value`` grammar, whose selector key is the
@@ -192,6 +217,19 @@ RE_MCPTOOL='mcp__[A-Za-z0-9_-]+'
 # after a comma) all pass, with no exclusion list, the same way
 # classify_heading needs none for '## Gate activity'.
 RE_WRITEVERB='^[[:blank:]]*(-[[:blank:]]+|[0-9]+\.[[:blank:]]+)?(Write|Append|Create)[[:blank:]]'
+# CL4xx stack-agnostic prose. A <<...>> placeholder span is scrubbed from a
+# copy of the line before vocabulary/path matching (via a bash glob
+# substitution at the call site, never a per-line sed fork - see
+# rule_CL400_CL401_CL402), so a token that only ever appears inside a
+# project-config-style placeholder never fires.
+# A hardcoded absolute path: the character immediately before the leading '/'
+# or drive letter must be a genuine word boundary (blank, backtick, quote,
+# paren, or start of line) - never another path/placeholder character.
+# Without this POSITIVE boundary set, '~/.claude/hooks/sd/' and
+# '.specs/<ID>/04-artifacts/' both mint a phantom absolute path starting at
+# their OWN interior '/', which is not what CL402 means to catch.
+RE_ABSPATH_POSIX='(^|[[:blank:]`"'\''(])(/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]*)'
+RE_ABSPATH_WIN='(^|[[:blank:]`"'\''(])([A-Za-z]:\\[^[:blank:]`]+)'
 
 # ---- Phase A: index ---------------------------------------------------------
 
@@ -238,6 +276,10 @@ CL302
 CL303
 CL304
 CL305
+CL306
+CL400
+CL401
+CL402
 CL900
 CL901
 CL902"
@@ -276,6 +318,54 @@ OVERRIDE_TOKENS=""
 while IFS= read -r _t; do
     [[ -n "$_t" ]] && set_add OVERRIDE_TOKENS "$_t"
 done < <(mjq '.contractLint.overrideOptionTokens[]?')
+
+GATE_PROSE_ESCAPE_TOKENS=""
+while IFS= read -r _t; do
+    [[ -n "$_t" ]] && set_add GATE_PROSE_ESCAPE_TOKENS "$_t"
+done < <(mjq '.contractLint.gateProseEscapeTokens[]?')
+
+STACK_COMMANDS=""
+while IFS= read -r _t; do
+    [[ -n "$_t" ]] && set_add STACK_COMMANDS "$_t"
+done < <(mjq '.contractLint.stackTokens.commands[]?')
+
+STACK_LANGUAGES=""
+while IFS= read -r _t; do
+    [[ -n "$_t" ]] && set_add STACK_LANGUAGES "$_t"
+done < <(mjq '.contractLint.stackTokens.languages[]?')
+
+# Pre-compiled ONCE here, never inside the per-line rule loop - see
+# ere_escape's own comment for why that distinction is load-bearing.
+# tok \x1f pattern, newline-delimited - the per-token detail used ONLY to
+# name which token matched, on the rare line the COMBINED regex below hits.
+STACK_CMD_PATTERNS=""
+STACK_CMD_ALT=""
+while IFS= read -r _t; do
+    [[ -z "$_t" ]] && continue
+    _esc="$(ere_escape "$_t")"
+    STACK_CMD_PATTERNS="${STACK_CMD_PATTERNS}${_t}"$'\x1f'"(^|[^A-Za-z0-9_])${_esc}([^A-Za-z0-9_]|\$)"$'\n'
+    [[ -n "$STACK_CMD_ALT" ]] && STACK_CMD_ALT="${STACK_CMD_ALT}|"
+    STACK_CMD_ALT="${STACK_CMD_ALT}${_esc}"
+done <<< "$STACK_COMMANDS"
+# One alternation, tested ONCE per line - the common (no-hit) case pays for a
+# single regex match instead of one per vocabulary entry. A ~5k-line scan
+# tested per-token per-line (28 entries) took 1m50s on the Windows runner;
+# this collapses that to one test, only falling back to STACK_CMD_PATTERNS
+# to name the specific token on the rare line that actually matches.
+STACK_CMD_COMBINED=""
+[[ -n "$STACK_CMD_ALT" ]] && STACK_CMD_COMBINED="(^|[^A-Za-z0-9_])(${STACK_CMD_ALT})([^A-Za-z0-9_]|\$)"
+
+STACK_LANG_PATTERNS=""
+STACK_LANG_ALT=""
+while IFS= read -r _t; do
+    [[ -z "$_t" ]] && continue
+    _esc="$(ere_escape "$_t")"
+    STACK_LANG_PATTERNS="${STACK_LANG_PATTERNS}${_t}"$'\x1f'"(^|[^A-Za-z0-9_])${_esc}([^A-Za-z0-9_]|\$)"$'\n'
+    [[ -n "$STACK_LANG_ALT" ]] && STACK_LANG_ALT="${STACK_LANG_ALT}|"
+    STACK_LANG_ALT="${STACK_LANG_ALT}${_esc}"
+done <<< "$STACK_LANGUAGES"
+STACK_LANG_COMBINED=""
+[[ -n "$STACK_LANG_ALT" ]] && STACK_LANG_COMBINED="(^|[^A-Za-z0-9_])(${STACK_LANG_ALT})([^A-Za-z0-9_]|\$)"
 
 READONLY_AGENTS=""
 while IFS= read -r _a; do
@@ -1063,7 +1153,7 @@ gate_options() { # file blockStartLine blockEndExclusive0
         fi
         if [[ "$_line" =~ ^-[[:blank:]] ]]; then
             _bullets=$((_bullets + 1))
-            if [[ "$_line" =~ ^-[[:blank:]]+\`([^\`]+)\` ]]; then
+            if [[ "$_line" =~ $RE_BULLETTOK ]]; then
                 _tok="$(normalize_option "${BASH_REMATCH[1]}")"
                 [[ -n "$_tok" ]] && OPT_TOKENS="${OPT_TOKENS}$((_i + 1))"$'\x1f'"${_tok}"$'\n'
             fi
@@ -1105,8 +1195,8 @@ normalize_option() { # raw piece -> stdout lowercase leading token
     printf '%s' "$_s"
 }
 
-rule_CL300_CL301_CL305() {
-    local _f _l _kind _label _hard _end _i _has_stop _ol _ot
+rule_CL300_CL301_CL305_CL306() {
+    local _f _l _kind _label _hard _end _i _has_stop _ol _ot _phrase _hit
     while IFS=$'\x1f' read -r _f _l _kind _label _hard _end; do
         [[ -z "$_f" ]] && continue
         if [[ "$CUR_REL" != "$_f" ]]; then load_file "$_f"; fi
@@ -1131,7 +1221,92 @@ rule_CL300_CL301_CL305() {
                 fi
             done <<< "$OPT_TOKENS"
         fi
+        if [[ $_hard -eq 1 ]]; then
+            # CL306 - a naive phrase scan over gate-block PROSE, deliberately
+            # excluding whatever CL305 already governs: CLAUDE.md rule 6
+            # frames "listed as a choice" and "described in prose" as the two
+            # mutually exclusive halves of a HARD gate's escape-hatch
+            # surface, so a line that is itself part of the option-set
+            # syntax (the slash parenthetical, or a backtick-led option
+            # bullet) is CL305's territory, not CL306's - without this
+            # exclusion, perf.md's already CL305-suppressed Case A ('proceed
+            # anyway' inside the option set) false-fires CL306 too, on both
+            # the option line and its own suppression comment's reason text.
+            # It fires on commands/bug.md's logged insist-and-proceed
+            # sentence and commands/release.md's "may override the version"
+            # bullet (neither is option-set syntax) unless annotated -
+            # fixing that is the point of this rule, not a bug in it. See
+            # GATE_PROSE_ESCAPE_TOKENS above.
+            for ((_i = _l - 1; _i < _end; _i++)); do
+                [[ "${CUR_FENCE[$_i]}" == "1" ]] && continue
+                [[ "${CUR_LINES[$_i]}" =~ $RE_SUPPRESS ]] && continue
+                [[ "${CUR_LINES[$_i]}" =~ $RE_OPTPAREN ]] && continue
+                [[ "${CUR_LINES[$_i]}" =~ $RE_BULLETTOK ]] && continue
+                _hit=0
+                while IFS= read -r _phrase; do
+                    [[ -z "$_phrase" ]] && continue
+                    case "${CUR_LINES[$_i]}" in
+                        *"$_phrase"*) _hit=1; break ;;
+                    esac
+                done <<< "$GATE_PROSE_ESCAPE_TOKENS"
+                if [[ $_hit -eq 1 ]]; then
+                    add_finding CL306 "$_f" "$((_i + 1))" "HARD gate prose describes an escape hatch ('$_phrase')"
+                fi
+            done
+        fi
     done <<< "$GATES"
+}
+
+# CL400 / CL401 / CL402 - stack-agnostic prose + hardcoded absolute paths.
+# One line-scan pass over scanScope, deliberately narrow (word-bounded
+# vocabulary hits, positive-boundary path regex) to keep the false-positive
+# band this wave occupies under control - see STACK_CMD_PATTERNS /
+# STACK_LANG_PATTERNS above and the manifest's $stackTokensComment. Every
+# pattern is PRE-COMPILED before this function runs - no command
+# substitution and no external process anywhere in this per-line loop. The
+# combined alternation is tested first; the per-token table only runs on a
+# line that already matched it, which is what keeps ~5k lines x 28 vocabulary
+# entries from paying for 28 regex tests each.
+rule_CL400_CL401_CL402() {
+    local _rel _i _line _scrubbed _tok _pat
+    while IFS= read -r _rel; do
+        [[ -z "$_rel" ]] && continue
+        load_file "$_rel"
+        for ((_i = 0; _i < CUR_N; _i++)); do
+            [[ "${CUR_FENCE[$_i]}" == "1" ]] && continue
+            _line="${CUR_LINES[$_i]}"
+            # Fork-free scrub: a per-line sed subprocess across ~5k scanScope
+            # lines is the exact anti-pattern collect_refs already warns
+            # about (a Windows-runner fork is orders of magnitude slower than
+            # a native bash op), so this only touches lines that actually
+            # contain '<<' and uses bash's own glob substitution, never sed.
+            _scrubbed="$_line"
+            if [[ "$_scrubbed" == *"<<"* ]]; then
+                _scrubbed="${_scrubbed//<<*>>/}"
+            fi
+            if [[ -n "$STACK_CMD_COMBINED" && "$_scrubbed" =~ $STACK_CMD_COMBINED ]]; then
+                while IFS=$'\x1f' read -r _tok _pat; do
+                    [[ -z "$_tok" ]] && continue
+                    if [[ "$_scrubbed" =~ $_pat ]]; then
+                        add_finding CL400 "$_rel" "$((_i + 1))" "hardcoded stack command token '$_tok'"
+                    fi
+                done <<< "$STACK_CMD_PATTERNS"
+            fi
+            if [[ -n "$STACK_LANG_COMBINED" && "$_scrubbed" =~ $STACK_LANG_COMBINED ]]; then
+                while IFS=$'\x1f' read -r _tok _pat; do
+                    [[ -z "$_tok" ]] && continue
+                    if [[ "$_scrubbed" =~ $_pat ]]; then
+                        add_finding CL401 "$_rel" "$((_i + 1))" "hardcoded language/framework name '$_tok'"
+                    fi
+                done <<< "$STACK_LANG_PATTERNS"
+            fi
+            if [[ "$_scrubbed" =~ $RE_ABSPATH_WIN ]]; then
+                add_finding CL402 "$_rel" "$((_i + 1))" "hardcoded absolute path '${BASH_REMATCH[2]}'"
+            elif [[ "$_scrubbed" =~ $RE_ABSPATH_POSIX ]]; then
+                add_finding CL402 "$_rel" "$((_i + 1))" "hardcoded absolute path '${BASH_REMATCH[2]}'"
+            fi
+        done
+    done <<< "$SCAN_FILES"
 }
 
 rule_CL302_CL303_CL304() {
@@ -1216,8 +1391,9 @@ rule_CL200
 rule_CL201
 rule_CL202
 rule_CL203
-rule_CL300_CL301_CL305
+rule_CL300_CL301_CL305_CL306
 rule_CL302_CL303_CL304
+rule_CL400_CL401_CL402
 
 # ---- Phase C: suppressions, sort, emit -------------------------------------
 #

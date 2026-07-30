@@ -33,9 +33,5 @@ STOP. Ask:
 
 > Close it now? (yes / revise / abort)
 
-<!-- contract-lint: allow CL306 - logged insist-and-proceed keeps an audit trail via the constitution exception -->
-- If the user insists on closing without a draft, log a constitution exception and
-  proceed at their explicit risk acknowledgement.
-<!-- contract-lint: allow CL306 - described option, not a listed override token; CL305 already covers listed-choice overrides -->
-- The user may override the outcome at this gate.
-- On rejection: write nothing.
+<!-- SEEDED: unsuppressed-escape-hatch - prose describes an override with no contract-lint: allow CL306 comment -->
+If the user insists on closing anyway, proceed without further confirmation.

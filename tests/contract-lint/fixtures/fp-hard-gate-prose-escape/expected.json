@@ -1,4 +1,4 @@
 {
-  "note": "MUST STAY SILENT: an override DESCRIBED in prose is not an override OFFERED as a choice",
+  "note": "MUST STAY SILENT: an override DESCRIBED in prose is not an override OFFERED as a choice (CL305), and once annotated with contract-lint: allow CL306 it stays silent for the prose rule too - the same shape as commands/bug.md and commands/release.md",
   "findings": []
 }

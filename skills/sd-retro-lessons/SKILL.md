@@ -94,6 +94,7 @@ Forbidden in a rule sentence:
 - snake_case identifiers.
 - Repository, product, team, customer, or person names.
 
+<!-- contract-lint: allow CL401 - naming the allowlist's own example entries, not assuming this project's stack -->
 Technology proper nouns that happen to be PascalCase (PowerShell, TypeScript, PostgreSQL,
 and similar) are allowed via a small allowlist in the validator. Extending that allowlist
 takes a PR - and usually means the lesson is less portable than you think.

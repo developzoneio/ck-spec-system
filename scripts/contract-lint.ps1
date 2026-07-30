@@ -132,6 +132,18 @@ $RE_MCPTOOL   = 'mcp__[A-Za-z0-9_-]+'
 # after a comma) all pass, with no exclusion list, the same way
 # Get-GateClassification needs none for '## Gate activity'.
 $RE_WRITEVERB = '^[ \t]*(-[ \t]+|[0-9]+\.[ \t]+)?(Write|Append|Create)[ \t]'
+# CL4xx stack-agnostic prose. A <<...>> placeholder span is scrubbed from a
+# copy of the line before vocabulary/path matching, so a token that only ever
+# appears inside a project-config-style placeholder never fires.
+$RE_PLACEHOLDER    = '<<[^>]*>>'
+# A hardcoded absolute path: the character immediately before the leading '/'
+# or drive letter must be a genuine word boundary (blank, backtick, quote,
+# paren, or start of line) - never another path/placeholder character.
+# Without this POSITIVE boundary set, '~/.claude/hooks/sd/' and
+# '.specs/<ID>/04-artifacts/' both mint a phantom absolute path starting at
+# their OWN interior '/', which is not what CL402 means to catch.
+$RE_ABSPATH_POSIX  = '(^|[ \t`"''(])(/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]*)'
+$RE_ABSPATH_WIN     = '(^|[ \t`"''(])([A-Za-z]:\\[^ \t`]+)'
 
 function Write-Err([string]$Message) {
     [Console]::Error.WriteLine($Message)
@@ -203,7 +215,8 @@ $dispatchIds = @(
     'CL001', 'CL002', 'CL003', 'CL004', 'CL005', 'CL006', 'CL007', 'CL008',
     'CL100', 'CL101', 'CL102', 'CL103', 'CL104',
     'CL200', 'CL201', 'CL202', 'CL203',
-    'CL300', 'CL301', 'CL302', 'CL303', 'CL304', 'CL305',
+    'CL300', 'CL301', 'CL302', 'CL303', 'CL304', 'CL305', 'CL306',
+    'CL400', 'CL401', 'CL402',
     'CL900', 'CL901', 'CL902'
 )
 $dispatchSet = New-OrdinalSet
@@ -240,6 +253,22 @@ if ($cl.PSObject.Properties.Name.Contains('skillConsumers') -and $null -ne $cl.s
 $overrideTokens = New-OrdinalSet
 if ($cl.PSObject.Properties.Name.Contains('overrideOptionTokens')) {
     foreach ($t in $cl.overrideOptionTokens) { [void]$overrideTokens.Add([string]$t) }
+}
+
+$gateProseEscapeTokens = New-Object 'System.Collections.Generic.List[string]'
+if ($cl.PSObject.Properties.Name.Contains('gateProseEscapeTokens')) {
+    foreach ($t in $cl.gateProseEscapeTokens) { [void]$gateProseEscapeTokens.Add([string]$t) }
+}
+
+$stackCommands = New-Object 'System.Collections.Generic.List[string]'
+$stackLanguages = New-Object 'System.Collections.Generic.List[string]'
+if ($cl.PSObject.Properties.Name.Contains('stackTokens') -and $null -ne $cl.stackTokens) {
+    if ($cl.stackTokens.PSObject.Properties.Name.Contains('commands')) {
+        foreach ($t in $cl.stackTokens.commands) { [void]$stackCommands.Add([string]$t) }
+    }
+    if ($cl.stackTokens.PSObject.Properties.Name.Contains('languages')) {
+        foreach ($t in $cl.stackTokens.languages) { [void]$stackLanguages.Add([string]$t) }
+    }
 }
 
 $readOnlyAgents = New-OrdinalSet
@@ -976,9 +1005,10 @@ function Get-GateOptions([string]$Rel, [int]$StartLine, [int]$BlockEnd) {
     return @{ HasSet = $hasSet; Tokens = $tokens }
 }
 
-# CL300 / CL301 / CL305
+# CL300 / CL301 / CL305 / CL306
 foreach ($g in $gates) {
     $lines = $fileLines[$g.File]
+    $fence = $fileFence[$g.File]
     $hasStop = $false
     for ($i = $g.Line - 1; $i -lt $g.BlockEnd; $i++) {
         if ($lines[$i].Contains('STOP')) { $hasStop = $true; break }
@@ -994,6 +1024,67 @@ foreach ($g in $gates) {
         foreach ($t in $opts.Tokens) {
             if ($overrideTokens.Contains($t.Token)) {
                 Add-Finding 'CL305' $g.File $t.Line "HARD gate offers override option '$($t.Token)'"
+            }
+        }
+        # CL306 - a naive phrase scan over gate-block PROSE, deliberately
+        # excluding whatever CL305 already governs: CLAUDE.md rule 6 frames
+        # "listed as a choice" and "described in prose" as the two mutually
+        # exclusive halves of a HARD gate's escape-hatch surface, so a line
+        # that is itself part of the option-set syntax (the slash
+        # parenthetical, or a backtick-led option bullet) is CL305's
+        # territory, not CL306's - without this exclusion, perf.md's already
+        # CL305-suppressed Case A ('proceed anyway' inside the option set)
+        # false-fires CL306 too, on both the option line and its own
+        # suppression comment's reason text. It fires on commands/bug.md's
+        # logged insist-and-proceed sentence and commands/release.md's "may
+        # override the version" bullet (neither is option-set syntax) unless
+        # annotated - fixing that is the point of this rule, not a bug in it.
+        # See gateProseEscapeTokens in the manifest.
+        for ($i = $g.Line - 1; $i -lt $g.BlockEnd; $i++) {
+            if ($fence[$i]) { continue }
+            if ([regex]::IsMatch($lines[$i], $RE_SUPPRESS)) { continue }
+            if ([regex]::IsMatch($lines[$i], $RE_OPTPAREN)) { continue }
+            if ([regex]::IsMatch($lines[$i], $RE_BULLETTOK)) { continue }
+            foreach ($phrase in $gateProseEscapeTokens) {
+                if ($lines[$i].Contains($phrase)) {
+                    Add-Finding 'CL306' $g.File ($i + 1) "HARD gate prose describes an escape hatch ('$phrase')"
+                    break
+                }
+            }
+        }
+    }
+}
+
+# CL400 / CL401 / CL402 - stack-agnostic prose + hardcoded absolute paths.
+# One line-scan pass over scanScope, deliberately narrow (word-bounded
+# vocabulary hits, positive-boundary path regex) to keep the false-positive
+# band this wave occupies under control - see the manifest's
+# $stackTokensComment.
+foreach ($rel in $scanFiles) {
+    $lines = $fileLines[$rel]
+    $fence = $fileFence[$rel]
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($fence[$i]) { continue }
+        $scrubbed = [regex]::Replace($lines[$i], $RE_PLACEHOLDER, '')
+        foreach ($tok in $stackCommands) {
+            $pat = '(^|[^A-Za-z0-9_])' + [regex]::Escape($tok) + '([^A-Za-z0-9_]|$)'
+            if ([regex]::IsMatch($scrubbed, $pat)) {
+                Add-Finding 'CL400' $rel ($i + 1) "hardcoded stack command token '$tok'"
+            }
+        }
+        foreach ($tok in $stackLanguages) {
+            $pat = '(^|[^A-Za-z0-9_])' + [regex]::Escape($tok) + '([^A-Za-z0-9_]|$)'
+            if ([regex]::IsMatch($scrubbed, $pat)) {
+                Add-Finding 'CL401' $rel ($i + 1) "hardcoded language/framework name '$tok'"
+            }
+        }
+        $mw = [regex]::Match($scrubbed, $RE_ABSPATH_WIN)
+        if ($mw.Success) {
+            Add-Finding 'CL402' $rel ($i + 1) "hardcoded absolute path '$($mw.Groups[2].Value)'"
+        } else {
+            $mp = [regex]::Match($scrubbed, $RE_ABSPATH_POSIX)
+            if ($mp.Success) {
+                Add-Finding 'CL402' $rel ($i + 1) "hardcoded absolute path '$($mp.Groups[2].Value)'"
             }
         }
     }

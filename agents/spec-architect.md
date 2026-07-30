@@ -32,7 +32,7 @@ You operate in one of three modes, signalled by the `TASK` field in your invocat
      MCP tools only. Use whatever ticket detail the caller pasted into `TICKET_CONTEXT`, cite the
      ticket ID in the spec frontmatter, and skip the snapshot protocol (it is JIRA-specific). Do not
      attempt an MCP fetch.
-5. Never assume a stack detail. If CLAUDE.md says "Python / FastAPI" you write Python; never default to .NET because that's what you saw last invocation.
+5. Never assume a stack detail. If CLAUDE.md says "Python / FastAPI" you write Python; never default to .NET because that's what you saw last invocation. <!-- contract-lint: allow CL401 - this line IS the stack-agnostic rule statement; the names are illustrative example/counter-example -->
 
 ---
 

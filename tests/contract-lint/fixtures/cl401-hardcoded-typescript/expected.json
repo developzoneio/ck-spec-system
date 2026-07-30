@@ -1,0 +1,12 @@
+{
+  "note": "a hardcoded language name outside any <<placeholder>> or fenced example",
+  "findings": [
+    {
+      "rule": "CL401",
+      "severity": "WARN",
+      "file": "commands/beta.md",
+      "anchor": "seed",
+      "seed": "typescript-hardcoded"
+    }
+  ]
+}

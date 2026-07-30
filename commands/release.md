@@ -107,6 +107,7 @@ Display, for explicit approval:
 **STOP. Wait for explicit user approval.** Silence is not approval.
 
 - If `--dry-run` was passed: stop here unconditionally. Report that nothing was written.
+<!-- contract-lint: allow CL306 - version override is a described option, not a listed override token; CL305 already covers listed-choice overrides -->
 - The user may override the version at this gate.
 - On rejection: write nothing; specs stay in `done`.
 

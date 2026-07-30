@@ -141,6 +141,7 @@ trip a gate rule -- they all sit under a `## Phase 0` heading.
 | `CL303` | WARN | hard gate labels are not exactly `1..N` without duplicates |
 | `CL304` | BLOCK | a conditional gate is on disk but undeclared, or declared and absent |
 | `CL305` | BLOCK | a HARD gate lists an override token as a selectable option |
+| `CL306` | WARN (promotes to BLOCK in a follow-up commit) | a HARD gate's prose describes an escape hatch with no `contract-lint: allow CL306` comment nearby |
 
 An **option set** is a slash-separated parenthetical such as `(yes / revise / abort)`, or two or
 more top-level `- ` bullets. `CL303` compares **sets, never file order**: `commands/bug.md` authors
@@ -148,11 +149,58 @@ more top-level `- ` bullets. `CL303` compares **sets, never file order**: `comma
 
 `CL305` is scoped to the gate's **option set**, never its prose. An override is a *listed choice*,
 not a *described consequence* -- `commands/release.md` may say "the user may override the version
-at this gate" without tripping it, while `(yes / skip / abort)` at a HARD gate fires. Catching the
-prose form honestly needs a per-gate declared-exception surface and is deferred to `CL306`.
+at this gate" without tripping it, while `(yes / skip / abort)` at a HARD gate fires.
+
+`CL306` is the prose half CLAUDE.md rule 6 calls out by name ("describing one in prose is fine"):
+it scans a HARD gate's remaining prose -- everything that is NOT the option-set parenthetical or a
+backtick-led option bullet, since those are CL305's territory -- against
+`contractLint.gateProseEscapeTokens`. It is deliberately a naive scanner, the same "reads prose
+intent" tradeoff `CL200` already made: it fires on `commands/bug.md`'s logged insist-and-proceed
+sentence and `commands/release.md`'s "may override the version" bullet until each is annotated with
+its own `<!-- contract-lint: allow CL306 - <reason> -->` comment. There is no separate per-gate
+declared-exception surface -- the existing suppression-comment convention already covers "this
+gate's escape hatch is intentional," the same way it covers `CL305` on `commands/perf.md`, so a
+second mechanism saying the same thing was not worth adding.
+
+**`CL306` shipped WARN on 2026-07-30 and promotes to BLOCK in a follow-up commit once it has run
+clean for a release** -- the same rollout `CL200` used, for the same reason: it reads prose intent,
+not pure structure.
 
 Gate classification needs no exclusion list. `Gate` followed by a lowercase word is never a gate,
 which is what makes `## Gate activity` in `commands/status.md` invisible to all six rules.
+
+### CL4xx -- stack-agnostic prose
+
+CLAUDE.md rule 4 says commands, agents and skills carry no hardcoded stack command or language
+assumption -- everything comes from the target project's `project-config.json` at runtime. This
+band is regression-prevention for that rule: it does not reach beyond `contractLint.scanScope`
+(never `CLAUDE.md`, `CONTRIBUTING.md` or `docs/`, which is exactly why their known sandbox paths
+and frontmatter examples need no special-case handling).
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL400` | WARN (promotes to BLOCK in a follow-up commit) | a stack command token (`contractLint.stackTokens.commands`) appears outside a `<<placeholder>>`, a fenced code block, or a `contract-lint: allow CL400` comment |
+| `CL401` | WARN (permanent) | a language/framework name (`contractLint.stackTokens.languages`) appears in the same contexts |
+| `CL402` | BLOCK | a hardcoded absolute filesystem path (a Windows drive letter, or a POSIX path with two or more segments) appears in scan scope |
+
+A vocabulary hit is **word-bounded**: the character immediately before and after the token must not
+itself be alphanumeric or `_`, so `npmrc` never trips on `npm` and `Going`/`algorithm` never trip on
+the language token `Go`. `CL401` stays WARN permanently, unlike `CL400` -- a language name in prose
+is often legitimate (an enumerated multi-stack heuristic, or the stack-agnostic rule's own
+"never hardcode X" illustration), while a literal stack **command** is closer to an actual
+instruction and is worth eventually blocking.
+
+`CL402`'s absolute-path match requires a genuine word boundary immediately before the leading `/`
+or drive letter (blank, backtick, quote, paren, or start of line) -- never another path or
+placeholder character. Without that positive boundary, `~/.claude/hooks/sd/` and
+`.specs/<ID>/04-artifacts/` would both mint a phantom absolute path starting at their own interior
+`/`, and `/sd:<name>` would collide with the leading slash of every slash-command reference in the
+engine (a `/prefix:name` command has no second `/`, so it never matches at all).
+
+**`CL400` shipped WARN on 2026-07-30 and promotes to BLOCK in a follow-up commit once it has run
+clean for a release**, the same rollout `CL200`/`CL306` use. `CL401` and `CL402` do not follow this
+schedule: `CL401` is permanent WARN by design, and `CL402` shipped BLOCK immediately since a
+hardcoded absolute path is a structural fact, not prose intent.
 
 ### CL9xx -- suppression hygiene
 
@@ -193,6 +241,8 @@ and never touch `areas`, `derived` or `docClaims`.
 | `specArtifacts` | the numbered artifact filenames CL008 accepts |
 | `skillConsumers` | skills whose only consumers live outside scan scope, with the reason |
 | `overrideOptionTokens` | the vocabulary CL305 treats as an escape hatch |
+| `gateProseEscapeTokens` | the phrase vocabulary CL306 scans HARD gate prose for |
+| `stackTokens.commands` / `.languages` | the CL400 / CL401 stack vocabulary |
 | `readOnlyAgents` | agent names CL201 checks for a write tool gained since being declared read-only |
 | `knownMcpTools` | the `mcp__*` allowlist CL202 checks scan-scope tokens against |
 
@@ -228,7 +278,7 @@ implementation, one fixture, one row in the tables above.
 | 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
 | 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
 | 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, WARN first (CL201 BLOCK) |
-| 3b | CL4xx stack-agnostic prose, CL306 | planned |
+| 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30, WARN first (CL402 BLOCK) |
 | 4 | CL5xx file budgets | planned, stays WARN |
 
 Four scope decisions were made deliberately and are recorded here so they read as decisions
@@ -250,6 +300,20 @@ rather than oversights:
   that comes from runtime MCP server configuration this repo cannot see. `CL202` stays WARN
   forever precisely because of this -- a stale allowlist must never be able to block CI. A `CL202`
   hit means "update this list or explain why not," never "suppress and move on."
+- **`CL401` stays WARN permanently**, unlike its `CL400`/`CL402`/`CL306` siblings -- a language or
+  framework name in prose is often legitimate (an enumerated multi-stack heuristic, or the
+  stack-agnostic rule's own "never hardcode X" illustration), so the same false-positive band that
+  makes `CL400`/`CL306` promotable makes `CL401` a permanent-WARN rule by design, the same
+  precedent `CL202` already set for `knownMcpTools`.
+- **`CL400`/`CL401`/`CL402` never widen `scanScope`**, on purpose. `CLAUDE.md`, `CONTRIBUTING.md`
+  and `docs/architecture.md` all carry sandbox paths, stack names and a frontmatter example that
+  this band would otherwise light up on day one -- exactly the risk `scanScope`'s own comment
+  already documents for `CL0xx`. Staying inside `commands/`, `agents/`, `skills/` is what lets the
+  positive-boundary path regex and the word-bounded vocabulary match stay this simple.
+- **`CL306` reuses the existing suppression comment instead of a new declared-exception surface.**
+  A `contractLint.gates.<file>.proseExceptions` key was considered (a per-gate list of allowed
+  escape-hatch labels) and rejected: it would say the same thing `<!-- contract-lint: allow CL306 -
+  <reason> -->` already says, just in a second place that could drift out of sync with the first.
 
 ## Testing it
 

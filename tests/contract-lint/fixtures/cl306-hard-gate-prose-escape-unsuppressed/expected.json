@@ -1,0 +1,12 @@
+{
+  "note": "a HARD gate's prose describes an escape hatch with no contract-lint: allow CL306 comment nearby",
+  "findings": [
+    {
+      "rule": "CL306",
+      "severity": "WARN",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unsuppressed-escape-hatch"
+    }
+  ]
+}

@@ -94,6 +94,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never mentioned it in its own body - would have tripped `CL203` on the fixture suite's own base
   tree the moment the rule shipped. Five older fixture overlays (`cl002`, `cl007`, `cl101`, `cl102`,
   `cl103`) had the same latent gap in their own copies of the demo agent, found the same way.
+- **Check 8 wave 3b: `CL4xx` stack-agnostic prose + `CL306`** (SW-34), four rules closing the two
+  promises wave 1 deferred: `CL400` (WARN, promotes to BLOCK in a follow-up commit) a hardcoded
+  stack command token outside a `<<placeholder>>`, a fenced example, or a suppression comment;
+  `CL401` (WARN, permanent) the same for a language/framework name - a language name in prose is
+  often legitimate, so this one never promotes; `CL402` (BLOCK) a hardcoded absolute filesystem path
+  in scan scope; `CL306` (WARN, promotes to BLOCK in a follow-up commit) a HARD gate's prose
+  describes an escape hatch with no `contract-lint: allow CL306` comment nearby - the prose half of
+  `CL305` that wave 1 deferred for exactly this reason. `CL306` deliberately excludes whatever
+  `CL305` already governs (the option-set parenthetical and backtick-led option bullets), so the two
+  rules cover disjoint territory instead of double-firing on the same line. No new manifest surface
+  for per-gate exceptions: `CL306` reuses the existing suppression-comment convention rather than
+  adding a second mechanism that would say the same thing. Two new hand-maintained vocabulary lists
+  in `specwright.manifest.json` (`contractLint.stackTokens.{commands,languages}` and
+  `gateProseEscapeTokens`), same category as `overrideOptionTokens`. The hardcoded MSSQL/C#/
+  TypeScript references this ticket originally described were already genericized by an earlier
+  commit; the real findings this wave turned up in the current tree were all illustrative or
+  multi-stack-heuristic uses of stack vocabulary (enumerated manifest-filename lists in
+  `commands/setup.md`, forbidden-example prose in `commands/verify.md`, `agents/spec-architect.md`
+  and `skills/sd-retro-lessons/SKILL.md`, and a settings.json path-pattern description in
+  `commands/setup.md`) - each annotated with a `contract-lint: allow` comment rather than rewritten,
+  since rewriting them would have deleted correct stack-agnostic design, not fixed a bug. Nine new
+  fixture cases (four must-fire, five false-positive guards) plus a row each in
+  `tests/contract-lint/README.md` and `docs/contract-lint.md`.
 
 ## [1.5.0] - 2026-07-23
 

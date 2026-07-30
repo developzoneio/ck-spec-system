@@ -96,6 +96,7 @@ STOP. This gate is HARD - no overrides. Ask:
 - `partial` -> ask user if they accept investigating with partial repro (logs / traces only). Log the decision and risks to retro.
 - `no` -> **REFUSE to proceed**. Tell the user: investigation without reproduction risks fixing the wrong thing. Options: gather more telemetry, add observability, or close as "cannot reproduce".
 
+<!-- contract-lint: allow CL306 - logged insist-and-proceed keeps an audit trail via the constitution exception; it is described in prose, never offered as a selectable option -->
 If the user insists on proceeding without repro, log a constitution exception to retro and proceed at their explicit risk acknowledgement.
 
 ---

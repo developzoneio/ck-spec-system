@@ -155,6 +155,30 @@
         "summary": "HARD gate listing an override token as a selectable option"
       },
       {
+        "id": "CL306",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "HARD gate prose describes an escape hatch with no contract-lint: allow suppression (ships WARN, promotes to BLOCK in a follow-up)"
+      },
+      {
+        "id": "CL400",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "hardcoded stack command token outside a <<placeholder>>, fenced example or suppression comment (ships WARN, promotes to BLOCK in a follow-up)"
+      },
+      {
+        "id": "CL401",
+        "severity": "WARN",
+        "wave": 3,
+        "summary": "hardcoded language/framework name in the same contexts (stays WARN permanently - often legitimate in prose)"
+      },
+      {
+        "id": "CL402",
+        "severity": "BLOCK",
+        "wave": 3,
+        "summary": "hardcoded absolute filesystem path (Windows drive letter or POSIX multi-segment) in scan scope"
+      },
+      {
         "id": "CL900",
         "severity": "BLOCK",
         "wave": 1,
@@ -200,6 +224,16 @@
       "bypass",
       "force",
       "ignore"
-    ]
+    ],
+    "gateProseEscapeTokens": [
+      "insists on",
+      "may override",
+      "proceed anyway",
+      "bypass this gate"
+    ],
+    "stackTokens": {
+      "commands": ["dotnet", "npm", "npx", "yarn", "pnpm", "pytest", "mvn", "gradle", "cargo", "go test", "rake", "bundle exec", "composer"],
+      "languages": ["C#", ".NET", "TypeScript", "JavaScript", "Python", "Java", "Go", "Rust", "Ruby", "PHP", "MSSQL", "SQL Server", "PostgreSQL", "MySQL", "MongoDB"]
+    }
   }
 }
