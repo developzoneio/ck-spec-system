@@ -71,6 +71,7 @@ wording can improve in one commit while a divergence still fails.
 | `cl400-hardcoded-npm-test` | CL400 |
 | `cl401-hardcoded-typescript` | CL401 |
 | `cl402-hardcoded-absolute-path` | CL402 |
+| `cl500-file-over-budget` | CL500 |
 | `cl900-suppression-without-reason` | CL900 |
 | `cl901-suppression-unknown-rule` | CL901 |
 | `cl902-suppression-suppresses-nothing` | CL902 |
@@ -91,6 +92,7 @@ These are not decoration. They are the only thing stopping a future tightening o
 | `fp-cl400-placeholder-and-fenced-example` | a stack command token inside a `<<placeholder>>` and inside a fenced example | `commands/perf.md`, `commands/verify.md` |
 | `fp-cl401-placeholder-and-fenced-example` | a language name inside a `<<placeholder>>` and inside a fenced example | `commands/setup.md`, `agents/spec-architect.md` |
 | `fp-cl402-slash-command-reference` | `/sd:<name>` references and `~/.claude/...` install-target paths, not filesystem paths | throughout `commands/`, `agents/` |
+| `fp-cl500-file-at-budget-ceiling` | a file just under `contractLint.budgets.commandsBytes` must not trip CL500 | - |
 
 ## The case that must still BITE
 

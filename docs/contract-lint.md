@@ -202,6 +202,34 @@ clean for a release**, the same rollout `CL200`/`CL306` use. `CL401` and `CL402`
 schedule: `CL401` is permanent WARN by design, and `CL402` shipped BLOCK immediately since a
 hardcoded absolute path is a structural fact, not prose intent.
 
+### CL5xx -- file budgets
+
+Prompt files only ever grow, and a file that grows past the point where the model reliably reads
+all of it fails quietly -- the instructions at the bottom just stop being followed, with no error
+and no signal in a diff. This band makes that growth visible in review instead.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL500` | WARN (permanent) | a file exceeds `contractLint.budgets.<area>Bytes` for its scan-scope area |
+
+There is exactly one rule here on purpose. `CL500` stays WARN forever -- promoting it to BLOCK
+would turn a judgement call (is this growth worth it?) into a build failure, and the judgement is
+the point. The finding reports how far over budget the file is, in bytes, not a bare "over budget":
+`file is 27510 bytes, 1532 over the 25978-byte budget`.
+
+**The byte count is normalized, never a raw disk read.** `contractLint.scanScope` is `text=auto`
+(see `.gitattributes`), so identical content checks out as LF on a Linux CI runner and CRLF on a
+native Windows checkout -- confirmed on this repo: `commands/spec.md` is 25979 bytes as a git blob
+but 26521 bytes checked out on Windows, a 542-byte difference for the same content. A raw byte count
+would make `CL500` disagree with itself between platforms. Instead, both implementations sum each
+line's byte length (already available from the same per-line cache every other rule reads) plus one
+separator per line boundary -- a measure that does not depend on which OS checked the file out.
+
+**Budgets are a ratchet, set at today's largest file per area**, so the repo passes clean on day one
+and every later `CL500` hit is real growth, never a paragraph someone happened to write before the
+rule existed. Raising a ceiling in `contractLint.budgets` is a real decision that belongs in a PR
+description, never a reflex to a red CI run.
+
 ### CL9xx -- suppression hygiene
 
 | Rule | Severity | Fires when |
@@ -245,6 +273,7 @@ and never touch `areas`, `derived` or `docClaims`.
 | `stackTokens.commands` / `.languages` | the CL400 / CL401 stack vocabulary |
 | `readOnlyAgents` | agent names CL201 checks for a write tool gained since being declared read-only |
 | `knownMcpTools` | the `mcp__*` allowlist CL202 checks scan-scope tokens against |
+| `budgets.commandsBytes` / `.agentsBytes` / `.skillsBytes` | the per-area byte ceiling CL500 checks a file's normalized size against |
 
 `scanScope` is load-bearing. `CLAUDE.md` and `CONTRIBUTING.md` use `sd-test` as a sandbox path and
 `docs/architecture.md` carries a `name: sd-debugger` frontmatter example, so widening the scope to
@@ -279,7 +308,7 @@ implementation, one fixture, one row in the tables above.
 | 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
 | 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, WARN first (CL201 BLOCK) |
 | 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30, WARN first (CL402 BLOCK) |
-| 4 | CL5xx file budgets | planned, stays WARN |
+| 4 | CL5xx file budgets | shipped 2026-07-30, stays WARN |
 
 Four scope decisions were made deliberately and are recorded here so they read as decisions
 rather than oversights:

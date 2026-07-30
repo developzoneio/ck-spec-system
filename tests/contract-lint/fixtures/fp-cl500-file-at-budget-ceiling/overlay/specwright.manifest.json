@@ -206,7 +206,7 @@
     "gates": {
       "commands/alpha.md": {
         "quantity": null,
-        "hard": 3,
+        "hard": 2,
         "conditional": []
       },
       "commands/beta.md": {
@@ -236,8 +236,43 @@
       "bypass this gate"
     ],
     "stackTokens": {
-      "commands": ["dotnet", "npm", "npx", "yarn", "pnpm", "pytest", "mvn", "gradle", "cargo", "go test", "rake", "bundle exec", "composer"],
-      "languages": ["C#", ".NET", "TypeScript", "JavaScript", "Python", "Java", "Go", "Rust", "Ruby", "PHP", "MSSQL", "SQL Server", "PostgreSQL", "MySQL", "MongoDB"]
+      "commands": [
+        "dotnet",
+        "npm",
+        "npx",
+        "yarn",
+        "pnpm",
+        "pytest",
+        "mvn",
+        "gradle",
+        "cargo",
+        "go test",
+        "rake",
+        "bundle exec",
+        "composer"
+      ],
+      "languages": [
+        "C#",
+        ".NET",
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Java",
+        "Go",
+        "Rust",
+        "Ruby",
+        "PHP",
+        "MSSQL",
+        "SQL Server",
+        "PostgreSQL",
+        "MySQL",
+        "MongoDB"
+      ]
+    },
+    "readOnlyAgents": [],
+    "knownMcpTools": [],
+    "budgets": {
+      "commandsBytes": 750
     }
   }
 }

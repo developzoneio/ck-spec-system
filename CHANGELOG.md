@@ -117,6 +117,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   since rewriting them would have deleted correct stack-agnostic design, not fixed a bug. Nine new
   fixture cases (four must-fire, five false-positive guards) plus a row each in
   `tests/contract-lint/README.md` and `docs/contract-lint.md`.
+- **Check 8 wave 4: `CL5xx` file budgets** (SW-35), one rule closing the "prompt files only ever
+  grow" gap: `CL500` (WARN, permanent) a file exceeds the new `contractLint.budgets.<area>Bytes`
+  ceiling for its scan-scope area. The finding reports how far over budget the file is, not a bare
+  "over budget". The byte count is normalized (sum of each line's byte length off the same per-line
+  cache every other rule reads, plus one separator per boundary), never a raw disk read - scan-scope
+  `*.md` is `text=auto` and checks out CRLF on Windows but LF on Linux CI, so a raw byte count would
+  make `CL500` disagree with itself across platforms for identical content (confirmed:
+  `commands/spec.md` is 25979 bytes as a git blob, 26521 bytes on a native Windows checkout). Three
+  new manifest keys (`contractLint.budgets.commandsBytes/agentsBytes/skillsBytes`), each ratcheted
+  to today's largest file in that area so the repo passes clean by construction and every later hit
+  is real growth. Two new fixture cases (one must-fire, one false-positive guard at the budget
+  boundary) plus a row each in `tests/contract-lint/README.md` and `docs/contract-lint.md`.
 
 ## [1.5.0] - 2026-07-23
 
