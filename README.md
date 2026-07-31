@@ -65,6 +65,21 @@ claude
 
 That's it. `/sd:setup` will scaffold `CLAUDE.md`, `.specs/`, and `.claude/project-config.json` interactively.
 
+**No project handy yet?** Try the bundled example instead - a tiny, runnable, non-.NET
+(plain Node.js) project, already scaffolded:
+
+```bash
+cd examples/fixture-project
+node --test               # confirm the fixture's own tests pass first
+claude
+> /sd:feature <slug>      # run a real spec-driven change end-to-end
+```
+
+`/sd:setup` will report "already set up" here - `CLAUDE.md`, `.specs/`, and `.claude/` are
+committed. Read `.specs/FEAT-todo-priority/00-spec.md` through `06-verify.md` for a complete
+worked example before running your own. See
+[`examples/fixture-project/README.md`](examples/fixture-project/README.md) for details.
+
 See [`install/README.md`](install/README.md) for advanced options.
 
 ### Uninstall
@@ -242,8 +257,8 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 | Ubuntu 22.04+ | bash 5 | `stat -c %Y` syntax supported |
 | jq | 1.6+ | Optional. Bash hooks exit 0 if missing. |
 | .NET stack | ASP.NET Core 8 | Stack-agnostic - .NET is just one example |
-| Node stack | Node 20+ / TS 5+ | Same `/sd:feature` workflow |
-| Python stack | 3.11+ / FastAPI / Django | Same `/sd:feature` workflow |
+| Node stack | Node 20+ (plain JS) | Demonstrated end-to-end in [`examples/fixture-project/`](examples/fixture-project/) - real `/sd:feature` run committed, not just asserted. TS not yet exercised. |
+| Python stack | 3.11+ / FastAPI / Django | Same `/sd:feature` workflow - not yet demonstrated with a committed example |
 
 ---
 
@@ -251,7 +266,8 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 
 - [`docs/architecture.md`](docs/architecture.md) - 3-layer design, lifecycle, cost model
 - [`docs/usage.md`](docs/usage.md) - Command-by-command reference with examples
-- [`docs/walkthrough.md`](docs/walkthrough.md) - End-to-end fictional project demo
+- [`docs/walkthrough.md`](docs/walkthrough.md) - End-to-end fictional project demo (illustrative prose)
+- [`examples/fixture-project/`](examples/fixture-project/) - End-to-end **runnable** non-.NET example, with a committed worked spec
 - [`docs/troubleshooting.md`](docs/troubleshooting.md) - Common issues and fixes
 - [`install/README.md`](install/README.md) - Install guide and options
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - PR process and dev guidelines

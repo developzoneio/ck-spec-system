@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`examples/fixture-project/`** (SW-30) - a tiny, runnable, non-.NET (plain Node.js) example
+  project: pre-scaffolded `CLAUDE.md`, `.specs/constitution.md`, and `.claude/project-config.json`,
+  plus `.specs/FEAT-todo-priority/`, a complete, real `/sd:feature` run (spec through verify)
+  committed as the worked example. Proves stack-agnosticism by demonstration instead of assertion
+  alone - the first non-.NET spec run through the engine. Root `README.md` Quickstart, compatibility
+  matrix, and Documentation list updated to point at it; `examples/README.md` and
+  `docs/walkthrough.md` reconciled to stop promising a fixture that didn't exist yet. Closes SW-8's
+  overlapping "runnable examples/ fixture" acceptance criterion by reference.
+
 - **Check 8: cross-file contract lint** (`scripts/contract-lint.ps1` / `scripts/contract-lint.sh`,
   SW-26 wave 1). Where Check 7 guards inventory, Check 8 guards the relationships between commands,
   agents and skills. 17 rules across three bands: `CL0xx` reference resolution, `CL3xx` gate

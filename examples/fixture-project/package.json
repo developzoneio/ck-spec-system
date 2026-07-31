@@ -1,0 +1,15 @@
+{
+  "name": "fixture-project",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny in-memory todo-list library - specwright's runnable non-.NET example.",
+  "scripts": {
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage",
+    "start": "node src/demo.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

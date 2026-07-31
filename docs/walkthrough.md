@@ -1,5 +1,10 @@
 # End-to-end walkthrough
 
+> **Looking for something you can actually run?** This walkthrough is illustrative prose, not a
+> runnable project. For a real, runnable, non-.NET example you can clone and drive yourself -
+> including a committed `.specs/` tree from an actual `/sd:feature` run - see
+> [`../examples/fixture-project/`](../examples/fixture-project/).
+
 This is a fictional but realistic example. The project is `inventory-service`, an ASP.NET Core 8 + PostgreSQL backend with JIRA tickets matching `^INV-\d+$`. The walkthrough covers:
 
 1. First-time setup with `/sd:setup`.

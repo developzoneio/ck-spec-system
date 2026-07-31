@@ -1,6 +1,9 @@
 # Examples
 
-The primary worked example for specwright is the end-to-end walkthrough in:
+For a **runnable** example you can clone and drive yourself, start with
+[`fixture-project/`](fixture-project/) below.
+
+For a **narrated** end-to-end tour (illustrative, not runnable - a fictional .NET project), see:
 
 **[`../docs/walkthrough.md`](../docs/walkthrough.md)**
 
@@ -17,6 +20,11 @@ It covers:
 
 ## What is here now
 
+- [`fixture-project/`](fixture-project/) - a tiny, runnable, non-.NET (plain Node.js) example
+  project: pre-scaffolded `CLAUDE.md`, `.specs/constitution.md`, and `.claude/project-config.json`,
+  plus a committed `.specs/FEAT-todo-priority/` worked example from a real `/sd:feature` run.
+  Backs the SW-30 acceptance criteria - clone it, run `node --test`, and drive `/sd:feature`
+  against it directly. This is what proves stack-agnosticism rather than merely asserting it.
 - [`spec-lint-fixture/`](spec-lint-fixture/) - a clean `.specs/` tree and a seeded-broken one for
   exercising `/sd:spec validate`. Backs the SW-4 acceptance criterion. Run by hand, not in CI -
   the linter is a prompt, so no script can execute it; the fixture README explains the trade-off.
@@ -28,7 +36,6 @@ It covers:
 Ideas under consideration, no committed timeline (see [`../ROADMAP.md`](../ROADMAP.md) for what
 is actually scheduled):
 
-- `examples/fixture-projects/` - tiny example repos (Node, .NET, Python) with pre-populated `.specs/` for demoing.
 - `examples/transcripts/` - anonymized real-run transcripts showing prompt-router and spec-gate behavior.
 - `examples/templates-customized/` - reference customizations of `constitution.template.md` for common stacks (Clean Architecture for .NET, hexagonal for Node, etc.).
 
