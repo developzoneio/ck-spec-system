@@ -99,7 +99,7 @@ cannot auto-fix. That guarantee is only as good as the prompt text agreeing with
 
 | Rule | Severity | Fires when |
 |---|---|---|
-| `CL200` | WARN (promotes to BLOCK in a follow-up commit) | an agent with no write tool is instructed to write, append or create |
+| `CL200` | BLOCK | an agent with no write tool is instructed to write, append or create |
 | `CL201` | BLOCK | an agent listed in `contractLint.readOnlyAgents` declares a write tool |
 | `CL202` | WARN | an `mcp__*` name in scan scope is absent from `contractLint.knownMcpTools` |
 | `CL203` | WARN | an agent's own frontmatter declares a tool its own body never mentions |
@@ -121,7 +121,8 @@ subject ("The calling command appends your output") and a mid-sentence use ("wri
 findings._` ``, after a comma) all pass untouched, with no exclusion list -- the same shape
 `Get-GateClassification`/`classify_heading` already uses for `## Gate activity`. It is the only
 rule in this band that reads prose intent rather than pure structure, which is why it ships WARN
-first: **CL200 promotes to BLOCK in a follow-up commit once it has run clean for a release.**
+first: **CL200 promoted to BLOCK on 2026-07-31, once the engine tree ran clean under both
+implementations.**
 
 `CL203` searches an agent's own **body** -- everything after its closing `---` -- for the declared
 tool's exact name. A tool mentioned only inside the `tools:` line itself (its own declaration) does
@@ -141,7 +142,7 @@ trip a gate rule -- they all sit under a `## Phase 0` heading.
 | `CL303` | WARN | hard gate labels are not exactly `1..N` without duplicates |
 | `CL304` | BLOCK | a conditional gate is on disk but undeclared, or declared and absent |
 | `CL305` | BLOCK | a HARD gate lists an override token as a selectable option |
-| `CL306` | WARN (promotes to BLOCK in a follow-up commit) | a HARD gate's prose describes an escape hatch with no `contract-lint: allow CL306` comment nearby |
+| `CL306` | BLOCK | a HARD gate's prose describes an escape hatch with no `contract-lint: allow CL306` comment nearby |
 
 An **option set** is a slash-separated parenthetical such as `(yes / revise / abort)`, or two or
 more top-level `- ` bullets. `CL303` compares **sets, never file order**: `commands/bug.md` authors
@@ -162,9 +163,9 @@ declared-exception surface -- the existing suppression-comment convention alread
 gate's escape hatch is intentional," the same way it covers `CL305` on `commands/perf.md`, so a
 second mechanism saying the same thing was not worth adding.
 
-**`CL306` shipped WARN on 2026-07-30 and promotes to BLOCK in a follow-up commit once it has run
-clean for a release** -- the same rollout `CL200` used, for the same reason: it reads prose intent,
-not pure structure.
+**`CL306` shipped WARN on 2026-07-30 and promoted to BLOCK on 2026-07-31, once the engine tree ran
+clean under both implementations** -- the same rollout `CL200` used, for the same reason: it reads
+prose intent, not pure structure.
 
 Gate classification needs no exclusion list. `Gate` followed by a lowercase word is never a gate,
 which is what makes `## Gate activity` in `commands/status.md` invisible to all six rules.
@@ -179,7 +180,7 @@ and frontmatter examples need no special-case handling).
 
 | Rule | Severity | Fires when |
 |---|---|---|
-| `CL400` | WARN (promotes to BLOCK in a follow-up commit) | a stack command token (`contractLint.stackTokens.commands`) appears outside a `<<placeholder>>`, a fenced code block, or a `contract-lint: allow CL400` comment |
+| `CL400` | BLOCK | a stack command token (`contractLint.stackTokens.commands`) appears outside a `<<placeholder>>`, a fenced code block, or a `contract-lint: allow CL400` comment |
 | `CL401` | WARN (permanent) | a language/framework name (`contractLint.stackTokens.languages`) appears in the same contexts |
 | `CL402` | BLOCK | a hardcoded absolute filesystem path (a Windows drive letter, or a POSIX path with two or more segments) appears in scan scope |
 
@@ -197,10 +198,10 @@ placeholder character. Without that positive boundary, `~/.claude/hooks/sd/` and
 `/`, and `/sd:<name>` would collide with the leading slash of every slash-command reference in the
 engine (a `/prefix:name` command has no second `/`, so it never matches at all).
 
-**`CL400` shipped WARN on 2026-07-30 and promotes to BLOCK in a follow-up commit once it has run
-clean for a release**, the same rollout `CL200`/`CL306` use. `CL401` and `CL402` do not follow this
-schedule: `CL401` is permanent WARN by design, and `CL402` shipped BLOCK immediately since a
-hardcoded absolute path is a structural fact, not prose intent.
+**`CL400` shipped WARN on 2026-07-30 and promoted to BLOCK on 2026-07-31, once the engine tree ran
+clean under both implementations**, the same rollout `CL200`/`CL306` used. `CL401` and `CL402` do
+not follow this schedule: `CL401` is permanent WARN by design, and `CL402` shipped BLOCK
+immediately since a hardcoded absolute path is a structural fact, not prose intent.
 
 ### CL5xx -- file budgets
 
@@ -306,8 +307,8 @@ implementation, one fixture, one row in the tables above.
 |---|---|---|
 | 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
 | 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
-| 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, WARN first (CL201 BLOCK) |
-| 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30, WARN first (CL402 BLOCK) |
+| 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, BLOCK (CL200 promoted from WARN; CL202/CL203 stay WARN) |
+| 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30 WARN, now BLOCK (CL400/CL306 promoted 2026-07-31; CL401 stays WARN) |
 | 4 | CL5xx file budgets | shipped 2026-07-30, stays WARN |
 
 Four scope decisions were made deliberately and are recorded here so they read as decisions

@@ -3,7 +3,7 @@
   "findings": [
     {
       "rule": "CL306",
-      "severity": "WARN",
+      "severity": "BLOCK",
       "file": "commands/alpha.md",
       "anchor": "seed",
       "seed": "unsuppressed-escape-hatch"

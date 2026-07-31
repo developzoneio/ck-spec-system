@@ -96,9 +96,9 @@
       },
       {
         "id": "CL200",
-        "severity": "WARN",
+        "severity": "BLOCK",
         "wave": 3,
-        "summary": "agent with no write tool is instructed to write, append or create (ships WARN, promotes to BLOCK in a follow-up)"
+        "summary": "agent with no write tool is instructed to write, append or create"
       },
       {
         "id": "CL201",
@@ -156,15 +156,15 @@
       },
       {
         "id": "CL306",
-        "severity": "WARN",
+        "severity": "BLOCK",
         "wave": 3,
-        "summary": "HARD gate prose describes an escape hatch with no contract-lint: allow suppression (ships WARN, promotes to BLOCK in a follow-up)"
+        "summary": "HARD gate prose describes an escape hatch with no contract-lint: allow suppression"
       },
       {
         "id": "CL400",
-        "severity": "WARN",
+        "severity": "BLOCK",
         "wave": 3,
-        "summary": "hardcoded stack command token outside a <<placeholder>>, fenced example or suppression comment (ships WARN, promotes to BLOCK in a follow-up)"
+        "summary": "hardcoded stack command token outside a <<placeholder>>, fenced example or suppression comment"
       },
       {
         "id": "CL401",

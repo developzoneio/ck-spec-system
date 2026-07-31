@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-plan" sub-path in `agents/spec-architect.md`, since the declaration has no syntax for an
   either/or required set.
 - **Check 8 wave 3a: `CL2xx` role and tool integrity** (SW-33), four rules over the agent role
-  contract: `CL200` (WARN, promotes to BLOCK in a follow-up commit) an agent with no write tool is
+  contract: `CL200` (BLOCK) an agent with no write tool is
   instructed to write, append or create; `CL201` (BLOCK) an agent listed in the new
   `contractLint.readOnlyAgents` declares a write tool anyway; `CL202` (WARN) an `mcp__*` name in
   scan scope is absent from the new `contractLint.knownMcpTools`; `CL203` (WARN) an agent's own
@@ -95,11 +95,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tree the moment the rule shipped. Five older fixture overlays (`cl002`, `cl007`, `cl101`, `cl102`,
   `cl103`) had the same latent gap in their own copies of the demo agent, found the same way.
 - **Check 8 wave 3b: `CL4xx` stack-agnostic prose + `CL306`** (SW-34), four rules closing the two
-  promises wave 1 deferred: `CL400` (WARN, promotes to BLOCK in a follow-up commit) a hardcoded
-  stack command token outside a `<<placeholder>>`, a fenced example, or a suppression comment;
-  `CL401` (WARN, permanent) the same for a language/framework name - a language name in prose is
-  often legitimate, so this one never promotes; `CL402` (BLOCK) a hardcoded absolute filesystem path
-  in scan scope; `CL306` (WARN, promotes to BLOCK in a follow-up commit) a HARD gate's prose
+  promises wave 1 deferred: `CL400` (BLOCK) a hardcoded stack command token outside a
+  `<<placeholder>>`, a fenced example, or a suppression comment; `CL401` (WARN, permanent) the same
+  for a language/framework name - a language name in prose is often legitimate, so this one never
+  promotes; `CL402` (BLOCK) a hardcoded absolute filesystem path in scan scope; `CL306` (BLOCK) a
+  HARD gate's prose
   describes an escape hatch with no `contract-lint: allow CL306` comment nearby - the prose half of
   `CL305` that wave 1 deferred for exactly this reason. `CL306` deliberately excludes whatever
   `CL305` already governs (the option-set parenthetical and backtick-led option bullets), so the two
@@ -129,6 +129,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to today's largest file in that area so the repo passes clean by construction and every later hit
   is real growth. Two new fixture cases (one must-fire, one false-positive guard at the budget
   boundary) plus a row each in `tests/contract-lint/README.md` and `docs/contract-lint.md`.
+
+### Changed
+- **SW-26 promotion: `CL200`/`CL306`/`CL400` WARN -> BLOCK.** All three shipped WARN with an
+  explicit "promotes to BLOCK in a follow-up commit once it has run clean for a release" clause.
+  As of 2026-07-31 the engine tree has zero findings for all three under both implementations, so
+  the promotion in `specwright.manifest.json` is now live (severity is registry-driven, so no rule
+  logic changed). `CL201`/`CL402` were already BLOCK; `CL202`/`CL203`/`CL401`/`CL500` stay WARN by
+  design and do not promote. Five existing `<!-- contract-lint: allow -->` suppressions change from
+  silencing a WARN to being load-bearing for a green CI: `commands/bug.md` and
+  `commands/release.md` (`CL306`), `commands/setup.md` (two) and `commands/verify.md` (`CL400`).
 
 ## [1.5.0] - 2026-07-23
 

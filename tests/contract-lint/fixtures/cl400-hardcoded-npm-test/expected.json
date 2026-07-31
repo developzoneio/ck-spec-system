@@ -3,7 +3,7 @@
   "findings": [
     {
       "rule": "CL400",
-      "severity": "WARN",
+      "severity": "BLOCK",
       "file": "commands/beta.md",
       "anchor": "seed",
       "seed": "stack-command-hardcoded"

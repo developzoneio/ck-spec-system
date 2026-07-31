@@ -1,6 +1,6 @@
 {
   "note": "sd-keeper has no write tool; the seeded line still instructs it to Append output",
   "findings": [
-    { "rule": "CL200", "severity": "WARN", "file": "agents/keeper.md", "anchor": "seed", "seed": "no-write-tool-instructed" }
+    { "rule": "CL200", "severity": "BLOCK", "file": "agents/keeper.md", "anchor": "seed", "seed": "no-write-tool-instructed" }
   ]
 }
