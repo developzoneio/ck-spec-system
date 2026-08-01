@@ -1,0 +1,2 @@
+Phase 6 writes .claude/project-config.json and .claude/settings.json, which Claude Code
+treats as sensitive files requiring interactive approval that no headless run can give.

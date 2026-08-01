@@ -1,0 +1,15 @@
+/sd:feature todo-count
+
+Feature request: add a countByStatus() method to TodoService that returns { done: <n>, pending: <n> }
+counts across all todos currently in the store. Keep it small - this should be a 2-3 task spec.
+
+This is a headless, scripted test run with no human available to reply mid-workflow. Do not stop
+and wait for a real person. At every hard gate (Gate 1 spec approval, Gate 2 plan approval, Gate 3
+integration + review pass, and Gate Re-plan if it fires), treat the following as the standing reply
+and continue immediately: "yes". Do not treat this as skipping the gate - actually present each
+gate's summary as instructed, then proceed as if "yes" was just typed in response, all within this
+single turn. If Gate Complexity fires because the plan is oversized, shrink the plan back down to
+fit the 2-3 task feature described above rather than escalating.
+
+Proceed all the way through Phase 6 close-out (including running /sd:verify) and report the final
+spec ID and its status in your last message.

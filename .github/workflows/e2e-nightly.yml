@@ -1,0 +1,43 @@
+name: E2E behavioral eval (nightly)
+
+# Headless behavioral eval harness for commands and gates (SW-27). Drives real
+# `claude -p` sessions - real API cost and multi-minute wall clock - so this
+# is deliberately NOT wired into ci.yml's push/pull_request job. See
+# tests/e2e/README.md for what each scenario asserts, the isolation model,
+# and the permission-mode pitfall (acceptEdits silently ignores a hook's
+# deny - see that file before changing --permission-mode here).
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC daily - avoid the top-of-hour stampede
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    name: e2e (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run e2e suite
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        shell: pwsh
+        run: ./tests/e2e/run-e2e.ps1
+
+      - name: Run e2e self-test (guard-neutering detection)
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        shell: pwsh
+        run: ./tests/e2e/run-e2e.ps1 -SelfTest

@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`tests/e2e/`: headless behavioral eval harness for commands and gates** (SW-27). Where the rest
+  of `scripts/`/`tests/` proves the engine's *assets* reference each other correctly, this drives
+  real `claude -p` (headless) sessions against a throwaway copy of `examples/fixture-project` /
+  `examples/spec-lint-fixture/broken` and asserts on **produced artifacts** (files, frontmatter,
+  status values) rather than transcript wording - the first mechanism that proves the engine
+  *behaves* correctly end-to-end. 5 scenarios: `/sd:setup` fresh-scaffold, `/sd:feature` happy path
+  to a passing `06-verify.md`, spec-gate denying a code edit with no in-progress spec, spec-gate's
+  verify-gate denying an unverified close-out, and `/sd:spec validate` surfacing the seeded `SL0xx`
+  corpus. `run-e2e.ps1` (single pwsh runner, same posture as `tests/hooks/run-conformance.ps1` /
+  `tests/contract-lint/run-selftest.ps1`) sandboxes each run via a fresh "fake home" with the engine
+  installed into it through the installer's own `-BasePath` flag; `-SelfTest` re-runs the two
+  negative scenarios against a neutered spec-gate hook and asserts the harness notices. Not wired
+  into per-PR `ci.yml` - runs nightly / on manual dispatch via `.github/workflows/e2e-nightly.yml`.
+  `tests/e2e/README.md` documents the isolation model, prerequisites, cost, and two findings from
+  building it: `--permission-mode acceptEdits` silently overrides a `PreToolUse` hook's deny (only
+  `dontAsk` with no `--allowedTools` override actually respects one), and spec-gate's matcher covers
+  `Edit`/`Write`/`MultiEdit` only, not `Bash`-mediated file writes.
+
 - **`examples/fixture-project/`** (SW-30) - a tiny, runnable, non-.NET (plain Node.js) example
   project: pre-scaffolded `CLAUDE.md`, `.specs/constitution.md`, and `.claude/project-config.json`,
   plus `.specs/FEAT-todo-priority/`, a complete, real `/sd:feature` run (spec through verify)
