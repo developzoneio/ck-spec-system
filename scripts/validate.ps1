@@ -402,6 +402,57 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
         }
     }
 
+    # ---- Version claims: published version vs newest dated CHANGELOG heading ---
+    # Independent of Check 6's $nextHeader - that variable stays $null in the normal
+    # non-just-released state, since [Unreleased] currently has bullets right after its
+    # header and the Check 6 loop breaks on the bullet before ever hitting a '## [' line.
+    # Scan the whole file for the first dated release heading instead.
+    $releasedVersion = $null
+    foreach ($line in (Get-Content -LiteralPath $changelog)) {
+        $m = [regex]::Match($line, '^##\s+\[([0-9]+\.[0-9]+\.[0-9]+)\]\s+-\s+\S')
+        if ($m.Success) { $releasedVersion = $m.Groups[1].Value; break }
+    }
+    if ([string]::IsNullOrEmpty($releasedVersion)) {
+        Write-FailMsg 'CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)'
+        Add-Failure 'docs: no dated release heading in CHANGELOG.md'
+        $docsBad++
+    }
+
+    foreach ($claim in @($manifest.versionClaims)) {
+        $target = Join-Path $repoRoot ($claim.file -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            Write-FailMsg "$($claim.file) : declared version-claim file does not exist"
+            Add-Failure "docs: missing version-claim file $($claim.file)"
+            $docsBad++
+            continue
+        }
+        if ([string]::IsNullOrEmpty($releasedVersion)) { continue }
+
+        $hits = 0
+        $lineNo = 0
+        foreach ($line in (Get-Content -LiteralPath $target)) {
+            $lineNo++
+            $m = [regex]::Match($line, $claim.pattern)
+            if ($m.Success) {
+                $hits++
+                $found = $m.Groups[1].Value
+                if ($found -ne $releasedVersion) {
+                    Write-FailMsg "$($claim.file):$lineNo : says $found, CHANGELOG has $releasedVersion"
+                    Add-Failure "docs: $($claim.file):$lineNo version says $found not $releasedVersion"
+                    $docsBad++
+                }
+            }
+        }
+
+        # A pattern that matches nothing is a rotted regex, not a pass - same rationale
+        # as the docClaims vacuous-claim check above.
+        if ($hits -eq 0) {
+            Write-FailMsg "$($claim.file) : version pattern matched no lines (reworded?): $($claim.pattern)"
+            Add-Failure "docs: vacuous version claim in $($claim.file)"
+            $docsBad++
+        }
+    }
+
     # Undeclared-claim scan: any line that looks like an inventory claim but is not
     # covered by a docClaims entry. This is what keeps the manifest canonical - a new
     # doc cannot publish a number that nothing checks.
@@ -435,7 +486,8 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
     }
 
     if ($docsBad -eq 0) {
-        Write-Ok "$($manifest.docClaims.Count) published claim(s) match disk; no undeclared claims"
+        $versionClaimCount = @($manifest.versionClaims).Count
+        Write-Ok "$($manifest.docClaims.Count) published claim(s) + $versionClaimCount version claim(s) match disk/CHANGELOG; no undeclared claims"
     }
 }
 

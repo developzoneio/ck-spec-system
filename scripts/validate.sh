@@ -369,6 +369,56 @@ else
         fi
     done < <(mjq '.docClaims[] | "\(.file)\t\(.pattern)\t\(.equals)"')
 
+    # ---- Version claims: published version vs newest dated CHANGELOG heading ---
+    # Independent of Check 6's next_header - that variable resolves to whatever line
+    # sits directly below [Unreleased], which is a bullet (not a header) in the normal
+    # non-just-released state, so it cannot be relied on here. Scan the whole file for
+    # the first dated release heading instead.
+    released_version=""
+    release_line="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$changelog" || true)"
+    if [[ "$release_line" =~ \[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+        released_version="${BASH_REMATCH[1]}"
+    fi
+    if [[ -z "$released_version" ]]; then
+        fail "CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)"
+        add_failure "docs: no dated release heading in CHANGELOG.md"
+        docs_bad=$((docs_bad + 1))
+    fi
+
+    while IFS=$'\t' read -r v_file v_pattern; do
+        target="$repo_root/$v_file"
+        if [[ ! -f "$target" ]]; then
+            fail "$v_file : declared version-claim file does not exist"
+            add_failure "docs: missing version-claim file $v_file"
+            docs_bad=$((docs_bad + 1))
+            continue
+        fi
+        [[ -z "$released_version" ]] && continue
+
+        hits=0
+        lineno=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            lineno=$((lineno + 1))
+            if [[ "$line" =~ $v_pattern ]]; then
+                hits=$((hits + 1))
+                found="${BASH_REMATCH[1]}"
+                if [[ "$found" != "$released_version" ]]; then
+                    fail "$v_file:$lineno : says $found, CHANGELOG has $released_version"
+                    add_failure "docs: $v_file:$lineno version says $found not $released_version"
+                    docs_bad=$((docs_bad + 1))
+                fi
+            fi
+        done < "$target"
+
+        # A pattern that matches nothing is a rotted regex, not a pass - same rationale
+        # as the docClaims vacuous-claim check above.
+        if [[ $hits -eq 0 ]]; then
+            fail "$v_file : version pattern matched no lines (reworded?): $v_pattern"
+            add_failure "docs: vacuous version claim in $v_file"
+            docs_bad=$((docs_bad + 1))
+        fi
+    done < <(mjq '.versionClaims[] | "\(.file)\t\(.pattern)"')
+
     # Undeclared-claim scan: any line that looks like an inventory claim but is not
     # covered by a docClaims entry. This is what keeps the manifest canonical - a new
     # doc cannot publish a number that nothing checks.
@@ -409,7 +459,8 @@ else
 
     if [[ $docs_bad -eq 0 ]]; then
         claim_total="$(mjq '.docClaims | length')"
-        ok "$claim_total published claim(s) match disk; no undeclared claims"
+        version_total="$(mjq '.versionClaims | length')"
+        ok "$claim_total published claim(s) + $version_total version claim(s) match disk/CHANGELOG; no undeclared claims"
     fi
 fi
 

@@ -79,10 +79,16 @@ What this means in practice:
 - **Writing intentionally historical docs** (superseded counts as a past-state record): put the
   path in `historicalExclusions`. `docs/history/`, `docs/superpowers/` and `CHANGELOG.md` are
   already excluded. Never "fix" their numbers to match today's disk state.
+- **Publishing the current released version**: add a `versionClaims` entry (`file` + a `pattern`
+  with one capture group, no `equals`). It is checked against the newest dated
+  `## [x.y.z] - <date>` heading in `CHANGELOG.md`, not against a manifest quantity - CHANGELOG is
+  the single source of truth for "what version is released." Unlike `docClaims`, there is no
+  undeclared-claim scan for version strings yet: a version claim in a doc that is not listed here
+  is not caught.
 
 Two constraints on `pattern`: it must be valid in **both** POSIX ERE (bash `[[ =~ ]]`) and .NET
 (PowerShell), so use `[0-9]` rather than `\d` and avoid lookarounds; and it is matched
-**case-sensitively** on both platforms.
+**case-sensitively** on both platforms. This applies to `versionClaims` patterns too.
 
 `scripts/selftest-docs.{ps1,sh}` proves Check 7 still bites, by corrupting a throwaway copy of the
 repo and asserting the validator catches it. CI runs it on all three OSes.

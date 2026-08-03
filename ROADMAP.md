@@ -4,7 +4,7 @@ Planned and exploratory work for specwright. Shipped items live in [`CHANGELOG.m
 this file is forward-looking only and intentionally non-binding - priorities shift as the engine is
 dogfooded on real projects.
 
-Current released version: **1.3.0** (see the [changelog](CHANGELOG.md) for what shipped).
+Current released version: **1.5.0** (see the [changelog](CHANGELOG.md) for what shipped).
 
 ## Near-term
 
@@ -19,8 +19,9 @@ Small, well-scoped items targeted at the next minor release.
 
 Larger items that each warrant a full `/sd:feature` spec before building.
 
-_Nothing queued right now - the last two Planned items (`/sd:setup` codebase scan, `sd-docs-writer`
-agent) shipped; see [`CHANGELOG.md`](CHANGELOG.md)._
+_Nothing new proposed right now. Substantial work is already specced and built, queued for the
+next version cut - see the `[Unreleased]` section of [`CHANGELOG.md`](CHANGELOG.md) for what
+that is._
 
 ## Exploratory
 

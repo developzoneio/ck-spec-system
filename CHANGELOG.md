@@ -167,6 +167,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silencing a WARN to being load-bearing for a green CI: `commands/bug.md` and
   `commands/release.md` (`CL306`), `commands/setup.md` (two) and `commands/verify.md` (`CL400`).
 
+### Fixed
+- Check 7 could not see version/release-state claims at all - its entire vocabulary
+  (`docClaims`/`claimPhrases`) is built around integer counts derived from disk, so a stale
+  version string had nothing to trip it (SW-28). `ROADMAP.md` had said `Current released version:
+  **1.3.0**` since before the `1.4.0` release, unnoticed through every green Check 7 run since,
+  and its `## Planned` section claimed "nothing queued right now" while `[Unreleased]` carried
+  eight real entries - a release's worth of built-but-uncut work. A new `versionClaims` array in
+  `specwright.manifest.json` closes this: entries are `{file, pattern}` (no `equals` - there is no
+  disk-derived quantity for a version, so the expected value is always the newest dated
+  `## [x.y.z] - <date>` heading in `CHANGELOG.md`, computed once per run). `scripts/validate.sh`/
+  `.ps1` gained a matching check, deliberately independent of Check 6's existing
+  `next_header`/`$nextHeader` variables - those resolve to whatever line sits directly below
+  `[Unreleased]`, which is the first bullet rather than a heading in the normal (non-just-released)
+  state, so reusing them would have passed on bash and silently done nothing on PowerShell.
+  `ROADMAP.md` now reads `1.5.0` and its `## Planned` section points at `[Unreleased]` instead of
+  claiming an empty queue. `selftest-docs.{sh,ps1}` grow from 6 scenarios to 7: the new one plants
+  a wrong version in a sandboxed `ROADMAP.md` and asserts the validator names both the wrong value
+  and the true one from `CHANGELOG.md`, using the same derive-don't-hardcode discipline SW-20
+  established for corruption targets. The ticket's secondary finding (a hand-maintained
+  `PROJECT-SNAPSHOT.md` needing generation or trimming) does not apply - that file does not exist
+  in this repo and never has.
+
 ## [1.5.0] - 2026-07-23
 
 ### Fixed

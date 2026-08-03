@@ -248,6 +248,27 @@
     { "file": "docs/adr/0003-adaptive-replan-loop.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" }
   ],
 
+  "versionClaims": [
+    { "file": "ROADMAP.md", "pattern": "^Current released version: \\*\\*([0-9]+\\.[0-9]+\\.[0-9]+)\\*\\*" }
+  ],
+
+  "$versionClaimsComment": [
+    "A version claim is a different shape from docClaims: docClaims compares a captured integer",
+    "against a manifest 'quantities' value derived from an areas/derived count, and needs 'equals'",
+    "to say which one. A version claim compares a captured x.y.z string against the newest dated",
+    "'## [x.y.z] - <date>' heading in CHANGELOG.md instead - there is no quantities entry for that,",
+    "so 'equals' does not apply here and is intentionally absent from these entries.",
+    "",
+    "v1 is an EXPLICIT LIST ONLY - unlike docClaims there is no undeclared-claim scan for version",
+    "strings. A semver-shaped phrase pattern would collide with legitimate non-claim version",
+    "strings already in the repo (keepachangelog.com/en/1.1.0/, semver.org/spec/v2.0.0.html,",
+    "illustrative versions in commands/release.md, docs/usage.md, template/fixture content), and",
+    "policing that needs a second exclusions/vocabulary surface disproportionate to the one real",
+    "offender this closes (SW-28). If a second tracked doc starts publishing a released-version",
+    "claim, add it here explicitly rather than building the scan; only build the scan if this list",
+    "grows enough that omissions become plausible."
+  ],
+
   "$contractLintComment": [
     "Contract contract for specwright's PRODUCT (commands/agents/skills), read by",
     "scripts/contract-lint.ps1 and scripts/contract-lint.sh (Check 8: cross-file contract lint).",

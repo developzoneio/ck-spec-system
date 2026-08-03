@@ -13,13 +13,17 @@
 #   4. An undeclared new claim     -> fails as undeclared.
 #   5. A spelled-out CAPITALISED   -> fails as undeclared.  (SW-24)
 #   6. A bare-noun claim           -> fails as undeclared.  (SW-24)
+#   7. A wrong published version   -> fails, naming the version and CHANGELOG's truth. (SW-28)
 #
 # Scenarios 3 and 4 are what stop the check rotting: without them someone could
 # reword or add docs and quietly leave Check 7 guarding nothing. Scenarios 5 and 6
 # cover the two escapes SW-24 found, both of which had let a real wrong claim sit in
 # a tracked doc through many green runs. They are deliberately separate: a fix that
 # only adds a lowercase word alternation passes 4 and fails 5, and a fix that only
-# handles decorated nouns passes 5 and fails 6.
+# handles decorated nouns passes 5 and fails 6. Scenario 7 covers the SW-28 blind
+# spot: Check 7's docClaims/claimPhrases vocabulary is entirely count-based, so a
+# stale version string (e.g. ROADMAP.md) escaped detection until versionClaims was
+# added.
 #
 # Exit 0 = the check behaves correctly; 1 = the check is broken.
 
@@ -69,6 +73,13 @@ make_copy() {
 # specwright.manifest.json exists to abolish.
 TRUE_COMMANDS="$(find "$repo_root/commands" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
 WRONG_COMMANDS=$((TRUE_COMMANDS + 1))
+
+# Same anti-hardcoding rationale as TRUE_COMMANDS above, applied to the version claim
+# added by SW-28: derived from THIS repo's own CHANGELOG.md at run time, never
+# hardcoded, since a literal here would itself rot on the next release cut.
+TRUE_VERSION="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$repo_root/CHANGELOG.md" \
+    | sed -E 's/^##[[:space:]]+\[([0-9]+\.[0-9]+\.[0-9]+)\].*/\1/')"
+WRONG_VERSION="9.9.9"
 
 # Replace first match of a regex in a file, portably (macOS sed -i differs from GNU).
 # Returns non-zero when the file did not change, so a corruption that silently failed to
@@ -135,14 +146,14 @@ echo "  Sandbox:   $work_root"
 
 # ---- Scenario 1: clean copy passes -----------------------------------------
 
-section "Scenario 1/6: clean copy passes"
+section "Scenario 1/7: clean copy passes"
 clean="$work_root/clean"
 make_copy "$clean"
 run_case "clean" 1 "" "$clean"
 
 # ---- Scenario 2: a wrong published number fails ----------------------------
 
-section "Scenario 2/6: wrong README number fails"
+section "Scenario 2/7: wrong README number fails"
 wrong="$work_root/wrong-number"
 make_copy "$wrong"
 if corrupt_or_fail "wrong-number" "$wrong/README.md" \
@@ -152,7 +163,7 @@ fi
 
 # ---- Scenario 3: a reworded claim fails as vacuous --------------------------
 
-section "Scenario 3/6: reworded claim fails as vacuous"
+section "Scenario 3/7: reworded claim fails as vacuous"
 reworded="$work_root/reworded"
 make_copy "$reworded"
 if corrupt_or_fail "reworded" "$reworded/README.md" \
@@ -162,7 +173,7 @@ fi
 
 # ---- Scenario 4: an undeclared claim fails ---------------------------------
 
-section "Scenario 4/6: undeclared claim in a new doc fails"
+section "Scenario 4/7: undeclared claim in a new doc fails"
 undeclared="$work_root/undeclared"
 make_copy "$undeclared"
 printf '\nThe engine ships 99 reusable skills.\n' >> "$undeclared/docs/usage.md"
@@ -175,7 +186,7 @@ run_case "undeclared" 0 "undeclared inventory claim" "$undeclared"
 # a spelled-out count in prose is usually sentence-initial, which is exactly the form a
 # lowercase-only word alternation misses. A lowercase-only fix passes scenario 4 and fails
 # here, which is the whole reason this scenario is separate.
-section "Scenario 5/6: spelled-out capitalised claim fails"
+section "Scenario 5/7: spelled-out capitalised claim fails"
 spelled="$work_root/spelled-out"
 make_copy "$spelled"
 printf '\nSeven reusable skills ship with the engine.\n' >> "$spelled/docs/usage.md"
@@ -186,17 +197,28 @@ run_case "spelled-out" 0 "undeclared inventory claim" "$spelled"
 # Before SW-24 the vocabulary only listed decorated forms ('slash commands', 'workflow
 # commands'), so an undecorated 'N commands' matched nothing at all. That is how
 # 'Five commands invoke no subagent' sat in docs/architecture.md unseen.
-section "Scenario 6/6: bare-noun claim fails"
+section "Scenario 6/7: bare-noun claim fails"
 barenoun="$work_root/bare-noun"
 make_copy "$barenoun"
 printf '\nThe engine ships 99 commands.\n' >> "$barenoun/docs/usage.md"
 run_case "bare-noun" 0 "undeclared inventory claim" "$barenoun"
 
+# ---- Scenario 7: a wrong version claim fails (SW-28) ------------------------
+
+section "Scenario 7/7: wrong ROADMAP version fails"
+wrongversion="$work_root/wrong-version"
+make_copy "$wrongversion"
+if corrupt_or_fail "wrong-version" "$wrongversion/ROADMAP.md" \
+    "Current released version: \*\*${TRUE_VERSION}\*\*" \
+    "Current released version: **${WRONG_VERSION}**"; then
+    run_case "wrong-version" 0 "says ${WRONG_VERSION}, CHANGELOG has ${TRUE_VERSION}" "$wrongversion"
+fi
+
 # ---- summary ---------------------------------------------------------------
 
 section "Summary"
 if [[ $failures -eq 0 ]]; then
-    ok "Check 7 bites on all 6 scenarios."
+    ok "Check 7 bites on all 7 scenarios."
     exit 0
 else
     fail "$failures scenario(s) behaved wrong - Check 7 is not trustworthy."
