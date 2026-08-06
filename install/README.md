@@ -52,8 +52,9 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 | `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
 | `templates/` | `templates/sd/` | 4 + 5 | Setup templates + `specs/` subfolder with 5 spec templates |
 | `skills/` | `skills/sd/` | 8 | One folder per skill, each with a `SKILL.md` |
+| _(generated at install)_ | `<area>/sd/specwright-version.txt` | 5 | One version stamp per installed area, derived from `CHANGELOG.md`'s newest release, removed by uninstall |
 
-**Total**: 39 files per OS.
+**Total**: 44 files per OS.
 
 ---
 
@@ -84,7 +85,7 @@ After install, check the target directories:
 Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 12 .md files
 Get-ChildItem $env:USERPROFILE\.claude\agents\sd\       # expect 6 .md files
 Get-ChildItem $env:USERPROFILE\.claude\hooks\sd\        # expect 3 .ps1 files
-Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 4 files + specs\ folder
+Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 5 files + specs\ folder
 ```
 
 **Unix:**
@@ -93,7 +94,7 @@ ls ~/.claude/commands/sd/      # 13 .md files
 ls ~/.claude/agents/sd/        # 6 .md files
 ls ~/.claude/hooks/sd/         # 3 .sh files (executable)
 ls -l ~/.claude/hooks/sd/      # confirm +x bits set
-ls ~/.claude/templates/sd/     # 4 files + specs/ folder
+ls ~/.claude/templates/sd/     # 5 files + specs/ folder
 ```
 
 Then in a real project:

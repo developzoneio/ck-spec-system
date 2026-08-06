@@ -34,6 +34,12 @@ EXPECTED_SKILLS="$(find "$repo_root/skills" -mindepth 2 -maxdepth 2 -type f -nam
 EXPECTED_HOOKS="$(find "$repo_root/hooks/bash" -maxdepth 1 -type f -name '*.sh' | wc -l | tr -d ' ')"
 EXPECTED_TEMPLATES="$(find "$repo_root/templates" -type f | wc -l | tr -d ' ')"
 
+# The version stamp has no source-tree counterpart - it is generated at install time from
+# CHANGELOG.md, never copied from a source dir - so unlike the counts above it cannot be
+# derived from a glob. This is the one hand-written constant Check 5 uses: how many stamp
+# files land per installed area.
+STAMP_FILES_PER_AREA=1
+
 for pair in "commands:$EXPECTED_COMMANDS" "agents:$EXPECTED_AGENTS" "skills:$EXPECTED_SKILLS" \
     "hooks:$EXPECTED_HOOKS" "templates:$EXPECTED_TEMPLATES"; do
     if [[ "${pair#*:}" -eq 0 ]]; then
@@ -160,29 +166,171 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 section "Check 5/8: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
-cleanup_tmp() { [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true; }
+tmp_nc_src="${TMPDIR:-/tmp}/sd-validate-nc-src-$$"
+tmp_nc_base="${TMPDIR:-/tmp}/sd-validate-nc-base-$$"
+cleanup_tmp() {
+    [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true
+    [[ -n "${tmp_nc_src:-}" && -d "$tmp_nc_src" ]] && rm -rf "$tmp_nc_src" || true
+    [[ -n "${tmp_nc_base:-}" && -d "$tmp_nc_base" ]] && rm -rf "$tmp_nc_base" || true
+}
 trap cleanup_tmp EXIT
-rm -rf "$tmp"
+rm -rf "$tmp" "$tmp_nc_src" "$tmp_nc_base"
+# Counts files under dir and compares against expected, reporting through the same
+# fail/ok/add_failure vocabulary as every other check. Reused below for both the
+# fresh install and the idempotent re-run, so both runs are asserted through one
+# code path rather than two hand-copied loops.
+check_count() {
+    local name="$1" dir="$2" expected="$3" cnt=0
+    if [[ -d "$dir" ]]; then cnt="$(find "$dir" -type f | wc -l | tr -d ' ')"; fi
+    if [[ "$cnt" -eq "$expected" ]]; then
+        ok "$name/sd : $cnt file(s)"
+    else
+        fail "$name/sd : expected $expected, found $cnt"
+        add_failure "install: $name/sd expected $expected found $cnt"
+    fi
+}
 if bash "$install_sh" --base-path "$tmp" --force >/dev/null 2>&1; then
-    check_count() {
-        local name="$1" dir="$2" expected="$3" cnt=0
-        if [[ -d "$dir" ]]; then cnt="$(find "$dir" -type f | wc -l | tr -d ' ')"; fi
-        if [[ "$cnt" -eq "$expected" ]]; then
-            ok "$name/sd : $cnt file(s)"
-        else
-            fail "$name/sd : expected $expected, found $cnt"
-            add_failure "install: $name/sd expected $expected found $cnt"
+    EXPECTED_COMMANDS_WITH_STAMP=$((EXPECTED_COMMANDS + STAMP_FILES_PER_AREA))
+    EXPECTED_AGENTS_WITH_STAMP=$((EXPECTED_AGENTS + STAMP_FILES_PER_AREA))
+    EXPECTED_SKILLS_WITH_STAMP=$((EXPECTED_SKILLS + STAMP_FILES_PER_AREA))
+    EXPECTED_HOOKS_WITH_STAMP=$((EXPECTED_HOOKS + STAMP_FILES_PER_AREA))
+    EXPECTED_TEMPLATES_WITH_STAMP=$((EXPECTED_TEMPLATES + STAMP_FILES_PER_AREA))
+    check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS_WITH_STAMP"
+    check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS_WITH_STAMP"
+    check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS_WITH_STAMP"
+    check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS_WITH_STAMP"
+    check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES_WITH_STAMP"
+
+    # ---- stamp content: every area's stamp equals the CHANGELOG-derived version ----
+    stamp_changelog="$repo_root/CHANGELOG.md"
+    stamp_version=""
+    stamp_release_line="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$stamp_changelog" || true)"
+    if [[ "$stamp_release_line" =~ \[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+        stamp_version="${BASH_REMATCH[1]}"
+    fi
+    if [[ -z "$stamp_version" ]]; then
+        fail "CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)"
+        add_failure "install: stamp version source unreadable"
+    else
+        stamp_bad=0
+        for area_dir in commands agents skills hooks templates; do
+            stamp_file="$tmp/$area_dir/sd/specwright-version.txt"
+            if [[ ! -f "$stamp_file" ]]; then
+                fail "$area_dir/sd/specwright-version.txt : not found"
+                add_failure "install: $area_dir/sd stamp missing"
+                stamp_bad=$((stamp_bad + 1))
+                continue
+            fi
+            # Tolerate a stray trailing CR on read - the byte contract itself is
+            # asserted below on one stamp; this comparison only cares about content.
+            stamp_content="$(cat "$stamp_file")"
+            stamp_content="${stamp_content%$'\r'}"
+            if [[ "$stamp_content" != "$stamp_version" ]]; then
+                fail "$area_dir/sd/specwright-version.txt : content '$stamp_content' != CHANGELOG version '$stamp_version'"
+                add_failure "install: $area_dir/sd stamp content mismatch"
+                stamp_bad=$((stamp_bad + 1))
+            fi
+        done
+        if [[ $stamp_bad -eq 0 ]]; then ok "5 stamp(s) match CHANGELOG version $stamp_version"; fi
+
+        # Byte-level contract on one stamp (commands): no BOM, no CR, exactly one trailing LF.
+        byte_stamp="$tmp/commands/sd/specwright-version.txt"
+        if [[ -f "$byte_stamp" ]]; then
+            read -r -a stamp_bytes <<< "$(od -A n -v -t x1 "$byte_stamp")"
+            byte_count=${#stamp_bytes[@]}
+            has_bom=0
+            if [[ $byte_count -ge 3 && "${stamp_bytes[0]}" == "ef" && "${stamp_bytes[1]}" == "bb" && "${stamp_bytes[2]}" == "bf" ]]; then
+                has_bom=1
+            fi
+            has_cr=0
+            for b in "${stamp_bytes[@]}"; do
+                if [[ "$b" == "0d" ]]; then has_cr=1; break; fi
+            done
+            ends_with_lf=0
+            double_lf=0
+            if [[ $byte_count -gt 0 && "${stamp_bytes[$((byte_count - 1))]}" == "0a" ]]; then
+                ends_with_lf=1
+                if [[ $byte_count -gt 1 && "${stamp_bytes[$((byte_count - 2))]}" == "0a" ]]; then
+                    double_lf=1
+                fi
+            fi
+            if [[ $has_bom -eq 1 || $has_cr -eq 1 || $ends_with_lf -eq 0 || $double_lf -eq 1 ]]; then
+                fail "commands/sd/specwright-version.txt : byte contract violated (BOM=$has_bom CR=$has_cr trailingLF=$ends_with_lf doubleLF=$double_lf)"
+                add_failure "install: commands/sd stamp byte contract"
+            else
+                ok "commands/sd/specwright-version.txt : LF, no BOM, no CR, single trailing newline"
+            fi
         fi
-    }
-    check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS"
-    check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS"
-    check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS"
-    check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS"
-    check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES"
+    fi
+
+    # ---- idempotent re-run: second --force pass must be a no-op for the stamp ----
+    if bash "$install_sh" --base-path "$tmp" --force >/dev/null 2>&1; then
+        bak_count="$(find "$tmp" -type f -name '*.bak.*' | wc -l | tr -d ' ')"
+        if [[ "$bak_count" -gt 0 ]]; then
+            fail "second install run created $bak_count *.bak.* file(s) - stamp is not idempotent"
+            add_failure "install: second run produced .bak files"
+        else
+            ok "second --force run created zero *.bak.* file(s)"
+        fi
+        check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS_WITH_STAMP"
+        check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS_WITH_STAMP"
+        check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS_WITH_STAMP"
+        check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS_WITH_STAMP"
+        check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES_WITH_STAMP"
+    else
+        fail "second installer run failed: bash install.sh --base-path <tmp> --force"
+        add_failure "install: second installer run returned non-zero"
+    fi
 else
     fail "installer failed: bash install.sh --base-path <tmp> --force"
     add_failure "install: installer returned non-zero"
 fi
+
+# ---- negative case: missing version source fails loudly, copies nothing ----
+# The required-source-directory list is mirrored FROM install.sh's own
+# REQUIRED_DIRS array, not hand-duplicated here, so a future added requirement
+# fails this scenario visibly instead of silently changing what it proves.
+required_dirs=()
+while IFS= read -r rd; do
+    required_dirs+=("$rd")
+done < <(grep -m1 '^REQUIRED_DIRS=' "$install_sh" | grep -oE '"[^"]+"' | tr -d '"')
+if [[ ${#required_dirs[@]} -eq 0 ]]; then
+    fail "install.sh : could not parse REQUIRED_DIRS - missing-CHANGELOG scenario skipped"
+    add_failure "install: could not parse install.sh required dirs"
+else
+    mkdir -p "$tmp_nc_src/install"
+    cp "$install_sh" "$tmp_nc_src/install/install.sh"
+    for d in "${required_dirs[@]}"; do
+        mkdir -p "$tmp_nc_src/$d"
+    done
+    nc_out=""
+    nc_exit=0
+    nc_out="$(bash "$tmp_nc_src/install/install.sh" --base-path "$tmp_nc_base" --force 2>&1)" || nc_exit=$?
+    nc_bad=0
+    if [[ $nc_exit -eq 0 ]]; then
+        fail "missing-CHANGELOG scenario: installer exited 0, expected non-zero"
+        add_failure "install: missing-changelog scenario did not fail"
+        nc_bad=$((nc_bad + 1))
+    fi
+    if [[ "$nc_out" != *"CHANGELOG.md"* ]]; then
+        fail "missing-CHANGELOG scenario: installer output did not mention CHANGELOG.md"
+        add_failure "install: missing-changelog scenario message missing CHANGELOG.md"
+        nc_bad=$((nc_bad + 1))
+    fi
+    nc_file_count=0
+    if [[ -d "$tmp_nc_base" ]]; then
+        nc_file_count="$(find "$tmp_nc_base" -type f | wc -l | tr -d ' ')"
+    fi
+    if [[ "$nc_file_count" -ne 0 ]]; then
+        fail "missing-CHANGELOG scenario: base contains $nc_file_count file(s), expected 0"
+        add_failure "install: missing-changelog scenario copied files"
+        nc_bad=$((nc_bad + 1))
+    fi
+    if [[ $nc_bad -eq 0 ]]; then
+        ok "missing-CHANGELOG.md scenario: installer failed loudly and copied nothing"
+    fi
+fi
+
 cleanup_tmp
 trap - EXIT
 
@@ -306,6 +454,31 @@ else
         q_set "$area_name" "$area_count"
     done < <(mjq '.areas | to_entries[] | "\(.key)\t\(if .value.glob then "glob" else "files" end)\t\(.value.glob // (.value.files | join(" ")))"')
     shopt -u nullglob
+
+    # Stamp count is a THIRD kind of quantity here: not read from a source-tree glob (there
+    # is no stamp source dir) but derived from areas.*.installTo - one stamp lands in each
+    # distinct '<area>/sd/' root the installer writes to. Seeded here, before the derived
+    # loop, so derived.installTotalWithStamps can reference it without depending on JSON key
+    # order, and it self-corrects if an area is added or removed. Plain string + word-split,
+    # not an array: an empty array under `set -u` is not safe on bash 3.2 (macOS).
+    install_roots=""
+    while IFS= read -r install_to; do
+        [[ -z "$install_to" ]] && continue
+        seg1="${install_to%%/*}"
+        rest="${install_to#*/}"
+        seg2="${rest%%/*}"
+        [[ -z "$seg2" ]] && continue
+        root="$seg1/$seg2"
+        case " $install_roots " in
+            *" $root "*) ;;
+            *) install_roots="$install_roots $root" ;;
+        esac
+    done < <(mjq '.areas | to_entries[] | .value.installTo // empty')
+    install_stamps=0
+    for r in $install_roots; do
+        install_stamps=$((install_stamps + 1))
+    done
+    q_set "installStamps" "$install_stamps"
 
     while IFS=$'\t' read -r der_name der_parts; do
         der_total=0

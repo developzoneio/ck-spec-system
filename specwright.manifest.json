@@ -76,6 +76,15 @@
       "hooksPowerShell",
       "templatesSetup",
       "templatesSpec"
+    ],
+    "installTotalWithStamps": [
+      "commands",
+      "agents",
+      "skills",
+      "hooksPowerShell",
+      "templatesSetup",
+      "templatesSpec",
+      "installStamps"
     ]
   },
 
@@ -112,7 +121,8 @@
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) templates",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?skills",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?rule packs",
-    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) hard gates?"
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) hard gates?",
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) version stamps?"
   ],
 
   "$claimPhrasesComment": [
@@ -205,7 +215,8 @@
     { "file": "install/README.md", "pattern": "`templates/sd/` \\| ([0-9]+) \\+ [0-9]+ \\|", "equals": "templatesSetup" },
     { "file": "install/README.md", "pattern": "`templates/sd/` \\| [0-9]+ \\+ ([0-9]+) \\|", "equals": "templatesSpec" },
     { "file": "install/README.md", "pattern": "^\\| `skills/` \\| `skills/sd/` \\| ([0-9]+) \\|", "equals": "skills" },
-    { "file": "install/README.md", "pattern": "\\*\\*Total\\*\\*: ([0-9]+) files per OS", "equals": "installTotal" },
+    { "file": "install/README.md", "pattern": "^\\| _\\(generated at install\\)_ \\| `<area>/sd/specwright-version\\.txt` \\| ([0-9]+) \\|", "equals": "installStamps" },
+    { "file": "install/README.md", "pattern": "\\*\\*Total\\*\\*: ([0-9]+) files per OS", "equals": "installTotalWithStamps" },
 
     { "file": "docs/architecture.md", "pattern": "commands/sd/ +([0-9]+) workflow definitions", "equals": "commands" },
     { "file": "docs/architecture.md", "pattern": "agents/sd/ +([0-9]+) subagent prompt files", "equals": "agents" },

@@ -144,6 +144,12 @@ jobs:
           for area in commands agents hooks templates skills; do
             test ! -d "$base/$area/sd" || { echo "FAIL: $area/sd survived uninstall"; exit 1; }
           done
+          remaining="$(find "$base" -type f)"
+          if [ -n "$remaining" ]; then
+            echo "FAIL: files survived uninstall:"
+            echo "$remaining"
+            exit 1
+          fi
           rm -rf "$base"
           echo "round-trip OK"
 
@@ -164,5 +170,7 @@ jobs:
           foreach ($area in 'commands','agents','hooks','templates','skills') {
             if (Test-Path "$base/$area/sd") { Write-Error "FAIL: $area/sd survived uninstall"; exit 1 }
           }
+          $remaining = Get-ChildItem -LiteralPath $base -Recurse -File -Force
+          if ($remaining) { Write-Error "FAIL: files survived uninstall:`n$($remaining.FullName -join "`n")"; exit 1 }
           Remove-Item -Recurse -Force $base
           Write-Host 'round-trip OK'

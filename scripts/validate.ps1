@@ -47,6 +47,12 @@ $ExpectedSkills    = (Get-ChildItem (Join-Path $repoRoot 'skills') -Filter 'SKIL
 $ExpectedHooks     = (Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File).Count
 $ExpectedTemplates = (Get-ChildItem (Join-Path $repoRoot 'templates') -File -Recurse).Count
 
+# The version stamp has no source-tree counterpart - it is generated at install time from
+# CHANGELOG.md, never copied from a source dir - so unlike the counts above it cannot be
+# derived from a glob. This is the one hand-written constant Check 5 uses: how many stamp
+# files land per installed area.
+$StampFilesPerArea = 1
+
 foreach ($pair in @(
     @{ Name = 'commands';  Count = $ExpectedCommands },
     @{ Name = 'agents';    Count = $ExpectedAgents },
@@ -117,6 +123,24 @@ function Find-WorkingBash {
         }
     }
     return $null
+}
+
+# Counts files under Dir and compares against Expected, reporting through the same
+# Write-Ok / Write-FailMsg / Add-Failure vocabulary as every other check. Reused by
+# Check 5 for both the fresh install and the idempotent re-run, so both runs are
+# asserted through one code path rather than two hand-copied loops.
+function Test-AreaCount {
+    param([string]$Name, [string]$Dir, [int]$Expected)
+    $cnt = 0
+    if (Test-Path -LiteralPath $Dir) {
+        $cnt = (Get-ChildItem -LiteralPath $Dir -Recurse -File).Count
+    }
+    if ($cnt -eq $Expected) {
+        Write-Ok "$Name/sd : $cnt file(s)"
+    } else {
+        Write-FailMsg "$Name/sd : expected $Expected, found $cnt"
+        Add-Failure "install: $Name/sd expected $Expected found $cnt"
+    }
 }
 
 Write-Section 'specwright validate'
@@ -219,9 +243,13 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 Write-Section 'Check 5/8: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
+$tmpNc = Join-Path $env:TEMP "sd-validate-nc-$PID"
+$tmpNcBase = Join-Path $env:TEMP "sd-validate-nc-base-$PID"
 $psExe = (Get-Process -Id $PID).Path
 try {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -Recurse -Force $tmp }
+    if (Test-Path -LiteralPath $tmpNc) { Remove-Item -Recurse -Force $tmpNc }
+    if (Test-Path -LiteralPath $tmpNcBase) { Remove-Item -Recurse -Force $tmpNcBase }
     if ($env:OS -eq 'Windows_NT') {
         $childArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installPs1, '-BasePath', $tmp, '-Force')
     } else {
@@ -233,29 +261,142 @@ try {
         Add-Failure "install: installer exit $LASTEXITCODE"
     } else {
         $targets = @(
-            [pscustomobject]@{ Name = 'commands';  Path = 'commands\sd';  Expected = $ExpectedCommands },
-            [pscustomobject]@{ Name = 'agents';    Path = 'agents\sd';    Expected = $ExpectedAgents },
-            [pscustomobject]@{ Name = 'skills';    Path = 'skills\sd';    Expected = $ExpectedSkills },
-            [pscustomobject]@{ Name = 'hooks';     Path = 'hooks\sd';     Expected = $ExpectedHooks },
-            [pscustomobject]@{ Name = 'templates'; Path = 'templates\sd'; Expected = $ExpectedTemplates }
+            [pscustomobject]@{ Name = 'commands';  Path = 'commands\sd';  Expected = $ExpectedCommands  + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'agents';    Path = 'agents\sd';    Expected = $ExpectedAgents    + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'skills';    Path = 'skills\sd';    Expected = $ExpectedSkills    + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'hooks';     Path = 'hooks\sd';     Expected = $ExpectedHooks     + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'templates'; Path = 'templates\sd'; Expected = $ExpectedTemplates + $StampFilesPerArea }
         )
         foreach ($t in $targets) {
-            $full = Join-Path $tmp $t.Path
-            if (Test-Path -LiteralPath $full) {
-                $cnt = (Get-ChildItem -LiteralPath $full -Recurse -File).Count
-            } else {
-                $cnt = 0
+            Test-AreaCount -Name $t.Name -Dir (Join-Path $tmp $t.Path) -Expected $t.Expected
+        }
+
+        # ---- stamp content: every area's stamp equals the CHANGELOG-derived version ----
+        $stampChangelog = Join-Path $repoRoot 'CHANGELOG.md'
+        $stampVersion = $null
+        foreach ($line in (Get-Content -LiteralPath $stampChangelog)) {
+            $m = [regex]::Match($line, '^##\s+\[([0-9]+\.[0-9]+\.[0-9]+)\]\s+-\s+\S')
+            if ($m.Success) { $stampVersion = $m.Groups[1].Value; break }
+        }
+        if ([string]::IsNullOrEmpty($stampVersion)) {
+            Write-FailMsg 'CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)'
+            Add-Failure 'install: stamp version source unreadable'
+        } else {
+            $stampBad = 0
+            foreach ($t in $targets) {
+                $stampPath = Join-Path (Join-Path $tmp $t.Path) 'specwright-version.txt'
+                if (-not (Test-Path -LiteralPath $stampPath -PathType Leaf)) {
+                    Write-FailMsg "$($t.Name)/sd/specwright-version.txt : not found"
+                    Add-Failure "install: $($t.Name)/sd stamp missing"
+                    $stampBad++
+                    continue
+                }
+                # Tolerate a stray trailing CR on read - the byte contract itself is
+                # asserted below on one stamp; this comparison only cares about content.
+                $stampContent = (Get-Content -LiteralPath $stampPath -Raw) -replace '[\r\n]+$', ''
+                if ($stampContent -ne $stampVersion) {
+                    Write-FailMsg "$($t.Name)/sd/specwright-version.txt : content '$stampContent' != CHANGELOG version '$stampVersion'"
+                    Add-Failure "install: $($t.Name)/sd stamp content mismatch"
+                    $stampBad++
+                }
             }
-            if ($cnt -eq $t.Expected) {
-                Write-Ok "$($t.Name)/sd : $cnt file(s)"
-            } else {
-                Write-FailMsg "$($t.Name)/sd : expected $($t.Expected), found $cnt"
-                Add-Failure "install: $($t.Name)/sd expected $($t.Expected) found $cnt"
+            if ($stampBad -eq 0) { Write-Ok "5 stamp(s) match CHANGELOG version $stampVersion" }
+
+            # Byte-level contract on one stamp (commands): no BOM, no CR, exactly one trailing LF.
+            $byteStampPath = Join-Path (Join-Path $tmp 'commands\sd') 'specwright-version.txt'
+            if (Test-Path -LiteralPath $byteStampPath -PathType Leaf) {
+                $stampBytes = [System.IO.File]::ReadAllBytes($byteStampPath)
+                $hasBom = ($stampBytes.Length -ge 3) -and ($stampBytes[0] -eq 0xEF) -and ($stampBytes[1] -eq 0xBB) -and ($stampBytes[2] -eq 0xBF)
+                $hasCr = $stampBytes -contains 0x0D
+                $endsWithLf = ($stampBytes.Length -gt 0) -and ($stampBytes[$stampBytes.Length - 1] -eq 0x0A)
+                $doubleLf = ($stampBytes.Length -gt 1) -and ($stampBytes[$stampBytes.Length - 2] -eq 0x0A)
+                if ($hasBom -or $hasCr -or (-not $endsWithLf) -or $doubleLf) {
+                    Write-FailMsg "commands/sd/specwright-version.txt : byte contract violated (BOM=$hasBom CR=$hasCr trailingLF=$endsWithLf doubleLF=$doubleLf)"
+                    Add-Failure 'install: commands/sd stamp byte contract'
+                } else {
+                    Write-Ok 'commands/sd/specwright-version.txt : LF, no BOM, no CR, single trailing newline'
+                }
             }
+        }
+
+        # ---- idempotent re-run: second -Force pass must be a no-op for the stamp ----
+        & $psExe @childArgs *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-FailMsg "second installer run exited with code $LASTEXITCODE"
+            Add-Failure "install: second installer run exit $LASTEXITCODE"
+        } else {
+            $bakFiles = @(Get-ChildItem -LiteralPath $tmp -Recurse -File -Filter '*.bak.*' -ErrorAction SilentlyContinue)
+            if ($bakFiles.Count -gt 0) {
+                Write-FailMsg "second install run created $($bakFiles.Count) *.bak.* file(s) - stamp is not idempotent"
+                Add-Failure 'install: second run produced .bak files'
+            } else {
+                Write-Ok 'second -Force run created zero *.bak.* file(s)'
+            }
+            foreach ($t in $targets) {
+                Test-AreaCount -Name $t.Name -Dir (Join-Path $tmp $t.Path) -Expected $t.Expected
+            }
+        }
+    }
+
+    # ---- negative case: missing version source fails loudly, copies nothing ----
+    # The required-source-directory list is mirrored FROM install.ps1's own
+    # $requiredDirs block, not hand-duplicated here, so a future added requirement
+    # fails this scenario visibly instead of silently changing what it proves.
+    $reqDirsFromInstaller = New-Object System.Collections.Generic.List[string]
+    $inReqBlock = $false
+    foreach ($line in (Get-Content -LiteralPath $installPs1)) {
+        if ($line -match '^\$requiredDirs\s*=\s*@\(') { $inReqBlock = $true; continue }
+        if ($inReqBlock) {
+            if ($line -match '^\)') { break }
+            $m = [regex]::Match($line, "Path\s*=\s*'([^']+)'")
+            if ($m.Success) { $reqDirsFromInstaller.Add($m.Groups[1].Value) }
+        }
+    }
+    if ($reqDirsFromInstaller.Count -eq 0) {
+        Write-FailMsg 'install.ps1 : could not parse $requiredDirs - missing-CHANGELOG scenario skipped'
+        Add-Failure 'install: could not parse install.ps1 required dirs'
+    } else {
+        New-Item -ItemType Directory -Path (Join-Path $tmpNc 'install') -Force | Out-Null
+        Copy-Item -LiteralPath $installPs1 -Destination (Join-Path $tmpNc 'install\install.ps1') -Force
+        foreach ($d in $reqDirsFromInstaller) {
+            New-Item -ItemType Directory -Path (Join-Path $tmpNc $d) -Force | Out-Null
+        }
+        $ncInstallPs1 = Join-Path $tmpNc 'install\install.ps1'
+        if ($env:OS -eq 'Windows_NT') {
+            $ncArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ncInstallPs1, '-BasePath', $tmpNcBase, '-Force')
+        } else {
+            $ncArgs = @('-NoProfile', '-File', $ncInstallPs1, '-BasePath', $tmpNcBase, '-Force')
+        }
+        $ncOut = & $psExe @ncArgs 2>&1 | Out-String
+        $ncExit = $LASTEXITCODE
+        $ncBad = 0
+        if ($ncExit -eq 0) {
+            Write-FailMsg 'missing-CHANGELOG scenario: installer exited 0, expected non-zero'
+            Add-Failure 'install: missing-changelog scenario did not fail'
+            $ncBad++
+        }
+        if ($ncOut -notmatch 'CHANGELOG\.md') {
+            Write-FailMsg 'missing-CHANGELOG scenario: installer output did not mention CHANGELOG.md'
+            Add-Failure 'install: missing-changelog scenario message missing CHANGELOG.md'
+            $ncBad++
+        }
+        $ncFileCount = 0
+        if (Test-Path -LiteralPath $tmpNcBase) {
+            $ncFileCount = (Get-ChildItem -LiteralPath $tmpNcBase -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+        }
+        if ($ncFileCount -ne 0) {
+            Write-FailMsg "missing-CHANGELOG scenario: base contains $ncFileCount file(s), expected 0"
+            Add-Failure 'install: missing-changelog scenario copied files'
+            $ncBad++
+        }
+        if ($ncBad -eq 0) {
+            Write-Ok 'missing-CHANGELOG.md scenario: installer failed loudly and copied nothing'
         }
     }
 } finally {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $tmpNc) { Remove-Item -Recurse -Force $tmpNc -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $tmpNcBase) { Remove-Item -Recurse -Force $tmpNcBase -ErrorAction SilentlyContinue }
 }
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
@@ -331,6 +472,22 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
         }
         $quantities[$areaName] = $areaCount
     }
+
+    # Stamp count is a THIRD kind of quantity here: not read from a source-tree glob (there
+    # is no stamp source dir) but derived from areas.*.installTo - one stamp lands in each
+    # distinct '<area>/sd/' root the installer writes to. Seeded here, before the derived
+    # loop, so derived.installTotalWithStamps can reference it without depending on JSON key
+    # order, and it self-corrects if an area is added or removed.
+    $installRoots = @()
+    foreach ($areaProp in $manifest.areas.PSObject.Properties) {
+        $installTo = $areaProp.Value.installTo
+        if ([string]::IsNullOrEmpty($installTo)) { continue }
+        $segments = @($installTo -split '/' | Where-Object { $_ -ne '' })
+        if ($segments.Count -lt 2) { continue }
+        $root = "$($segments[0])/$($segments[1])"
+        if ($installRoots -notcontains $root) { $installRoots += $root }
+    }
+    $quantities['installStamps'] = $installRoots.Count
 
     foreach ($derProp in $manifest.derived.PSObject.Properties) {
         $derTotal = 0

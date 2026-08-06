@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Install-time version stamp** (SW-29) - `install/install.ps1` / `install/install.sh` now write
+  `specwright-version.txt` into every installed `<area>/sd/` root, parsed at install time from the
+  newest dated `## [x.y.z] - <date>` heading in `CHANGELOG.md` - the same source `versionClaims`
+  already treats as canonical - so an installed engine can finally report which version it is
+  without a second version literal anywhere in the installer. LF, no BOM, US-ASCII, byte-identical
+  whichever installer writes it; a repeat install reports the stamp `identical` and skips it, and
+  `uninstall.ps1` / `uninstall.sh` remove it for free since it lives inside the `sd/` directory they
+  already delete recursively. Check 5 in `scripts/validate.ps1` / `scripts/validate.sh` now asserts
+  the stamp's presence, encoding, content and no-op/refresh behavior; the CI round-trip's install ->
+  uninstall step now verifies no engine-written file survives anywhere under the base path, not just
+  that the `sd/` directories are gone.
+
 - **`tests/e2e/`: headless behavioral eval harness for commands and gates** (SW-27). Where the rest
   of `scripts/`/`tests/` proves the engine's *assets* reference each other correctly, this drives
   real `claude -p` (headless) sessions against a throwaway copy of `examples/fixture-project` /
