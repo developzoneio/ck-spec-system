@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uninstall step now verifies no engine-written file survives anywhere under the base path, not just
   that the `sd/` directories are gone.
 
+- **`/sd:setup` reads the version stamp and reports engine/config drift** (SW-29). Phase 0 now
+  loads the installed `specwright-version.txt`; Phase 1.5's batch drift-check compares it against
+  `.claude/project-config.json`'s `version` field and generalizes the missing-field check into a
+  full template diff, so a project scaffolded under an older engine sees every gap, not just the
+  two fields the check used to hardcode. `version` is the one field the Apply step is allowed to
+  overwrite outside the project-specific preserve-list, since it is engine-tracked. Fresh scaffolds
+  (Phase 6) now stamp the real installed engine version instead of the template's literal `1.0.0`.
+  Also removes the dead `$schema` URL from `project-config.template.json` - no schema was ever
+  published at that path, and the org name in the URL didn't even match the real repo
+  (`Developzone` vs `developzoneio`); the drift-check now flags any leftover `$schema` key for
+  removal instead of a rewrite.
+
 - **`tests/e2e/`: headless behavioral eval harness for commands and gates** (SW-27). Where the rest
   of `scripts/`/`tests/` proves the engine's *assets* reference each other correctly, this drives
   real `claude -p` (headless) sessions against a throwaway copy of `examples/fixture-project` /

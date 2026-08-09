@@ -21,6 +21,9 @@ Scaffolds a project to use `specwright`. Safe to re-run: detects existing state 
    - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`). <!-- contract-lint: allow CL400 - a multi-stack detection heuristic enumerating several ecosystems' manifest filenames, not an assumption that any one of them applies -->
    - If nothing found -> warn and ask: "This directory does not appear to be a project root. Continue anyway? (yes / no)".
 3. Read `~/.claude/templates/sd/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
+4. Read `~/.claude/templates/sd/specwright-version.txt` into memory as "installed engine version". <!-- contract-lint: allow CL005 - specwright-version.txt is generated at install time from CHANGELOG.md, never a checked-in template source file -->
+   If missing or unreadable (engine installed before this stamp existed), record it as `<unknown>`
+   and do NOT abort Phase 0 over this file specifically - unlike the hard existence checks in step 1.
 
 ---
 
@@ -72,17 +75,26 @@ is generic, so future renames and newly-introduced template fields are caught th
 
 **B. `.claude/project-config.json`**
 
-4. **`$schema` URL (MEDIUM).** If it does not equal the template's `$schema`
-   (`.../Developzone/specwright/main/schema/...`), flag the rewrite. Catches the old
-   `.../NXTK/ck-spec-system/...` host/org/repo.
+4. **Stale `$schema` key (MEDIUM).** The current template publishes no `$schema` - no schema file
+   is published for it. If the file still has a `$schema` key (leftover from an older template,
+   e.g. the old `.../NXTK/ck-spec-system/...` host or the later dead `.../Developzone/specwright/...`
+   URL), flag it for removal.
 5. **Command/agent names in `_use` doc strings.** Scan every `_use` / `_*_use` string under
    `mcp.*`, `ticket.*`, `hooks.*`, `paths.*`. Flag old-namespace tokens: `/ck:*` -> `/sd:*` and
    `ck:<role>` / `ck-<role>` -> `sd-<role>`. Rewrite only the token, preserving the rest of the
    wording.
-6. **Missing newly-introduced fields.** Flag template keys the file lacks - currently
-   `ticket.snapshot` (whole object) and `paths.layers` + `paths._layers_use`. Add each from the
-   template's default; `paths.layers` defaults to `[]` (never invent a layer map here - that is
-   Phase 2.5's job on a real scaffold).
+6. **Version gap and missing newly-introduced fields.** Two related sub-findings:
+   - **Version gap.** Compare the file's `version` against the "installed engine version" read in
+     Phase 0. If the installed engine is newer (or the file's version is missing/unrecognized),
+     record `version: <old> -> <new>`. Skip this sub-finding if the installed engine version is
+     `<unknown>`.
+   - **Field diff.** Diff every top-level and nested key of the loaded `project-config.template.json`
+     against the file, excluding: placeholder-only differences (`<<...>>` tokens), and every
+     project-specific value already carved out below (project name/owner/repo, ticket settings,
+     detected commands/paths, filled `paths.layers`, MCP `enabled` flags, `specGate.mode`). Flag
+     any template key genuinely absent from the file, adding each from the template's default;
+     `paths.layers` defaults to `[]` (never invent a layer map here - that is Phase 2.5's job on a
+     real scaffold).
 7. **Pinned model IDs -> aliases.** Under `models.*`, flag any dated/versioned ID
    (`claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, ...) and map to the family alias
    (`claude-sonnet-*` -> `sonnet`, `claude-haiku-*` -> `haiku`, `claude-opus-*` -> `opus`). Leave
@@ -134,7 +146,9 @@ This is a confirmation of a batch, not a 4th interrogation question - the 3-ques
    place; add missing keys/blocks from the template at their template position. Do NOT reformat
    untouched content, reorder keys, drop `_`-prefixed comment keys, or change any project-specific
    value (project name, ticket settings, detected commands/paths, filled layers, MCP `enabled`
-   flags, `specGate.mode`). Preserve unfilled `<<placeholder>>` tokens.
+   flags, `specGate.mode`). Preserve unfilled `<<placeholder>>` tokens. Exception: `version` is
+   engine-tracked, not project-specific - when the item-6 version-gap sub-finding is approved,
+   overwrite the file's `version` with the installed engine version from Phase 0.
 3. Validate each patched file still parses as JSON (mirrors Phase 7) and re-run the
    hook-resolution check; report backups written, change counts per file, and post-migration hook
    resolution. Tell the user to restart Claude Code so corrected hooks are picked up.
@@ -287,6 +301,8 @@ Active specs (auto-updated by /sd:spec status transitions):
 
 1. Create `.claude/` directory if missing.
 2. Write `.claude/project-config.json` from `~/.claude/templates/sd/project-config.template.json`:
+   - Set `version` to the installed engine version read in Phase 0 (not the template's literal
+     `1.0.0`).
    - Substitute project name, owner (from git config), repo URL (from git remote).
    - Set `ticket.system`, `ticket.pattern`, `ticket.baseUrl` from Phase 3 Q1/Q2.
    - Set `commands.{build,test,lint,coverage,run}` from Phase 2.5 detected facts; any command not

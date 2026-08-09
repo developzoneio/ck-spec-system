@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Developzone/specwright/main/schema/project-config.schema.json",
   "version": "1.0.0",
 
   "project": {
