@@ -317,8 +317,13 @@ sequence over the generic spec machinery:
    it (frontmatter provenance, the behavioral contract, and the three fidelity tables - see the
    **sd-port-fidelity** skill for their column schemas).
 2. Add the new spec's row to `.specs/index.md`.
-3. Capture the donor snapshot under `.specs/<PORT-ID>/04-artifacts/source/`, with a `MANIFEST.md`
-   recording each file's donor path, commit, byte hash, and member line ranges.
+3. Capture the donor side: run `\sd:explore --port <entry point> --scope <scope>
+   [--snapshot contract+source]` **in the donor repo** (a separate session - never load a host
+   project's `CLAUDE.md` or constitution alongside it). It writes a fixed-section contract, plus
+   - under `contract+source` - a `source/` bundle with `MANIFEST.md`, to the donor's own
+   `.specs/_explorations/`. Copy that bundle into `.specs/<PORT-ID>/04-artifacts/source/` in the
+   host repo - copying between the two repos is a manual or scripted step, not automated by
+   either command.
 4. **Freeze the snapshot**: append every file under `source/` plus `MANIFEST.md`, as individual
    literal paths, to `paths.protected` in `.claude/project-config.json`. `/sd:spec` cannot do this
    step itself (it never touches `.claude/`).

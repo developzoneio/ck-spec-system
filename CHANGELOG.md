@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`port-extract` TASK mode on `sd-code-explorer`, invoked from `/sd:explore --port`** (SW-39) -
+  the donor-side extraction half of the port workflow, consuming `sd-port-fidelity` (SW-37) and
+  feeding `PORT` spec authoring (SW-38). Eight fixed sections (Entry surface, Output surface,
+  Member closure, Complement set, Collaborators, Non-obvious invariants, Dead paths on this entry
+  point, Precedent conventions), each `file:line`-cited or explicitly `None found (searched:
+  ...)` - replacing the prior free-form `/sd:explore` prose contract whose gaps a host
+  implementer filled by invention. Member closure's `Donor path`/`Ordinal`/`Member` columns carry
+  over verbatim into the host's Member manifest table. Explorer's tool allowlist is unchanged (no
+  write tool added) - `/sd:explore` itself, not the agent, computes `source_commit` (`git
+  rev-parse HEAD`, with an explicit `dirty` sentence instead of a misleading sha when `git status
+  --porcelain` is non-empty), hashes, and copies donor files into
+  `.specs/_explorations/<slug>-<timestamp>/source/` plus a `MANIFEST.md` in the exact
+  `sd-port-fidelity` "Snapshot artifacts" format when `--snapshot contract+source` is passed -
+  matching how `impact-map`'s output is appended by the caller rather than written by the agent.
+  Output is stack-agnostic and donor-only; the host side of the bridge (copying the produced
+  folder into a `PORT` spec's `04-artifacts/source/`) stays a manual/scripted step, and reading a
+  donor from a host-rooted session stays out of scope - both per SW-39. The consumer that turns
+  this into an end-to-end pipeline is SW-41.
 - **`PORT` spec prefix, `port.template.md`, and snapshot artifact layout** (SW-38) - the authoring
   half of the port workflow, consuming `sd-port-fidelity` (SW-37). `PORT-<slug>-<YYYYMMDD>` joins
   `spec.prefixes` and every enumeration site (`commands/spec.md`, `commands/release.md`,

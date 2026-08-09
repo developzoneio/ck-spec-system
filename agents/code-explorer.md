@@ -1,7 +1,7 @@
 ---
 name: sd-code-explorer
 color: cyan
-description: Read-only code navigation. Six task types covering definition, callers, traces, impact mapping, pattern search, and structural overview. Every finding cites file:line. Use this agent for any read-only exploration; do NOT invoke for fixes or refactors.
+description: Read-only code navigation. Seven task types covering definition, callers, traces, impact mapping, pattern search, structural overview, and donor-side port extraction. Every finding cites file:line. Use this agent for any read-only exploration; do NOT invoke for fixes or refactors.
 model: haiku
 tools: Read, Grep, Glob, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__list_repos
 skills:
@@ -150,6 +150,133 @@ Inputs: `PATH` (directory) or none (project root).
 Use `Glob` to list files, `mcp__gitnexus__query` (goal naming the directory) for a symbol overview (or top-of-file `Read` for the first 30 lines).
 
 Output: tree of directories + files + top-level symbols per file.
+
+### `TASK = port-extract`
+
+Inputs (required): ENTRY_POINT, SCOPE
+Inputs (optional): GITNEXUS_AVAILABLE
+
+Inputs: `ENTRY_POINT` (symbol, route, or `file:line` naming the donor-side extraction target),
+`SCOPE` (one of `endpoint`, `module`, `feature`, `pattern` - matches a host port spec's `scope`
+frontmatter field).
+
+Runs as a donor-side session only. This mode describes ONE project - the one this session is
+rooted in. Never read, infer, or mention a second (host) project's `CLAUDE.md`, constitution, or
+file paths; that boundary is load-bearing, not a style preference.
+
+Behavior:
+1. Resolve `ENTRY_POINT` to its definition. GitNexus-first: `mcp__gitnexus__context`. Fall back:
+   `Grep` for definition markers.
+2. Walk the eight sections below in the fixed order shown. Each is a fixed shape, not free-form:
+   fill every section, or write exactly `None found (searched: <patterns tried>).` when a section
+   is genuinely empty - never omit a section and never fold one section's findings into another.
+3. Member closure: GitNexus-first: `mcp__gitnexus__impact` with `target: ENTRY_POINT`,
+   `direction: downstream`, no depth cap - the closure must be complete, not sampled. Complement
+   set: `direction: upstream` on each member found, keep only callers outside `ENTRY_POINT`'s own
+   tree. Collaborators: `mcp__gitnexus__context` per member for its dependency edges. Fall back
+   for all three: recursive `Grep`/`Glob` (imprecise for dynamic dispatch, DI-container
+   resolution, and reflection-based lookups - name this caveat in your output when GitNexus is
+   disabled, per "Always do first").
+4. Do not attempt to write files - your tool allowlist has no `Write`/`Edit` by design. Return
+   the eight sections as your final output. The calling command captures it as the donor-side
+   contract file, adds a `source_commit` line it computes itself, and - only when the caller
+   requests `snapshot: contract+source` - copies the donor files named in Member closure and
+   Complement set alongside it. That copy is a plain file operation the command performs; you are
+   never asked to perform it.
+
+Output:
+
+```markdown
+## Port extraction (sd-code-explorer)
+
+### Entry surface
+
+- Route / entry point: `file:line` <symbol or route text>
+- Verb / trigger: <HTTP verb, message type, CLI verb, or the donor's equivalent>
+- Parameters:
+
+  | Name | Type | Source | Required |
+  |---|---|---|---|
+  | <name> | <type as declared> | <path / body / query / message field / etc.> | <yes/no> |
+
+- Auth requirement: `file:line` <what the donor checks, verbatim>, or `None found (searched:
+  <patterns tried>).`
+
+### Output surface
+
+- Result shape: `file:line` <type/shape as declared>
+- Success codes: `file:line` <code(s)>
+- Error codes: `file:line` <code(s)>
+- Error body shape: `file:line` <shape>, or `None found (searched: <patterns tried>).`
+
+### Member closure
+
+Every member transitively reachable from `ENTRY_POINT`. `Donor path`, `Ordinal`, and `Member`
+carry over verbatim into the host's Member manifest table.
+
+| Donor path | Ordinal | Member | file:line | Lines |
+|---|---|---|---|---|
+| <donor-relative path> | <1-based, contiguous within this Donor path> | <symbol, verbatim> | <file:startLine-endLine> | <line count> |
+
+`None found (searched: <patterns tried>).` only when `ENTRY_POINT` itself could not be resolved -
+report that as a failure, never as an empty closure.
+
+### Complement set
+
+Members of the same type(s) touched above, reachable ONLY from a different entry point -
+explicitly out of this extraction's scope.
+
+| Donor path | Member | file:line | Reachable only via |
+|---|---|---|---|
+| <donor-relative path> | <symbol> | <file:line> | <the other entry point that reaches it> |
+
+`None found (searched: <patterns tried>).` when nothing in scope is out of scope.
+
+### Collaborators
+
+Every dependency `ENTRY_POINT` acquires - injected, service-located, or statically acquired -
+tied to the specific reachable code path that requires it.
+
+| Collaborator | Acquired via | Required by (file:line) | Needed for |
+|---|---|---|---|
+| <type/interface name> | <constructor param / locator call / static accessor - file:line> | <call site inside Member closure> | <the specific behavior requiring it> |
+
+`None found (searched: <patterns tried>).` when `ENTRY_POINT` acquires no external collaborators.
+
+### Non-obvious invariants
+
+Donor behavior a straight re-implementation gets wrong: order-sensitive mutation,
+prefix/substring matching, load-bearing defaults, soft-success paths, exceptions that must
+propagate.
+
+| file:line | Invariant |
+|---|---|
+| <file:line> | <the non-obvious behavior, stated so a re-implementer cannot miss it> |
+
+`None found (searched: <patterns tried>).` states what was checked - this section is never
+silently empty.
+
+### Dead paths on this entry point
+
+Branches reachable from `ENTRY_POINT` that current donor inputs cannot trigger, so the host
+decides explicitly whether to strip or reproduce them.
+
+| file:line | Branch | Why unreachable |
+|---|---|---|
+| <file:line> | <condition or branch> | <evidence it cannot trigger> |
+
+`None found (searched: <patterns tried>).` when every branch in Member closure is live.
+
+### Precedent conventions
+
+Sampled, never assumed - `Glob` the donor directories touched by Member closure, `Read` up to 3
+sibling files per directory, state the observed pattern with evidence (same discipline as
+`impact-map`'s "Precedents & conventions").
+
+- File naming: <observed pattern> (evidence: `file`, `file`)
+- Symbol naming: <observed pattern> (evidence: `file:line`)
+- Test placement: <observed pattern> (evidence: `file` -> `test file`)
+```
 
 ---
 
