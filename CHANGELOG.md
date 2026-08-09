@@ -304,6 +304,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under "Agents". No agent behaviour changed.
 
 ### Changed
+- **`README.md` cut from 390 to 263 lines (-33%) with no claim dropped.** The restructure below
+  fixed the *order* of the page but not its *volume*; a reader still scrolled past a lot of
+  repetition to reach the call to action. The redundancy was concentrated, not scattered:
+  - **`## Architecture highlights` was a near-copy of `## Why spec-driven?`** - three of its four
+    bullets restated hard gates, the cost model, and stack-agnosticism verbatim. The section is
+    gone; its one distinct idea (the three layers) is now a sentence in `## Why spec-driven?`, and
+    the 18-line ASCII diagram was dropped because `docs/architecture.md` already carries it.
+  - **`## Features` was a table of contents for the two tables beneath it** - all 14 command names
+    printed there and again in `## Commands`, all 6 agent names there and again in
+    `## Agents and skills`. The rows stay (they anchor `docClaims`); only the duplicated cell
+    contents were replaced with a pointer.
+  - **Fifteen `---` rules cost ~30 lines to draw a line GitHub already draws** under every `h2`.
+    All removed.
+  - Also: the spec-folder tree showed five spec types where one plus a note conveys the same shape,
+    the two install code blocks were merged into one, and the YAML frontmatter snippet was dropped
+    (it duplicates `docs/architecture.md`).
 - **`README.md` restructured to lead with evidence rather than inventory.** The page opened with a
   feature count and asked the reader to take 330 lines of tables on trust before showing a single
   line of output. It now opens with `## What it looks like` - a real Gate 1 spec-approval STOP and
