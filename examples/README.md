@@ -28,6 +28,10 @@ It covers:
 - [`spec-lint-fixture/`](spec-lint-fixture/) - a clean `.specs/` tree and a seeded-broken one for
   exercising `/sd:spec validate`. Backs the SW-4 acceptance criterion. Run by hand, not in CI -
   the linter is a prompt, so no script can execute it; the fixture README explains the trade-off.
+- [`port-parity-fixture/`](port-parity-fixture/) - matched clean and seeded-broken port trees over a
+  toolchain-free plain-text donor, for exercising `sd-reviewer`'s `port-parity` adjudication. Backs
+  the SW-40 acceptance criteria. Run by hand, not in CI, for the same reason `spec-lint-fixture` is:
+  the adjudicator is a prompt, so no script can execute it.
 
 ---
 

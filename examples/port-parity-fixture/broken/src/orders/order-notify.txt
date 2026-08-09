@@ -1,0 +1,29 @@
+member NotifyDispatch
+  1. build the dispatch message
+  2. send the dispatch message
+  3. log "Dispatch message sent for <reference>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --
+
+member HandleFailure
+  1. send the failure message
+  2. build the failure message
+  3. log "failure sent: <reference>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --
+
+member NotifyEscalation
+  1. check retry count against the escalation threshold
+  2. page the on-call queue
+  3. log "escalated: <reference>"
+end member

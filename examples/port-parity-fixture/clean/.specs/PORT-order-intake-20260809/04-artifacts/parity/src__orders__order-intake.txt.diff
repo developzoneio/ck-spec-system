@@ -1,0 +1,22 @@
+--- examples/port-parity-fixture/clean/.specs/PORT-order-intake-20260809/04-artifacts/source/orders/order-intake.txt	2026-08-09 18:07:35.902512800 +0700
++++ examples/port-parity-fixture/clean/src/orders/order-intake.txt	2026-08-09 18:07:38.605667300 +0700
+@@ -1,8 +1,8 @@
+ member CreateOrder
+   1. trim the customer reference
+   2. reject an empty reference
+-  3. reject a reference already in ledger
+-  4. append the order to ledger
++  3. reject a reference already in orderLedger
++  4. append the order to orderLedger
+   5. log "order accepted: <reference>"
+ end member
+ 
+@@ -12,7 +12,7 @@
+ -- this block is unchanged across every donor/host pair. --
+ -- no further remarks. --
+ 
+-member ValidateTotals
++member CheckTotals
+   1. sum the line amounts
+   2. compare the sum to the declared total
+   3. reject on mismatch

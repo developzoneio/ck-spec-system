@@ -1,0 +1,5 @@
+member AuditTrail
+  1. record the order id
+  2. record the timestamp
+  3. log "audit recorded: <reference>"
+end member

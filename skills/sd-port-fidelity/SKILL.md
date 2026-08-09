@@ -155,10 +155,36 @@ remains possible; consuming them is out of scope for this story.
 
 ---
 
+## Parity artifacts (main thread)
+
+The diff `sd-reviewer` adjudicates is produced by the main thread, never by an agent. The reviewer
+has no `Bash` and no write tool - that allowlist is what structurally stops the adjudicator from
+fixing what it judges - so the diff must already be a file on disk when the reviewer is invoked.
+
+Output root is `04-artifacts/parity/`, a sibling of the frozen `04-artifacts/source/`: same spec,
+same artifacts folder, evidence produced at a later phase by a different actor. Nothing under
+`parity/` is frozen or appended to `paths.protected` - it is regenerated on every parity run and
+overwrites the previous one.
+
+- One diff per non-`omit` path mapping row, snapshot side first, host side second, unified format,
+  at least 3 lines of context. File name is the `Host path` with `/` replaced by `__`, suffix
+  `.diff`.
+- A mapping row whose `Host path` does not exist still gets its diff - an all-deletion one. That is
+  what makes a `missing` member visible without the reviewer listing the host tree itself.
+- Every changeset file with no mapping row gets an all-addition diff, named the same way. Path
+  conformance is then a property of the diff set rather than a second traversal.
+- `INDEX.md` at the parity root, one row per diff file: `Diff file`, `Snapshot path`, `Host path`,
+  `Mapping row` (the path mapping row number, or `-` when there is none).
+
+`INDEX.md` is the reviewer's `DIFF_REF`. A run that cannot produce a diff for a row says so in that
+row's `Mapping row` cell instead of dropping the row - a silently absent row reads as a clean file.
+
+---
+
 ## Hunk classification (sd-reviewer)
 
 Classify every hunk of the port changeset into exactly one class. The vocabulary is closed - there
-is no fifth class and no "probably fine".
+is no sixth class and no "probably fine".
 
 | Class | Condition | Verdict |
 |---|---|---|
@@ -166,11 +192,41 @@ is no fifth class and no "probably fine".
 | `unjustified` | departs from the donor form with no deviation row covering it | BLOCK |
 | `missing` | a manifest member has no host counterpart and no `omitted` status | BLOCK |
 | `extra` | host content with no donor counterpart and no deviation row | BLOCK |
+| `overreached` | a deviation row covers the hunk, but the hunk changes more than that row's `Host form` states | BLOCK |
+
+`overreached` is where a rubber stamp hides: one legitimately cited rename carrying an unrelated
+reordering in the same hunk. Judge the hunk against the row's `Host form` text, never against the
+mere existence of a row.
+
+A `justified` hunk is a PASS and is not written up as a finding - report the count in the summary
+line. Listing them individually buries the BLOCKs they outnumber.
 
 Anchor every fidelity BLOCK to the port spec's fidelity acceptance criterion - a spec acceptance
 criterion is a legal anchor for a code target under **sd-severity-taxonomy**. Cite the deviation
 row, or its absence, as the supporting `file:line` per **sd-evidence-citation**. A deviation row is
 evidence; it is never the anchor by itself.
+
+### Whole-artifact checks
+
+Two checks no hunk class can express, because each is a property of the changeset as a whole. Both
+run once per parity review, both are BLOCK, and both are reported even when they pass - the count
+is the evidence the check ran.
+
+| Check | Question | Reported as |
+|---|---|---|
+| Member completeness | does every manifest row with `Status` `ported` or `deviated` have a host counterpart? | `<n>/<total> members present`, plus one BLOCK naming the `Donor path`, `Member` and `Ordinal` of each absent row |
+| Path conformance | does every changeset file appear as a `Host path` in the path mapping table? | one BLOCK per unmapped file, citing the file and the table it is missing from |
+
+Both belong to the reviewer rather than to `/sd:verify`, which decides everything from the spec's
+own artifacts and reads no host source - the reasoning is recorded in `docs/architecture.md`.
+
+### The parity gate
+
+A HARD gate. Any BLOCK from the classification or from either whole-artifact check refuses
+close-out. Two resolutions exist: revert the host toward the snapshot, or add a deviation row whose
+group and citation hold up, then regenerate the parity artifacts and re-run. There is no third, and
+no override - a gate that can be waived measures nothing. Deriving the missing rows from the
+unexplained hunks is not a resolution either; it makes the diff justify itself.
 
 ---
 

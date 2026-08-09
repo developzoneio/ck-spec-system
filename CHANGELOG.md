@@ -10,6 +10,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Port parity adjudication: `port-parity` TASK_TYPE on `sd-reviewer`, the parity diff artifact,
+  and the parity gate** (SW-40) - the enforcement half of the port epic and the only mechanism in
+  it that can see logic drift, structural mismatch, or silent simplification; test-green and
+  contract compliance are blind to all three, which left the fidelity rules from SW-37 as
+  honour-system prose. The main thread writes `04-artifacts/parity/`: one unified diff per
+  non-`omit` path mapping row, an all-deletion diff for a row whose host file is absent, an
+  all-addition diff for a changeset file with no row at all, plus `INDEX.md` listing them.
+  `sd-reviewer` consumes `INDEX.md` as `DIFF_REF` and classifies every hunk with
+  `sd-port-fidelity`'s vocabulary, now five classes rather than four. `overreached` is the new one -
+  a deviation row covers the hunk but the hunk changes more than that row's `Host form` states -
+  and it is the class a rubber stamp hides in. Two whole-artifact checks join it: member
+  completeness, reported as a count with each absent row named, and path conformance, one BLOCK per
+  unmapped changeset file. A `justified` hunk is a PASS and is deliberately NOT written up, so a
+  real BLOCK cannot drown in a list of accepted diffs. `templates/specs/port.template.md`'s fixed
+  AC-1 gains `overreached` and a `Host form`-covers-the-hunk clause: reworded to track the skill's
+  vocabulary, never renumbered, because the number is what every fidelity finding anchors to.
+  - **Diff generation stays on the main thread, enforced by the tool allowlist** - `sd-reviewer`
+    gains no `Bash` and no write tool and stays in `contractLint.readOnlyAgents` (CL201). The
+    reviewer that cannot produce the diff also cannot fix what the diff shows; adjudicating from a
+    file it did not write is the entire structural guarantee.
+  - **The `/sd:verify` overlap, decided before any checking logic was written** - member
+    completeness and path conformance stay with the reviewer and `/sd:verify` is untouched, no new
+    `VF0xx` rule. Rationale recorded in `docs/architecture.md`: `/sd:verify` decides everything from
+    `00-spec.md` and `02-tasks.md` with fixed regex shapes, and neither check can be decided that
+    way - one needs a member boundary recognized in an arbitrary host language, the other needs a
+    changeset input `/sd:verify` does not take.
+  - **Deliberately NOT built**: semantic equivalence checking, which is the behavior-pinning
+    phase's job rather than the diff's, and auto-generation of deviation rows from unexplained
+    hunks, which would let the diff justify itself and turn the gate into a rubber stamp. The gate
+    stays HARD with exactly two resolutions - revert the host toward the snapshot, or add a
+    deviation row whose group and citation hold up and re-run - and no override.
+  - **Known gap**: the pipeline command that would generate the parity artifacts and host the gate
+    is SW-41. Until it lands, diff generation is a documented manual step (AC-1 asks for it
+    documented, not automated) and the new mode is invoked by no command, so contract-lint reports
+    a `CL101` WARN for it, joining the ones `sd-code-explorer` and `sd-reviewer` already carry.
+    Recorded in `docs/troubleshooting.md`.
+- **`examples/port-parity-fixture/`** (SW-40) - matched `clean/` and `broken/` port trees over a
+  toolchain-free plain-text donor, following `spec-lint-fixture`'s convention: a README table of
+  expected findings and `<!-- SEEDED: ... -->` comments naming each defect. `broken/` seeds one
+  defect per BLOCK class plus both whole-artifact checks, and carries deviations that are correctly
+  cited and applied in `clean/` but exceeded in `broken/` - `overreached`, not a fourth unrelated
+  deviation, demonstrates the negative. Seed markers live in the spec rather than in the ported
+  files, because a comment line inside a host file is itself an `extra` hunk and would seed a
+  defect the table does not claim. Members are separated by an unchanged padding block so every
+  seed lands in its own diff hunk under the "at least 3 lines of context" convention, rather than
+  merging adjacent changes into one hunk that would need two classifications. Not run in CI, for
+  the same reason `spec-lint-fixture` is not: the adjudicator is a prompt, and a script able to run
+  it would be a second copy of the rules.
+- **`contractLint.budgets.skillsBytes` raised 10656 -> 12377** - `skills/sd-port-fidelity/SKILL.md`
+  absorbed the parity artifact layout, the fifth hunk class, both whole-artifact checks and the
+  gate, and takes over as its area's ratchet-setter from `sd-spec-templates`. `agentsBytes` is
+  unchanged on purpose: `agents/reviewer.md` grows to roughly 10.5k against the 15232 ceiling
+  `agents/spec-architect.md` still sets, so the sixth task type needed no headroom.
 - **`port-extract` TASK mode on `sd-code-explorer`, invoked from `/sd:explore --port`** (SW-39) -
   the donor-side extraction half of the port workflow, consuming `sd-port-fidelity` (SW-37) and
   feeding `PORT` spec authoring (SW-38). Eight fixed sections (Entry surface, Output surface,

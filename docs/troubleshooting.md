@@ -232,6 +232,19 @@ accompanying FEAT spec. The same cause explains why `prompt-router` injects no c
 in-progress `PORT-` spec and why `subagent-retro` selects no `port`-scoped lessons. Prefix
 recognition is planned for the port pipeline, not yet shipped.
 
+### The port parity diff has to be produced by hand
+
+**Cause**: `sd-reviewer`'s `port-parity` mode reads a diff artifact it cannot produce - it has no
+`Bash` and no write tool, deliberately, because the adjudicator must not be able to fix what it
+judges. The command that would produce the artifact, the port pipeline, is not built yet.
+
+**Fix**: generate `04-artifacts/parity/` yourself before invoking the reviewer - one unified diff
+per non-`omit` path mapping row (snapshot side first), an all-deletion diff for a row whose host
+file is absent, an all-addition diff for a changeset file with no row, and an `INDEX.md` listing
+them all. The exact layout is in `sd-port-fidelity`'s "Parity artifacts" section, and
+`examples/port-parity-fixture/` is a worked pair whose shape you can copy. The same gap is why
+`contract-lint` reports a `CL101` WARN for the `port-parity` mode: no command invokes it yet.
+
 ---
 
 ## Spec-gate blocking unexpectedly

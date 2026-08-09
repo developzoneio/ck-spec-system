@@ -53,6 +53,10 @@ linked_specs: []
      as an individual literal path to `paths.protected` in `.claude/project-config.json` - matching
      there is exact-string, not glob, so this is an enumeration, not a wildcard.
 
+     Parity artifacts: the snapshot-vs-host diffs the parity review reads live under
+     `04-artifacts/parity/`, are written by the main thread at the parity phase, and are NOT frozen
+     - see sd-port-fidelity's "Parity artifacts" section.
+
      Known limitation: spec-gate's in-progress-spec detection, prompt-router's context injection,
      and subagent-retro's lesson scoping do not yet recognize the `PORT-` prefix (it is hardcoded
      in the hook scripts). This is a documented gap, not an oversight - see
@@ -131,12 +135,14 @@ linked_specs: []
 
 ## Success criteria
 
-<!-- AC-1 is fixed by sd-port-fidelity and is the anchor every fidelity finding cites - do not
-     reword or renumber it; renumbering breaks review anchors. AC-2+ are author-fill. -->
+<!-- AC-1 is fixed by sd-port-fidelity and is the anchor every fidelity finding cites - never
+     renumber it; renumbering breaks review anchors. Reword it only to track a change in
+     sd-port-fidelity's own vocabulary, never to soften it. AC-2+ are author-fill. -->
 
 - [ ] AC-1: Every host hunk in this port is either a structural mirror of its member-manifest row,
-  or is covered by a deviation-table row whose citation satisfies its group. No `unjustified`,
-  `missing`, or `extra` hunk remains (see sd-port-fidelity).
+  or is covered by a deviation-table row whose citation satisfies its group and whose `Host form`
+  accounts for the whole hunk. No `unjustified`, `missing`, `extra`, or `overreached` hunk remains
+  (see sd-port-fidelity).
 - [ ] AC-2: <<criterion citing an INV-<n> or a license/attribution obligation>>
 
 ## Out of scope

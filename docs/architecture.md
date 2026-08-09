@@ -128,6 +128,20 @@ the implementer makes the change one atomic task at a time, and the reviewer gat
 reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
 fresh implementer call.
 
+### Why port parity is a reviewer check, not a `/sd:verify` check
+
+`/sd:verify` and the port parity gate are both close-out gates, so the two whole-artifact checks
+the parity gate performs - member completeness and path conformance - had a plausible home in
+either. The test is whether a check can be decided from `00-spec.md` and `02-tasks.md` with fixed
+regex shapes and nothing else read, which is all `/sd:verify` ever does. Member completeness fails
+it: deciding that a manifest member is present means reading host source and recognizing a member
+boundary in whatever language the host happens to be written in, and that judgement is precisely
+what `/sd:verify` exists in order not to make. Path conformance nearly passes it, but `/sd:verify`
+takes no changeset input at all, and granting it one to serve a single set comparison buys a second
+non-deterministic surface and splits fidelity findings across two reports. Both checks therefore
+live in `sd-reviewer`'s `port-parity` mode, where the diff already is, and `/sd:verify` stays
+deterministic.
+
 ---
 
 ## Agent skills
@@ -150,7 +164,7 @@ The split exists for three reasons:
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
 | `sd-replan-loop` | `sd-spec-architect`; `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (runtime read) | Mid-execution re-plan protocol: HARD Gate Re-plan, append-only `## Revisions` log in `01-plan.md`, `Revised-by` task marker. Shared by the two plan+tasks workflows so the revision format is defined once. |
 | `sd-retro-lessons` | `scripts/validate-lessons.*`, `scripts/aggregate-lessons.*` (runtime read) | The `lesson` line format, tag vocabulary, and reusability bar for retro lessons. The one skill with no agent consumer - declared in `contractLint.skillConsumers`. |
-| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror default, four-group deviation allowlist, anti-simplification rules, three gate table schemas, closed hunk-classification vocabulary. |
+| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror default, four-group deviation allowlist, anti-simplification rules, three gate table schemas, parity artifact layout, closed five-class hunk vocabulary plus the two whole-artifact checks. |
 
 Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
 
