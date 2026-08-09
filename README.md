@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
 [![Cross-platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#compatibility-matrix)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/developzone)
 
 ---
 
@@ -294,6 +295,12 @@ Forward-looking work lives in [`ROADMAP.md`](ROADMAP.md). Highlights:
 - **Exploratory** - local-only, opt-in usage analytics.
 
 Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).
+
+---
+
+## Support
+
+If `specwright` saves you time, consider [buying me a coffee on Ko-fi](https://ko-fi.com/developzone).
 
 ---
 
