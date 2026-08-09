@@ -80,6 +80,21 @@ linked_specs: []
 
 - <<PHASE-6: trade-off 1, e.g. "Added in-memory LRU cache (1000 entries) in the read path. Trade-off: search result freshness window extended from real-time to up to 30s. Acceptable per product owner.">>
 
+## Spawned specs
+
+<!-- Follow-up work discovered while doing this spec. IDs are RESERVED, not created: this section
+     records the intent; the child spec is created later by running its own workflow. Same
+     four-column shape as rca.template.md, so there is one convention and not two.
+     Filled at close-out - i.e. after `approved` - so it deliberately carries NO `<<...>>` token:
+     an author-fill token here would still be unfilled at `approved` and fail /sd:spec validate
+     (SL010). Leave the table at header + separator when nothing was deferred.
+     Example row:  | BUG-1310 | bug | Guard the empty-prefix match | alice |
+     A reserved ID is NOT a registry entry. Never add it to `.specs/index.md` until the real spec
+     directory exists - see /sd:spec, "Index <-> folder symmetry". -->
+
+| Reserved ID | Type | Title | Owner |
+|---|---|---|---|
+
 ## Constitution check
 
 - **§1 Layer rules**: <<does optimization introduce cross-layer leakage? e.g. inlining a repo call into a controller would violate §1>>

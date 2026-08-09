@@ -46,6 +46,10 @@ Fill:
 - **`complexity` frontmatter** — the whole-spec size estimate, `S` | `M` | `L`, with a one-line
   rationale in the trailing comment. See "Complexity estimate" below.
 
+**Leave empty**: `## Spawned specs` — header + separator only, no rows and no `<<...>>` token. It
+mirrors `rca.template.md`'s four-column table and is filled at close-out by the owning workflow,
+not at create time. A reserved ID is a placeholder, never an `.specs/index.md` row.
+
 - Scenario headings use stable IDs: `### SC-<n>: <name>`. IDs are sequential from SC-1 and are
   never renumbered or reused after a scenario is deleted - downstream `Covers` fields and
   `/sd:verify` reports reference them.
@@ -119,7 +123,10 @@ Fill:
 - **Affected** — components, scope, first introduced (version / PR if known).
 - **Severity** — P0 (production down) / P1 (major feature broken) / P2 (partial degradation) / P3 (minor).
 
-**Leave empty**: Root cause section, Fix approach section — these are filled in Phase 3 (debugger) and Phase 5 (main thread + implementer). Pre-filling breaks the workflow gate discipline.
+**Leave empty**: Root cause section, Fix approach section, `## Spawned specs` (header + separator
+only, no `<<...>>` token) — the first two are filled in Phase 3 (debugger) and Phase 5 (main thread
++ implementer); `## Spawned specs` is filled at close-out by the owning workflow. Pre-filling
+breaks the workflow gate discipline.
 
 ---
 
@@ -135,6 +142,8 @@ Fill:
 Leave TBD:
 - **Impact surface** — Phase 2 explorer fills.
 - **Test coverage prerequisite measurements** — Phase 3 fills.
+- **`## Spawned specs`** — header + separator only, no `<<...>>` token; filled at close-out by the
+  owning workflow, not at create time.
 
 Public API: preserved by default. Any public API change requires explicit mention in the spec.
 
@@ -153,6 +162,7 @@ Leave empty:
 - **Results log** — filled iteratively in Phase 4.
 - **Hypothesis tree** — filled by debugger in Phase 3.
 - **Trade-offs accepted** — filled at close-out.
+- **`## Spawned specs`** — header + separator only, no `<<...>>` token; filled at close-out.
 
 ---
 

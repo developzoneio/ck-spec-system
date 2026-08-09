@@ -233,8 +233,15 @@ Ask:
    - Lessons learned (focus on prevention).
    - Rejected hypotheses (knowledge preservation).
    - Constitution exceptions (should be none).
-2. Set status=`done`, update index.
-3. If retro reveals a systemic issue, suggest spawning a REF-* or RCA-* spec.
+2. **Spawned specs**: re-read the lessons learned and rejected hypotheses just written to
+   05-retro.md, plus anything the Scope discipline check pushed out of the fix - a systemic issue,
+   a "while I'm here" cleanup deferred to a REF-* spec, a stale constitution section. For each one,
+   ask the user to reserve an ID and add a row to `00-spec.md`'s `## Spawned specs` table
+   (`Reserved ID | Type | Title | Owner`). This is a prompt, not a gate: nothing deferred, or the
+   user declines - leave the table at header + separator and proceed. Do NOT create the child
+   specs here, and do NOT add a reserved ID to `.specs/index.md`; an index row exists only once
+   the real spec directory does (see `/sd:spec`, "Index <-> folder symmetry").
+3. Set status=`done`, update index.
 
 ---
 

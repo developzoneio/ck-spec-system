@@ -321,7 +321,7 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 
 ```
 .specs/FEAT-INV-2501/
-├── 00-spec.md        Why / What / Success criteria / Constitution check
+├── 00-spec.md        Why / What / Success criteria / Spawned specs / Constitution check
 ├── 01-plan.md        Phased implementation plan
 ├── 02-tasks.md       Atomic tasks (11 required fields, incl. Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output

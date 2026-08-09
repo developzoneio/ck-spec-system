@@ -257,6 +257,7 @@ Behavior:
    - Task-block content, when `02-tasks.md` exists (see "Task-block checks" below). This is the
      only check that reads inside an artifact rather than around it.
    - Port-spec table integrity, when `type` is `port` (see "Port-spec checks" below).
+   - Close-out hygiene, when `status` is `done` (see "Close-out hygiene checks" below).
 2. Tree-wide checks (run once, only when the target is `--all`):
    - Index <-> folder symmetry (see below).
 3. Report every finding using the severity taxonomy (see "Output" below). Do not stop at the
@@ -305,6 +306,7 @@ BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who ha
 | `SL081` | `## Member manifest` table has no data rows | 🔴 BLOCK |
 | `SL082` | Deviation-table row with an empty `Citation`, or a `Group` that is empty or outside `1`-`4` | 🔴 BLOCK |
 | `SL083` | Path-mapping row whose `Kind` is not `mirror` and whose `Reason` is empty or `-` | 🔴 BLOCK |
+| `SL090` | Status `done`, the spec body names deferred work, and `## Spawned specs` has no data row (or no such section) | 🟡 SUGGEST |
 
 `SL061`-`SL069` are **reserved** for further task-block content rules. Claim from this band rather
 than extending another one - `SL05x` is link integrity and has nothing to do with task content.
@@ -330,11 +332,17 @@ referential integrity (`Deviation ID` <-> deviation row), or one-row-per-donor-f
 those are `sd-port-fidelity`'s gate-time job, and duplicating them here would create a second source
 of truth for the same predicate.
 
+`SL090` is the **close-out hygiene** band - work the spec named but never gave an owner or an ID.
+It is a new band on purpose: it is not task content (`SL06x`), not the revision log (`SL07x`), and
+not port fidelity (`SL08x`). `SL091`-`SL099` are reserved for further close-out-hygiene rules.
+
 Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
 so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
 (`SL011` - a measured field filled from memory). WARN is for a real problem that leaves the
-registry still truthful and is recoverable by re-running a command. There is no SUGGEST rule
-today; the section is still printed, per the taxonomy.
+registry still truthful and is recoverable by re-running a command. SUGGEST is for hygiene that
+costs a future reader but leaves nothing untrue and breaks nothing - `SL090` is the only one
+today, and it is deliberately never a failure: a spec that genuinely deferred nothing must not be
+made to answer for an empty table.
 
 `SL060` is WARN by that same test: a task with no `Pattern refs` leaves the registry truthful and
 is fixed by re-planning the spec. It is deliberately **not** BLOCK - in the only corpus measured,
@@ -419,6 +427,34 @@ schemas here, the same pattern `### Output` already uses for `sd-severity-taxono
 - **`SL083`.** A row in `## Path mapping table` whose `Kind` cell is not `mirror` (including a
   garbled or empty `Kind`) and whose `Reason` cell is empty or `-`. Cite the offending row.
 
+### Close-out hygiene checks
+
+Runs only when frontmatter `status` is `done`. One rule today, `SL090`, and it is 🟡 SUGGEST -
+never a BLOCK, never a WARN, and never a reason for the run to report failure.
+
+`SL090` fires when **both** hold:
+
+1. The spec **named deferred work**. Search `00-spec.md` and `05-retro.md`, case-insensitively,
+   for any of this closed list: `follow-up`, `follow up`, `deferred`, `defer to`, `separate spec`,
+   `spawn a`, `spawned`, `own spec`, `future spec`, `left as-is`, `reproduced as-is`,
+   `not fixed here`, `TODO`. The list is closed on purpose - "deferred-work language" judged
+   freehand is not a decidable predicate, and an advisory that fires on a hunch is noise.
+   Skip HTML comments, fenced code blocks, the `## Out of scope` section, and the
+   `## Spawned specs` section itself. `## Out of scope` is excluded because it declares a
+   boundary rather than deferring work, and it is where the templates put their own example
+   prose - scanning it would fire on template text. `phase-deferred` does not count as a match
+   for `deferred`: it names the `<<PHASE-N: ...>>` token mechanism, not deferred work.
+2. The spec has **no reserved ID**: `## Spawned specs` is absent, or present with a header and
+   separator but no data row.
+
+Cite the first matching line as `file:line` - that line is the deferred work with nowhere to
+land. Name the phrase that matched and the absent or empty table in the finding. Report **one**
+`SL090` per spec, not one per phrase.
+
+Do not fire on a spec that has at least one data row: this rule asks whether follow-up work was
+recorded at all, and never adjudicates whether the rows are the *right* rows. A reserved ID in
+that table is a placeholder, not a registry entry - see "Index <-> folder symmetry".
+
 ### Output
 
 Read `~/.claude/skills/sd/sd-severity-taxonomy/SKILL.md` and
@@ -473,6 +509,13 @@ under `spec.dir` against the set of rows in `spec.indexFile`:
 
 Directories whose name starts with `_` are engine-reserved (`_explorations/`, `_reviews/`,
 `_adr/`, `_archived/`) and are NOT specs - skip them. Skip `index.md` and `constitution.md` too.
+
+**Reserved IDs are not registry entries.** An ID in a spec's `## Spawned specs` table is a
+placeholder for work that has not been started. It gets an `.specs/index.md` row only once its
+spec directory actually exists - i.e. once someone runs the child workflow. Adding the row first
+manufactures exactly the ghost row `SL032` exists to catch: an index entry pointing at a
+directory that is in no commit. For the same reason a reserved ID never goes in `linked_specs`;
+the link is written by `/sd:spec link` after the child is created.
 
 ### Transition replay
 

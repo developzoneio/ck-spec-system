@@ -229,8 +229,14 @@ STOP. Display reviewer verdict counts + invariant verification table. Ask:
    - Invariants verified (table).
    - Surprises (e.g. discovered dead code, unexpected callers).
    - Constitution exceptions (should be none).
-2. Set status=`done`. Update index.
-3. If retro reveals follow-ups (e.g. "this refactor exposes a perf concern"), suggest spawning the relevant spec.
+2. **Spawned specs**: re-read the "Surprises" entry just written to 05-retro.md - dead code found,
+   unexpected callers, invariants that needed propping up, a perf concern this refactor exposed.
+   For each one, ask the user to reserve an ID and add a row to `00-spec.md`'s `## Spawned specs`
+   table (`Reserved ID | Type | Title | Owner`). This is a prompt, not a gate: nothing deferred, or
+   the user declines - leave the table at header + separator and proceed. Do NOT create the child
+   specs here, and do NOT add a reserved ID to `.specs/index.md`; an index row exists only once
+   the real spec directory does (see `/sd:spec`, "Index <-> folder symmetry").
+3. Set status=`done`. Update index.
 
 ---
 

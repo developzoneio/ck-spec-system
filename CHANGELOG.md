@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`## Spawned specs` in the feature, bug, refactor, and perf spec templates** (SW-42) - follow-up
+  work discovered mid-spec previously had nowhere to land except prose, where it evaporated. The
+  RCA template's reserved-ID table (`Reserved ID | Type | Title | Owner`) is now the one convention
+  across every spec type, not two. Each affected workflow's close-out **prompts** for the section
+  when the retro names deferred work - a prompt, not a gate: gate counts are unchanged, since
+  hard-gating hygiene would tax every spec for a minority's benefit.
+  - **The section ships with no `<<...>>` token.** It is filled at close-out, i.e. after
+    `approved`, so an author-fill placeholder there would be an `SL010` BLOCK on every spec that
+    deferred nothing. Header + separator is the empty state, and it is also `SL090`'s trigger.
+  - **`SL090`, the first 🟡 SUGGEST rule** - a `done` spec whose body names deferred work with an
+    empty spawned-specs table. Advisory, never a failure, and its trigger vocabulary is a closed
+    phrase list rather than a judgement call, because an advisory that fires on a hunch is noise.
+    `SL091`-`SL099` open the close-out-hygiene band.
+  - **A reserved ID is not a registry entry.** Documented alongside the index consistency rules:
+    it gets an `.specs/index.md` row only once its directory exists. Writing the row first
+    manufactures the ghost row `SL032` exists to catch - the fourth of the four real-world
+    follow-ups that motivated this change was exactly that.
 - **`/sd:port` - the fidelity-first port pipeline** (SW-41) - the orchestration story that wires the
   rest of the port epic (SW-37 skill, SW-38 template/snapshot layout, SW-39 extraction mode, SW-40
   parity gate) into one command: bridge/extract -> freeze -> host survey -> fidelity tables -> pin

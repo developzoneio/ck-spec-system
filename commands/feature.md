@@ -284,9 +284,17 @@ Treat findings:
    - Deferred follow-ups (with reserved spec IDs, if any).
    - Constitution exceptions taken (should be none).
    - Cost rough estimate if available.
-4. Set frontmatter status=`done` in `00-spec.md`.
-5. Update `.specs/index.md`: state -> `done`, completion date.
-6. Print a 5-line summary to the user.
+4. **Spawned specs**: re-read the "Deferred follow-ups" and "Surprises encountered" entries just
+   written to 05-retro.md and look for follow-up work that has no home: a defect left in place on
+   purpose, a rule or doc found stale, a "separate spec" hand-off, a hotspot not taken. For each
+   one, ask the user to reserve an ID and add a row to `00-spec.md`'s `## Spawned specs` table
+   (`Reserved ID | Type | Title | Owner`). This is a prompt, not a gate: nothing deferred, or the
+   user declines - leave the table at header + separator and proceed. Do NOT create the child
+   specs here, and do NOT add a reserved ID to `.specs/index.md`; an index row exists only once
+   the real spec directory does (see `/sd:spec`, "Index <-> folder symmetry").
+5. Set frontmatter status=`done` in `00-spec.md`.
+6. Update `.specs/index.md`: state -> `done`, completion date.
+7. Print a 5-line summary to the user.
 
 ---
 

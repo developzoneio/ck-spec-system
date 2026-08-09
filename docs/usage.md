@@ -418,6 +418,25 @@ When an RCA spawns fixes, link them so the registry knows:
 
 Now `/sd:spec show BUG-1310` reveals the parent RCA.
 
+### Recording deferred work
+
+Every spec type now carries a `## Spawned specs` table - `Reserved ID | Type | Title | Owner` -
+the same one the RCA has always had. Close-out in `/sd:feature`, `/sd:bug`, `/sd:refactor` and
+`/sd:perf` prompts for it whenever the retro names something deferred. It is a prompt, not a gate:
+an empty table is a legitimate answer.
+
+A reserved ID is a **placeholder, not a registry entry**. It does not go in `.specs/index.md` and
+it does not go in `linked_specs` until the child spec actually exists:
+
+```
+# FEAT-INV-2501 closes with | BUG-1310 | bug | Guard the empty-prefix match | alice |
+/sd:bug 1310                                          # now the directory exists
+/sd:spec link BUG-1310 spawned-by FEAT-INV-2501       # now the link exists
+```
+
+`/sd:spec validate` raises `SL090` (🟡 SUGGEST, never a failure) on a `done` spec that talks about
+follow-up work and leaves the table empty.
+
 ### When a workflow can't make progress
 
 If you hit a hard gate that the system refuses to override (e.g. bug reproduction unavailable, perf baseline cannot be measured), the workflow surfaces options:
