@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
 [![Cross-platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#compatibility-matrix)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/developzone)
+[![Buy me a coffee](https://storage.ko-fi.com/cdn/kofi5.png?v=3)](https://ko-fi.com/developzone)
 
 ---
 
@@ -300,7 +300,8 @@ Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Support
 
-If `specwright` saves you time, consider [buying me a coffee on Ko-fi](https://ko-fi.com/developzone).
+Enjoying `specwright`? A coffee goes a long way toward keeping it maintained -
+[buy me one on Ko-fi](https://ko-fi.com/developzone). Thank you!
 
 ---
 
