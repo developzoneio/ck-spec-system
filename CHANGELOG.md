@@ -304,7 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under "Agents". No agent behaviour changed.
 
 ### Changed
-- **`README.md` cut from 390 to 263 lines (-33%) with no claim dropped.** The restructure below
+- **`README.md` cut from 390 to 282 lines (-28%) with no claim dropped.** The restructure below
   fixed the *order* of the page but not its *volume*; a reader still scrolled past a lot of
   repetition to reach the call to action. The redundancy was concentrated, not scattered:
   - **`## Architecture highlights` was a near-copy of `## Why spec-driven?`** - three of its four
@@ -318,8 +318,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fifteen `---` rules cost ~30 lines to draw a line GitHub already draws** under every `h2`.
     All removed.
   - Also: the spec-folder tree showed five spec types where one plus a note conveys the same shape,
-    the two install code blocks were merged into one, and the YAML frontmatter snippet was dropped
-    (it duplicates `docs/architecture.md`).
+    and the YAML frontmatter snippet was dropped (it duplicates `docs/architecture.md`).
+  - **The install and uninstall blocks stay split per platform, on purpose.** Collapsing each pair
+    into a single fenced block was tried and reverted: it put PowerShell inside a ` ```bash ` fence,
+    forced the reader to parse trailing comments to find their own line, and - worst - chained the
+    preview into the real run with `&&`, so `--dry-run` output scrolled past and the install
+    happened anyway. A dry run you cannot read is not a dry run. Four blocks, ~19 lines more,
+    correct.
 - **`README.md` restructured to lead with evidence rather than inventory.** The page opened with a
   feature count and asked the reader to take 330 lines of tables on trust before showing a single
   line of output. It now opens with `## What it looks like` - a real Gate 1 spec-approval STOP and

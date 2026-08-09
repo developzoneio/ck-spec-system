@@ -82,14 +82,24 @@ Your first spec in under 5 minutes. You need the
 [Claude Code CLI](https://docs.claude.com/en/docs/claude-code) installed and authenticated, plus
 PowerShell 5.1+ on Windows or bash 4+ on macOS/Linux.
 
-**1. Install the engine.**
+**1. Install the engine.** Run the preview first, read what it plans to write, then install.
+
+macOS / Linux:
 
 ```bash
 git clone https://github.com/developzoneio/specwright.git
 cd specwright
+./install/install.sh --dry-run    # preview only - writes nothing
+./install/install.sh              # install to ~/.claude
+```
 
-./install/install.sh --dry-run && ./install/install.sh   # macOS / Linux
-.\install\install.ps1 -DryRun; .\install\install.ps1     # Windows PowerShell
+Windows:
+
+```powershell
+git clone https://github.com/developzoneio/specwright.git
+cd specwright
+.\install\install.ps1 -DryRun     # preview only - writes nothing
+.\install\install.ps1             # install to $env:USERPROFILE\.claude
 ```
 
 **2. Scaffold a project.**
@@ -219,9 +229,18 @@ The [Quickstart](#quickstart) covers the common path; for custom install roots, 
 backup behavior see [`install/README.md`](install/README.md). Uninstalling removes the five `sd/`
 engine directories and leaves every per-project artifact (`.specs/`, `.claude/`, `CLAUDE.md`) alone:
 
+macOS / Linux:
+
 ```bash
-./install/uninstall.sh --dry-run && ./install/uninstall.sh   # macOS / Linux
-.\install\uninstall.ps1 -DryRun; .\install\uninstall.ps1     # Windows PowerShell
+./install/uninstall.sh --dry-run   # preview only - removes nothing
+./install/uninstall.sh             # remove the five sd/ engine directories
+```
+
+Windows:
+
+```powershell
+.\install\uninstall.ps1 -DryRun    # preview only - removes nothing
+.\install\uninstall.ps1            # remove the five sd/ engine directories
 ```
 
 ## Documentation
