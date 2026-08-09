@@ -93,10 +93,10 @@ Automating it in CI would mean reimplementing the adjudicator as an executable s
 copy of the rules, the same drift `sd-port-fidelity` itself exists to prevent. Until that trade-off
 is decided, this fixture makes the SW-40 acceptance criteria **reproducible**, not **enforced**.
 
-**The parity diffs are checked in, not generated live.** The command that would generate
-`04-artifacts/parity/` from a live host is the port pipeline, SW-41, not yet built - see
-`docs/troubleshooting.md`. The `.diff` files here were produced by hand with `diff -u` against the
-donor snapshot and are exactly what that future command's output would look like.
+**The parity diffs are checked in, not generated live.** `/sd:port` Phase 8 generates
+`04-artifacts/parity/` from a live host; this fixture predates that pipeline landing, so its
+`.diff` files were produced by hand with `diff -u` against the donor snapshot and are kept as a
+static worked example rather than regenerated - see `docs/troubleshooting.md`.
 
 ## Cross-fixture invariant
 

@@ -63,7 +63,8 @@
       "feature": ["feature", "add", "implement", "new", "support"],
       "refactor": ["refactor", "restructure", "clean up", "extract", "rename"],
       "perf": ["perf", "performance", "slow", "optimize", "latency", "throughput"],
-      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"]
+      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"],
+      "port": ["backport", "port from", "port the", "donor repo", "mirror from", "replicate from"]
     },
     "gates": {
       "_comment": "Descriptive only - no hook or command reads this block today; it documents each workflow's hard-gate sequence for humans/tooling that may consume it later.",
@@ -71,7 +72,8 @@
       "bug": ["symptom-captured", "reproduction-confirmed", "root-cause-confirmed", "failing-test-written", "regression-pass"],
       "rca": ["evidence-gathered", "hypotheses-enumerated", "root-cause-confirmed"],
       "refactor": ["spec-approved", "coverage-threshold-met", "post-test-added", "plan-approved", "batch-tests-green", "holistic-review-pass"],
-      "perf": ["target-defined", "baseline-measured", "hotspot-identified", "hypothesis-selected", "correctness-verified", "keep-or-revert-decided", "regression-pass", "final-review-pass"]
+      "perf": ["target-defined", "baseline-measured", "hotspot-identified", "hypothesis-selected", "correctness-verified", "keep-or-revert-decided", "regression-pass", "final-review-pass"],
+      "port": ["donor-set-frozen", "tables-complete", "behavior-pinned", "plan-approved", "batch-tests-green", "parity-clean"]
     }
   },
 

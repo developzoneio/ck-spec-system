@@ -105,6 +105,7 @@ match_keywords feature  $'feature\nadd\nimplement\nnew\nsupport'
 match_keywords refactor $'refactor\nrestructure\nclean up\nextract\nrename'
 match_keywords perf     $'perf\nperformance\nslow\noptimize\nlatency\nthroughput'
 match_keywords rca      $'incident\noutage\nrca\nroot cause\npost-mortem\npostmortem'
+match_keywords port     $'backport\nport from\nport the\ndonor repo\nmirror from\nreplicate from'
 
 # --- ticket detection ---------------------------------------------------------
 

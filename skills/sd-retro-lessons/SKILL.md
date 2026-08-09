@@ -69,7 +69,7 @@ One line. Exactly this grammar:
   a future run filters on, so `all` must be earned: use it only when the rule genuinely does not
   depend on the workflow. A `port`-scoped lesson is recorded but not yet selected by
   `subagent-retro` - the hook's in-progress-spec detection does not recognize the `PORT-` prefix
-  until the port pipeline lands.
+  (see `docs/troubleshooting.md`).
 - `Rule sentence` - one sentence, imperative, **120 characters maximum**.
 
 After aggregation a repeat count may be appended - ` (3)`. Authors never write it.

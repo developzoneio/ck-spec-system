@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`/sd:port` - the fidelity-first port pipeline** (SW-41) - the orchestration story that wires the
+  rest of the port epic (SW-37 skill, SW-38 template/snapshot layout, SW-39 extraction mode, SW-40
+  parity gate) into one command: bridge/extract -> freeze -> host survey -> fidelity tables -> pin
+  behavior -> plan -> execute batched -> justified-diff parity -> close-out. Ten phases, six gates,
+  four of them HARD (donor set frozen, fidelity tables complete, behavior pinned, justified-diff
+  parity) with no override path; the other two (plan approval, per-batch tests) are ordinary
+  approvals. `--scope` is always explicit - Phase 0 asks when it is omitted rather than inferring
+  it, because scope selects the Phase 5 pinning mechanism. `--from` selects topology (a bridged
+  cross-repo contract artifact vs an in-repo path/symbol) without changing anything downstream.
+  - **Port policy stays Layer 2.** Phase 0 reads a `Port policy` heading from the host's
+    `.specs/constitution.md` and always states the effective policy in its output, including the
+    fallback (structural mirror, per `sd-port-fidelity`) when the host declares nothing - the
+    engine supplies the mechanism, never a hardcoded posture.
+  - **Behavior pinning is scope-dependent and gate-verified.** `endpoint` gets a contract test
+    suite runnable against both donor and host; `module` gets characterization tests through an
+    interface-typed construction seam, so re-pointing donor -> host changes exactly one factory
+    method and assertion bodies stay byte-identical; `feature` uses whichever the surface allows;
+    `pattern` skips pinning (no donor instance) but the gate still proves the host production tree
+    is unmodified via an empty `git diff` / `git status --porcelain`, not a good-faith claim.
+  - **A port-specific complexity metric.** The existing decompose thresholds count impacted files
+    and layers, which trip on nearly every port by construction (a port's file count equals the
+    donor's). Phase 6 instead counts deviation-table rows requiring adaptation - the quantity that
+    actually scales with how much judgment the work needs - and records the rationale in
+    `01-plan.md`.
+  - **The anti-drift mechanism lives in the task block, not the gate.** Every port task's `Pattern
+    refs` cites a snapshot member range (`04-artifacts/source/<path>:<first>-<last>`), never prose
+    and never a host sibling, and `Acceptance` carries the licensed-deviation ID list. Anything not
+    on that list is reproduced as-is. A task missing either is a planning defect, refused before
+    execution rather than caught only at the parity gate.
+  - **Lifecycle divergence, deliberate.** Unlike `/sd:feature` and `/sd:refactor`, `abort` never
+    jumps a port spec to `archived` - it leaves the spec at its current state so re-invoking resumes
+    exactly there, since a partially-frozen or partially-pinned port has no clean "give up" shortcut
+    the way an unstarted feature does.
+  - **`WORKFLOW_TYPE = port` added to `sd-implementer`** - neither `feature` (allows new public API
+    freely) nor `refactor` (forbids new public API, requires `INVARIANTS`) was the right constraint
+    set for reproducing a donor's structure under a licensed-deviation list, so this is a genuine
+    fifth mode, not a reuse of an existing one.
+  - **`port` joins the prompt-router keyword map** (`backport`, `port from`, `port the`, `donor
+    repo`, `mirror from`, `replicate from` - deliberately multi-word phrases; a bare `"port"` would
+    fire on "support", "report", "portal"), shipped in both hook implementations plus the
+    `project-config.template.json` default.
+  - **`contractLint.budgets.skillsBytes` raised 12377 -> 12412** - `skills/sd-port-fidelity/SKILL.md`
+    picked up two small cross-references to `/sd:port`'s phases (the freeze step, the fidelity-table
+    author) replacing prose that pointed at "a documented manual step until the port pipeline
+    lands"; the ratchet moves with it.
+  - **Deliberately NOT built**: `--sync` / re-port drift detection, multi-donor ports, and editing a
+    host project's build/lint/coverage configuration to exclude the snapshot - the command warns
+    about tooling that globs `.specs/`, it never edits.
+  - **Known gaps carried forward**: no `SL06x` rule machine-checks the port task-block contract
+    (Pattern refs range + licensed-deviation list) - it is enforced by Phase 6 refusing to execute a
+    defective block, not by `/sd:spec validate`; and `spec-gate`/`subagent-retro` still do not
+    recognize the `PORT-` prefix (only `prompt-router`'s keyword routing landed this round) - see
+    `docs/troubleshooting.md`. `PROJECT-SNAPSHOT.md` does not exist in this repo and never has (see
+    the historical note below); nothing in this change introduces it.
 - **Port parity adjudication: `port-parity` TASK_TYPE on `sd-reviewer`, the parity diff artifact,
   and the parity gate** (SW-40) - the enforcement half of the port epic and the only mechanism in
   it that can see logic drift, structural mismatch, or silent simplification; test-green and

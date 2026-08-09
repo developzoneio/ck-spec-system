@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> 13 slash commands, 6 specialized subagents, 3 guard-rail hooks, 10 templates, 9 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> 14 slash commands, 6 specialized subagents, 3 guard-rail hooks, 10 templates, 9 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -26,7 +26,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 
 | Capability | What you get |
 |---|---|
-| **13 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`, `/sd:verify`, `/sd:status` |
+| **14 slash commands** | `/sd:feature`, `/sd:bug`, `/sd:rca`, `/sd:refactor`, `/sd:perf`, `/sd:port`, `/sd:spec`, `/sd:explore`, `/sd:review`, `/sd:setup`, `/sd:release`, `/sd:adr`, `/sd:verify`, `/sd:status` |
 | **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **10 templates** | 4 setup templates + 6 spec templates (feature / bug / refactor / perf / rca / port) |
@@ -108,6 +108,7 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:rca <slug>` | Workflow | 3 | Incident analysis. **Output is the spec - no code change.** |
 | `/sd:refactor <slug>` | Workflow | 6 | Coverage-gated restructure: requires >=80% coverage before touching code |
 | `/sd:perf <slug>` | Workflow | 8 | Baseline-first optimization: measure -> hypothesize -> apply -> remeasure -> keep or revert |
+| `/sd:port <slug> --from <source> --scope <scope>` | Workflow | 6 | Fidelity-first port: bridge -> freeze -> tables -> pin -> execute -> justified-diff parity |
 | `/sd:spec <subcommand>` | Utility | - | Spec registry: list, show, status, link, archive, revive, search, validate, stats |
 | `/sd:explore <target-or-query>` | Utility | - | Read-only code navigation, single subagent call, optional save |
 | `/sd:review [path / "recent" / "spec ID"]` | Utility | - | Standalone constitution-compliance review with severity tags |

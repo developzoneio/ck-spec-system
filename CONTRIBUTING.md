@@ -42,7 +42,7 @@ per-file-type guidelines, and how to test changes locally.
 
 ```
 specwright/
-  commands/         # 13 slash commands (markdown with frontmatter)
+  commands/         # 14 slash commands (markdown with frontmatter)
   agents/           # 6 subagent definitions (markdown with frontmatter)
   hooks/
     powershell/     # 3 PowerShell hooks

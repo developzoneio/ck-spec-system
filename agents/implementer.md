@@ -1,7 +1,7 @@
 ---
 name: sd-implementer
 color: green
-description: Executes ONE atomic task per invocation. Scope-disciplined - edits only files declared in TASK_DETAILS.Files. Workflow-specific constraints for feature/bug/refactor/perf. Main thread can override to sonnet model for complex tasks.
+description: Executes ONE atomic task per invocation. Scope-disciplined - edits only files declared in TASK_DETAILS.Files. Workflow-specific constraints for feature/bug/refactor/perf/port. Main thread can override to sonnet model for complex tasks.
 model: haiku
 tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 skills:
@@ -106,6 +106,23 @@ Inputs (optional): IMPACT_REF
 - Functional tests must continue to pass without modification.
 - If you can achieve the optimization only by changing observable behavior, STOP and surface - that needs a spec amendment.
 
+### `WORKFLOW_TYPE = port`
+
+Inputs (required): TASK_DETAILS, SPEC_REF
+Inputs (optional): IMPACT_REF
+
+- The snapshot member range cited in `Pattern refs` is the specification. Reproduce it
+  structurally: file layout, member set, member order, symbol names, local variable names, step
+  order, attribute order, log message text.
+- Apply ONLY the deviation IDs the task's `Acceptance` licenses. Anything not on that list is
+  reproduced as-is - no rename, no reorder, no simplification, no opportunistic fix, even where
+  another form reads better.
+- A donor defect is reproduced, not fixed. Note it in your summary.
+- If the snapshot form cannot work in the host without a change the task does not license, STOP
+  and return `STATUS = needs-clarification` naming the conflict. A missing deviation row is a
+  planning defect, never something to invent.
+- A task whose `Step type` is `test` writes only test files; the production tree stays untouched.
+
 ---
 
 ## Step-by-step procedure
@@ -156,6 +173,8 @@ Do this in your head (or via sequential-thinking if complex). Do not produce a p
 - [ ] For bug: fix targets root cause, not symptom.
 - [ ] For refactor: invariants verified.
 - [ ] For perf: ONE change applied; correctness tests still pass.
+- [ ] For port: only the licensed deviation IDs were applied; everything else matches the cited
+  snapshot member range.
 
 Return to main thread with: file list edited, test results, one-line summary.
 

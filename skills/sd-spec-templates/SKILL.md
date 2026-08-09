@@ -189,8 +189,10 @@ Fill:
 - **`## Spawned specs`** mirrors `rca.template.md`'s 4-column table: one row per donor defect
   reproduced deliberately, not per sanctioned deviation.
 
-**No `<<PHASE-N: ...>>` tokens exist for this template** - there is no port execution pipeline yet
-to fill them (same as `feature.template.md`). Do not invent one.
+**No `<<PHASE-N: ...>>` tokens exist for this template** (same as `feature.template.md`) - the
+fidelity tables and `Frozen:` line are progressively filled by `sd-spec-architect` `refine` calls
+and main-thread edits across `/sd:port`'s phases, not gated by phase-deferred tokens. Do not invent
+one.
 
 Spec ID format: `PORT-<slug>-<YYYYMMDD>` using UTC date.
 

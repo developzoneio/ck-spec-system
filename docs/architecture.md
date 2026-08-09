@@ -10,7 +10,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    13 workflow definitions                         |
+|    commands/sd/    14 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 6 spec templates                      |
@@ -67,7 +67,7 @@ Phase N - Close-out
 
 A **gate** is a checkpoint where the workflow refuses to proceed without explicit user approval. Silence is not approval. Skipping a gate requires logging a constitution exception to the spec's retro.
 
-The 5 workflow commands have these gate counts:
+The 6 workflow commands have these gate counts:
 
 | Workflow | Gates | Why |
 |---|---|---|
@@ -76,6 +76,7 @@ The 5 workflow commands have these gate counts:
 | `/sd:rca` | 3 | evidence, hypotheses, root cause |
 | `/sd:refactor` | 6 | spec, coverage, post-test, plan, per-batch tests, holistic review |
 | `/sd:perf` | 8 | target, baseline (HARD), hotspot, hypothesis, correctness, keep/revert, regression, final review |
+| `/sd:port` | 6 | donor set frozen (HARD), fidelity tables (HARD), behavior pinned (HARD), plan, per-batch tests, justified-diff parity (HARD) |
 
 Gates marked HARD (e.g. bug reproduction, perf baseline) have no override path. The point is to force discipline at the moments when shortcuts are most tempting.
 
@@ -111,6 +112,7 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:refactor  -> spec-architect -> code-explorer -> implementer (coverage) -> spec-architect -> implementer (xN) -> reviewer
 /sd:perf      -> spec-architect -> debugger (hotspot / verify) -> implementer (xN) -> reviewer
 /sd:rca       -> spec-architect -> debugger (enumerate / verify)        [no code change - output IS the spec]
+/sd:port      -> code-explorer (port-extract, in-repo only) -> spec-architect -> code-explorer -> spec-architect -> implementer (xN) -> reviewer (port-parity)
 /sd:explore   -> code-explorer
 /sd:review    -> reviewer
 /sd:adr       -> docs-writer
@@ -426,7 +428,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 13 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 14 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---

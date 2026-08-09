@@ -4,7 +4,7 @@ The installer copies the engine (commands, agents, hooks, templates) into a Clau
 
 ```
 <base>/
-├── commands/sd/        13 slash commands
+├── commands/sd/        14 slash commands
 ├── agents/sd/          6 subagent definitions
 ├── hooks/sd/           3 hook scripts (.ps1 on Windows, .sh on Unix)
 ├── templates/sd/       10 templates (4 setup + 6 spec)
@@ -46,7 +46,7 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 
 | Source (in repo) | Target (under `<base>/`) | Files | Notes |
 |---|---|---|---|
-| `commands/` | `commands/sd/` | 13 | `feature`, `bug`, `rca`, `refactor`, `perf`, `spec`, `explore`, `review`, `setup`, `release`, `adr`, `verify`, `status` |
+| `commands/` | `commands/sd/` | 14 | `feature`, `bug`, `rca`, `refactor`, `perf`, `port`, `spec`, `explore`, `review`, `setup`, `release`, `adr`, `verify`, `status` |
 | `agents/` | `agents/sd/` | 6 | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | `hooks/powershell/` (Windows installer) | `hooks/sd/` | 3 | `prompt-router.ps1`, `spec-gate.ps1`, `subagent-retro.ps1` |
 | `hooks/bash/` (Unix installer) | `hooks/sd/` | 3 | `prompt-router.sh`, `spec-gate.sh`, `subagent-retro.sh` (chmod +x applied) |
@@ -54,7 +54,7 @@ Default base is `$HOME/.claude` (Unix) or `$env:USERPROFILE\.claude` (Windows).
 | `skills/` | `skills/sd/` | 9 | One folder per skill, each with a `SKILL.md` |
 | _(generated at install)_ | `<area>/sd/specwright-version.txt` | 5 | One version stamp per installed area, derived from `CHANGELOG.md`'s newest release, removed by uninstall |
 
-**Total**: 46 files per OS.
+**Total**: 47 files per OS.
 
 ---
 
@@ -82,7 +82,7 @@ After install, check the target directories:
 
 **Windows:**
 ```powershell
-Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 12 .md files
+Get-ChildItem $env:USERPROFILE\.claude\commands\sd\     # expect 14 .md files
 Get-ChildItem $env:USERPROFILE\.claude\agents\sd\       # expect 6 .md files
 Get-ChildItem $env:USERPROFILE\.claude\hooks\sd\        # expect 3 .ps1 files
 Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 5 files + specs\ folder
@@ -90,7 +90,7 @@ Get-ChildItem $env:USERPROFILE\.claude\templates\sd\    # expect 5 files + specs
 
 **Unix:**
 ```bash
-ls ~/.claude/commands/sd/      # 13 .md files
+ls ~/.claude/commands/sd/      # 14 .md files
 ls ~/.claude/agents/sd/        # 6 .md files
 ls ~/.claude/hooks/sd/         # 3 .sh files (executable)
 ls -l ~/.claude/hooks/sd/      # confirm +x bits set

@@ -60,10 +60,11 @@
         "commands/bug.md",
         "commands/rca.md",
         "commands/refactor.md",
-        "commands/perf.md"
+        "commands/perf.md",
+        "commands/port.md"
       ],
       "installTo": "commands/sd/",
-      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr, verify, status). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 5 of the 13'; the validators also assert each file exists."
+      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr, verify, status). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 6 of the 14'; the validators also assert each file exists."
     }
   },
 
@@ -238,6 +239,7 @@
     { "file": "README.md", "pattern": "^\\| `/sd:rca [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRca" },
     { "file": "README.md", "pattern": "^\\| `/sd:refactor [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
     { "file": "README.md", "pattern": "^\\| `/sd:perf [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+    { "file": "README.md", "pattern": "^\\| `/sd:port [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesPort" },
     { "file": "README.md", "pattern": "^\\| `/sd:setup` \\| Utility \\| ([0-9]+) \\|", "equals": "gatesSetup" },
     { "file": "README.md", "pattern": "^\\| `/sd:release [^|]*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesRelease" },
     { "file": "README.md", "pattern": "^\\| `/sd:adr .*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesAdr" },
@@ -247,12 +249,14 @@
     { "file": "docs/architecture.md", "pattern": "^\\| `/sd:rca` \\| ([0-9]+) \\|", "equals": "gatesRca" },
     { "file": "docs/architecture.md", "pattern": "^\\| `/sd:refactor` \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
     { "file": "docs/architecture.md", "pattern": "^\\| `/sd:perf` \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:port` \\| ([0-9]+) \\|", "equals": "gatesPort" },
 
     { "file": "commands/feature.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
     { "file": "commands/bug.md", "pattern": "([0-9]+) hard gates", "equals": "gatesBug" },
     { "file": "commands/rca.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRca" },
     { "file": "commands/refactor.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRefactor" },
     { "file": "commands/perf.md", "pattern": "([0-9]+) hard gates", "equals": "gatesPerf" },
+    { "file": "commands/port.md", "pattern": "([0-9]+) hard gates", "equals": "gatesPort" },
     { "file": "commands/adr.md", "pattern": "([0-9]+) hard gate", "equals": "gatesAdr" },
 
     { "file": "docs/usage.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
@@ -375,6 +379,7 @@
       "commands/rca.md":      { "quantity": "gatesRca",      "hard": 3, "conditional": [] },
       "commands/refactor.md": { "quantity": "gatesRefactor", "hard": 6, "conditional": ["Re-plan"] },
       "commands/perf.md":     { "quantity": "gatesPerf",     "hard": 8, "conditional": [] },
+      "commands/port.md":     { "quantity": "gatesPort",     "hard": 6, "conditional": [] },
       "commands/setup.md":    { "quantity": "gatesSetup",    "hard": 2, "conditional": [] },
       "commands/release.md":  { "quantity": "gatesRelease",  "hard": 1, "conditional": [] },
       "commands/adr.md":      { "quantity": "gatesAdr",      "hard": 1, "conditional": [] },
@@ -478,7 +483,7 @@
     "budgets": {
       "commandsBytes": 29664,
       "agentsBytes": 15232,
-      "skillsBytes": 12377
+      "skillsBytes": 12412
     },
 
     "$budgetsComment": [

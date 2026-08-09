@@ -147,8 +147,9 @@ At freeze, every file under `04-artifacts/source/` plus `MANIFEST.md` is appende
 **individual literal string** to `paths.protected` in `.claude/project-config.json`. Both
 `spec-gate` hooks match `paths.protected` by exact string equality, not glob - the enumeration
 *is* the mechanism, not a workaround for one. The append must be idempotent. `/sd:spec` cannot
-perform this step itself (it never touches `.claude/`); it is a documented manual step until the
-port pipeline lands. `spec-gate` guards `Edit`/`Write` only - it does not stop a shell delete.
+perform this step itself (it never touches `.claude/`); `/sd:port` Phase 2 performs the freeze.
+Outside that pipeline it stays a documented manual step. `spec-gate` guards `Edit`/`Write` only -
+it does not stop a shell delete.
 
 Per-file hashes are recorded now so a later drift check (re-hashing the donor at a newer commit)
 remains possible; consuming them is out of scope for this story.

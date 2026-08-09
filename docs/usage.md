@@ -156,6 +156,51 @@ Example:
 /sd:perf search-endpoint-latency
 ```
 
+### `/sd:port <slug> --from <source> --scope <scope>`
+
+Fidelity-first port. **The donor is the specification - every departure is a row in the deviation
+table, or it is a defect.** Reproduces a donor implementation inside this host repo, with a
+justified-diff parity review as the close-out gate.
+
+| Phase | Subagent / Actor | Gate |
+|---|---|---|
+| 0 - Bootstrap (args, port policy) | main thread | - |
+| 1 - Consume bridged contract / in-repo extract | main thread + `sd-code-explorer` (port-extract, in-repo only) + `sd-spec-architect` (create) | - |
+| 2 - Freeze snapshot | main thread | Gate 1 (HARD) |
+| 3 - Host survey | `sd-code-explorer` (impact-map) + main thread constitution scan | - |
+| 4 - Fidelity tables | `sd-spec-architect` (refine) | Gate 2 (HARD) |
+| 5 - Pin behavior | main thread + `sd-implementer` | Gate 3 (HARD) |
+| 6 - Plan atomic tasks | `sd-spec-architect` (plan) | Gate 4 |
+| 7 - Execute batched | `sd-implementer` per task | Gate 5 |
+| 8 - Parity review | main thread + `sd-reviewer` (port-parity) | Gate 6 (HARD) |
+| 9 - Close-out | main thread | - |
+
+**Spec ID**: `PORT-<slug>-<YYYYMMDD>`. `--scope` (`endpoint` / `module` / `feature` / `pattern`) is
+explicit - Phase 0 asks when it is omitted and never infers it, because a wrong guess changes the
+behavior-pinning mechanism used at Gate 3. `--from` selects topology: a bridged (cross-repo)
+contract artifact produced by `/sd:explore --port` in the donor repo, or an in-repo path/symbol for
+intra-repo duplication - the rest of the pipeline is identical either way.
+
+Phase 5's pinning mechanism follows scope: `endpoint` gets a contract test suite runnable against
+donor and host; `module` gets characterization tests through an interface-typed construction seam
+so re-pointing changes exactly one factory method; `feature` uses whichever the surface allows;
+`pattern` skips pinning (there is no donor instance) but still proves the host tree is unmodified.
+
+Phase 6's complexity triage uses a port-specific metric - the count of deviation-table rows
+requiring adaptation, not the impacted-file count the other workflows use, because a port's file
+count equals the donor's by construction and would trip on nearly every port regardless of how much
+judgment the work needs.
+
+Phase 0 reads the port policy from a `Port policy` heading in `.specs/constitution.md` and always
+states the effective policy in its output, including the fallback (structural mirror, per
+`sd-port-fidelity`) when the host constitution declares nothing.
+
+Example:
+```
+/sd:port order-intake --from .specs/_explorations/order-intake-20260809-1200/ --scope endpoint
+/sd:port order-intake --from src/orders/order-intake --scope module
+```
+
 ---
 
 ## Utility commands
@@ -310,31 +355,29 @@ progress check. A FAIL lists VF0xx findings with file:line citations.
 
 A `PORT` spec captures reproducing a donor repo's behavior in this host repo: which donor, at
 which commit, which members must land, where each path maps to, and which departures are
-sanctioned. There is no `/sd:port` workflow command yet - authoring one today is a manual
-sequence over the generic spec machinery:
+sanctioned. `/sd:port` (documented above) drives the full pipeline - bridge, freeze, survey,
+fidelity tables, behavior pinning, plan, batched execute, justified-diff parity, close-out.
 
-1. Copy `~/.claude/templates/sd/specs/port.template.md` to `.specs/<PORT-ID>/00-spec.md` and fill
-   it (frontmatter provenance, the behavioral contract, and the three fidelity tables - see the
-   **sd-port-fidelity** skill for their column schemas).
-2. Add the new spec's row to `.specs/index.md`.
-3. Capture the donor side: run `\sd:explore --port <entry point> --scope <scope>
-   [--snapshot contract+source]` **in the donor repo** (a separate session - never load a host
-   project's `CLAUDE.md` or constitution alongside it). It writes a fixed-section contract, plus
-   - under `contract+source` - a `source/` bundle with `MANIFEST.md`, to the donor's own
-   `.specs/_explorations/`. Copy that bundle into `.specs/<PORT-ID>/04-artifacts/source/` in the
-   host repo - copying between the two repos is a manual or scripted step, not automated by
-   either command.
-4. **Freeze the snapshot**: append every file under `source/` plus `MANIFEST.md`, as individual
-   literal paths, to `paths.protected` in `.claude/project-config.json`. `/sd:spec` cannot do this
-   step itself (it never touches `.claude/`).
-5. Drive lifecycle with `/sd:spec status <ID> <new-state>` and lint with `/sd:spec validate <ID>`.
+**Cross-repo (bridged) topology** - when the donor lives in a different repository, capture its
+side first: run `/sd:explore --port <entry point> --scope <scope> [--snapshot
+contract+source]` **in the donor repo** (a separate session - never load a host project's
+`CLAUDE.md` or constitution alongside it). It writes a fixed-section contract, plus - under
+`contract+source` - a `source/` bundle with `MANIFEST.md`, to the donor's own
+`.specs/_explorations/`. Pass that bundle's path as `--from` to `/sd:port` in the host repo - moving
+the bundle between the two repos is a manual or scripted step, not automated by either command.
 
-**Known limitations** (until the port pipeline lands):
+**Intra-repo topology** - when the donor and host are the same repository (duplicating a pattern
+elsewhere in the codebase), pass the donor path or symbol directly as `--from`; `/sd:port` invokes
+`sd-code-explorer`'s `port-extract` mode itself in Phase 1.
+
+**Known limitations**:
 - `spec-gate`, `prompt-router`, and `subagent-retro` do not recognize the `PORT-` prefix (it is
   hardcoded in the hook scripts) - a `PORT-` spec is invisible to in-progress-spec detection,
   context injection, and lesson scoping. Workaround: set `hooks.specGate.mode: "warn"` for the
   duration of the port, or track the work under an accompanying FEAT spec.
-- `hooks.specGate.verifyGate` is FEAT-scoped, so a port's `done` close-out is not verify-gated.
+- `hooks.specGate.verifyGate` is FEAT-scoped, so a port's `done` close-out is not verify-gated by
+  the hook - `/sd:port` Phase 9 still runs `/sd:verify` itself and requires `result: pass` before
+  closing out.
 
 ---
 
@@ -349,6 +392,7 @@ sequence over the generic spec machinery:
 | "Production incident; need a post-mortem with no code change" | `/sd:rca` |
 | "This file / module is too tangled; need to restructure" | `/sd:refactor` |
 | "X is too slow; need to optimize with measurements" | `/sd:perf` |
+| "Reproduce a donor repo's behavior in this repo, faithfully" | `/sd:port` |
 | "I just want to navigate the code" | `/sd:explore` |
 | "Review this change for compliance" | `/sd:review` |
 | "Manage / browse the spec registry" | `/sd:spec` |
@@ -359,7 +403,7 @@ sequence over the generic spec machinery:
 
 Workflow commands are **resumable**. Re-running `/sd:feature INV-2501` after closing your terminal mid-execution detects the current state of `.specs/FEAT-INV-2501/` and jumps to the next phase. The state machine is documented at the top of each command file.
 
-The main heuristic: workflow checks for the presence and contents of `00-spec.md`, `05-retro.md`, and (feature/refactor only) `01-plan.md` and `02-tasks.md` (with task completion ratio) to determine where you are.
+The main heuristic: workflow checks for the presence and contents of `00-spec.md`, `05-retro.md`, and (feature/refactor/port only) `01-plan.md` and `02-tasks.md` (with task completion ratio) to determine where you are.
 
 ### Linking specs
 

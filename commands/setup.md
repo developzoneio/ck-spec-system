@@ -341,7 +341,7 @@ Setup complete. Generated:
   - .claude/settings.json (hooks: prompt-router, spec-gate, subagent-retro)
 
 Installed engine paths:
-  - ~/.claude/commands/sd/     (13 workflow commands)
+  - ~/.claude/commands/sd/     (14 workflow commands)
   - ~/.claude/agents/sd/       (6 specialist agents)
   - ~/.claude/hooks/sd/        (3 hooks)
   - ~/.claude/templates/sd/    (templates)

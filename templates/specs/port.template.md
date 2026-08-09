@@ -59,8 +59,8 @@ linked_specs: []
 
      Known limitation: spec-gate's in-progress-spec detection, prompt-router's context injection,
      and subagent-retro's lesson scoping do not yet recognize the `PORT-` prefix (it is hardcoded
-     in the hook scripts). This is a documented gap, not an oversight - see
-     docs/troubleshooting.md. -->
+     in the hook scripts) even though prompt-router now routes port-shaped prompts via its
+     keyword map. This is a documented gap, not an oversight - see docs/troubleshooting.md. -->
 
 ## Behavioral contract
 

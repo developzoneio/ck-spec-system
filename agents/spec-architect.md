@@ -46,8 +46,7 @@ Inputs: `TEMPLATE`, `SPEC_ID`, optionally `TICKET_CONTEXT` (feature, bug), `SMEL
 command sets `INCIDENT_DETAILS` for the `rca` template today - `/sd:rca` fills Timeline / Symptoms
 / Affected scope / Recent changes interactively after the skeleton is created, not via an input
 token. `SOURCE_REPO` / `SOURCE_COMMIT` / `DONOR_SCOPE` supply donor provenance for the `port`
-template; no command sets them today (the port pipeline lands in a later story), so a port spec is
-authored with them passed by hand until then.
+template; `/sd:port` Phase 1 sets them from the bridged contract or the in-repo extraction.
 
 Output: `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
 
