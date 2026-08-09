@@ -1,7 +1,7 @@
 ---
 name: sd-spec-architect
 color: blue
-description: Creates, refines, and plans specs across all 5 workflow types (feature, bug, refactor, perf, rca). Reads CLAUDE.md and constitution.md at runtime. Use this agent for any spec authoring or atomic-task planning.
+description: Creates, refines, and plans specs across all 6 workflow types (feature, bug, refactor, perf, rca, port). Reads CLAUDE.md and constitution.md at runtime. Use this agent for any spec authoring or atomic-task planning.
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, mcp__atlassian__getJiraIssue, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssueRemoteIssueLinks, mcp__atlassian__getConfluencePage, mcp__context7__resolve-library-id, mcp__context7__query-docs
 skills:
@@ -40,12 +40,14 @@ You operate in one of three modes, signalled by the `TASK` field in your invocat
 ## Mode 1: `TASK = create`
 
 Inputs (required): TEMPLATE, SPEC_ID
-Inputs (optional): TICKET_CONTEXT, SMELL
+Inputs (optional): TICKET_CONTEXT, SMELL, SOURCE_REPO, SOURCE_COMMIT, DONOR_SCOPE
 
 Inputs: `TEMPLATE`, `SPEC_ID`, optionally `TICKET_CONTEXT` (feature, bug), `SMELL` (refactor). No
 command sets `INCIDENT_DETAILS` for the `rca` template today - `/sd:rca` fills Timeline / Symptoms
 / Affected scope / Recent changes interactively after the skeleton is created, not via an input
-token.
+token. `SOURCE_REPO` / `SOURCE_COMMIT` / `DONOR_SCOPE` supply donor provenance for the `port`
+template; no command sets them today (the port pipeline lands in a later story), so a port spec is
+authored with them passed by hand until then.
 
 Output: `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
 
@@ -56,6 +58,10 @@ estimate (`S` | `M` | `L`) plus a one-line rationale, per the "Complexity estima
 **sd-spec-templates**. Estimate it honestly from Why / What / SC / AC / Open questions - it is not
 always `M`, and a create-time `L` estimate escalates the impact and planning models downstream. It
 is a spec-level estimate, distinct from a task's `Estimated complexity`.
+
+For a **port** spec, the three fidelity tables (path mapping, member manifest, deviation table)
+and the mandatory fidelity acceptance criterion are governed by the **sd-port-fidelity** skill -
+read it before filling them. **sd-spec-templates** covers what else the template needs.
 
 ---
 

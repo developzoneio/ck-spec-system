@@ -10,6 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`PORT` spec prefix, `port.template.md`, and snapshot artifact layout** (SW-38) - the authoring
+  half of the port workflow, consuming `sd-port-fidelity` (SW-37). `PORT-<slug>-<YYYYMMDD>` joins
+  `spec.prefixes` and every enumeration site (`commands/spec.md`, `commands/release.md`,
+  `agents/spec-architect.md`, `sd-retro-lessons`, docs). `templates/specs/port.template.md` adds six
+  mandatory sections (Behavioral contract, Behavioral invariants, Path mapping table, Member
+  manifest, Deviation table, Spawned specs) plus five provenance frontmatter fields (`scope`,
+  `source_repo`, `source_commit`, `source_license`, `snapshot`); the three table schemas are reused
+  verbatim from `sd-port-fidelity` rather than the ticket's own prose, which described a different,
+  stale external precedent (`FEAT-details-translation-builder`, not present anywhere in this repo).
+  Snapshot layout (`04-artifacts/source/` + `MANIFEST.md`, per-file donor path/commit/hash/member
+  ranges) is documented in `sd-port-fidelity`'s new "Snapshot artifacts" section, which is also the
+  defined input a later drift check can consume. `/sd:spec validate` gains the `SL080`-`SL083`
+  port-integrity band. PORT is release-eligible, maps to CHANGELOG `Added`, and triggers a MINOR
+  bump like a feature.
+  - **Deviation from the ticket's "adds a glob" wording**: `paths.protected` matching in both
+    `spec-gate` hooks is exact-string only, with no glob engine on either platform. Freezing a
+    snapshot instead enumerates every file under `04-artifacts/source/` plus `MANIFEST.md` as
+    individual literal `paths.protected` entries - the mechanism is reused exactly as shipped, with
+    zero hook changes (AC-9 is satisfied to the letter).
+  - **Known gap, deferred**: the `(FEAT|BUG|REF|PERF|RCA)` prefix regex is hardcoded across
+    `spec-gate`, `subagent-retro`, and `prompt-router` (both platforms) and does not read
+    `spec.prefixes`. A `PORT-` spec is therefore invisible to in-progress-spec detection, lesson
+    scoping, and context injection until those hooks are updated - out of scope here (no AC in this
+    story requires a working end-to-end port pipeline; that pipeline is SW-41). Documented in the
+    new template, in `sd-port-fidelity`, and in `docs/troubleshooting.md`.
+  - No `.ps1` or `.sh` file was modified (AC-9).
+- **`contractLint.budgets` raised for the SW-38 wiring** - `commandsBytes` 25978 -> 29664
+  (`commands/spec.md` gained the port-spec validate rules and subsection, including a follow-up fix
+  so `SL080` also catches a literal `none` value), `agentsBytes` 14671 -> 15232
+  (`agents/spec-architect.md` gained the sixth workflow type and port-specific inputs),
+  `skillsBytes` 9134 -> 10656 (`sd-spec-templates` and `sd-port-fidelity` both grew; the latter is
+  now the ratchet-setter for its area). Real, reviewed growth from a new spec type landing across
+  three files that each already sat at their prior ceiling, not a reflex to a red run.
 - **`sd-port-fidelity` skill** (SW-37) - cross-project port policy, promoted into a skill because
   two agents need the same rule body: `sd-spec-architect` authors the deviation table and the port
   task blocks, `sd-reviewer` judges whether a diff hunk is justified. Defines structural mirror as

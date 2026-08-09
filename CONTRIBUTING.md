@@ -48,7 +48,7 @@ specwright/
     powershell/     # 3 PowerShell hooks
     bash/           # 3 bash hooks (parity with PowerShell)
   templates/        # 4 setup templates
-    specs/          # 5 spec templates
+    specs/          # 6 spec templates
   install/          # install.ps1 + install.sh + install/README.md
   docs/             # architecture, usage, walkthrough, troubleshooting
   examples/         # demo references

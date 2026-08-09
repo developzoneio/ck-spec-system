@@ -111,6 +111,50 @@ appears here exactly once; no row here is unreferenced by the manifest.
 
 ---
 
+## Snapshot artifacts (sd-spec-architect)
+
+Under a port spec's `04-artifacts/source/`: the bridged contract always, and under
+`snapshot: contract+source`, the donor files too. `MANIFEST.md` sits at that directory's root.
+
+### Snapshot manifest format
+
+- **Donor**: <repo url or path>
+- **Commit**: <full sha>
+- **Captured**: <YYYY-MM-DD>
+- **Mode**: contract | contract+source
+- **Hash algorithm**: sha256, lowercase hex, over the bytes as captured
+
+| Snapshot path | Donor path | Commit | Bytes | SHA-256 | Member ranges |
+|---|---|---|---|---|---|
+| `orders/order-intake` | `src/orders/order-intake` | `<sha>` | 4821 | `3f9a...` | `1: CreateOrder 12-58; 2: ValidateTotals 60-93` |
+
+One row per captured file. `Member ranges` is `<ordinal>: <member> <firstLine>-<lastLine>`,
+semicolon-separated, ordinals contiguous from 1 - the same ordinals the Member manifest table uses.
+
+### Two snapshot rules
+
+1. **Cite the snapshot, not the donor.** Path mapping and Member manifest rows cite `Snapshot
+   path`, never a donor-repo path - donor line numbers rot the moment the donor changes; the
+   snapshot is frozen. Donor paths, the commit, and line ranges live only in `MANIFEST.md`,
+   addressed by `(Snapshot path, Ordinal)` - the Member manifest table carries no line-range
+   column of its own.
+2. **Quarantine.** The snapshot directory is evidence, never a copy source handed to an
+   implementer without a Member manifest row and an allowed-deviation list scoping it.
+
+### Immutability
+
+At freeze, every file under `04-artifacts/source/` plus `MANIFEST.md` is appended as an
+**individual literal string** to `paths.protected` in `.claude/project-config.json`. Both
+`spec-gate` hooks match `paths.protected` by exact string equality, not glob - the enumeration
+*is* the mechanism, not a workaround for one. The append must be idempotent. `/sd:spec` cannot
+perform this step itself (it never touches `.claude/`); it is a documented manual step until the
+port pipeline lands. `spec-gate` guards `Edit`/`Write` only - it does not stop a shell delete.
+
+Per-file hashes are recorded now so a later drift check (re-hashing the donor at a newer commit)
+remains possible; consuming them is out of scope for this story.
+
+---
+
 ## Hunk classification (sd-reviewer)
 
 Classify every hunk of the port changeset into exactly one class. The vocabulary is closed - there

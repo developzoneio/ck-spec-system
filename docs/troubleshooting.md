@@ -221,6 +221,17 @@ This lists every inconsistency. Then fix manually (recommended) or remove the mi
 
 The aging report flags specs in `in-progress` > 7 days and `draft` > 14 days (defaults). These are signals, not errors. Decide per case: resume, close, or archive.
 
+### spec-gate ignores my `PORT-` spec while it's in-progress
+
+**Cause**: the in-progress-spec scan in `spec-gate`, `prompt-router`, and `subagent-retro` matches
+a hardcoded `(FEAT|BUG|REF|PERF|RCA)` prefix set; it does not read `spec.prefixes` from
+`project-config.json`, so a `PORT-` row is invisible to it.
+
+**Fix**: set `hooks.specGate.mode: "warn"` for the duration of the port, or track the work under an
+accompanying FEAT spec. The same cause explains why `prompt-router` injects no context for an
+in-progress `PORT-` spec and why `subagent-retro` selects no `port`-scoped lessons. Prefix
+recognition is planned for the port pipeline, not yet shipped.
+
 ---
 
 ## Spec-gate blocking unexpectedly

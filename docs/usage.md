@@ -237,7 +237,7 @@ Already covered above. Re-runnable. Detects state (fresh / post-init / partial /
 
 Cut a release from completed specs. **No code is changed. No subagent is invoked.** Pure file ops, like `/sd:spec`.
 
-Collects every spec currently in `done` (types feature / bug / refactor / perf - RCA is never released), groups them into Keep-a-Changelog sections, writes a versioned section to the project `CHANGELOG.md`, then transitions each released spec `done -> archived`.
+Collects every spec currently in `done` (types feature / bug / refactor / perf / port - RCA is never released), groups them into Keep-a-Changelog sections, writes a versioned section to the project `CHANGELOG.md`, then transitions each released spec `done -> archived`.
 
 | Phase | Actor | Gate |
 |---|---|---|
@@ -249,7 +249,7 @@ Collects every spec currently in `done` (types feature / bug / refactor / perf -
 | 5 - Write CHANGELOG + archive | main thread | - |
 | 6 - Report | main thread | - |
 
-Type-to-section mapping: feature -> `Added`, bug -> `Fixed`, refactor + perf -> `Changed`.
+Type-to-section mapping: feature + port -> `Added`, bug -> `Fixed`, refactor + perf -> `Changed`.
 
 Version is inferred when omitted (any feature -> minor bump, else patch; major is never auto-inferred - pass it explicitly). `--dry-run` renders the notes and the archive plan, then stops without writing.
 
@@ -296,13 +296,40 @@ Examples:
 Proves criterion -> task -> test traceability for one spec and writes
 `.specs/<ID>/06-verify.md` with `result: pass|fail`. The spec-gate hook blocks a FEAT
 (feature-spec) `index.md` row from transitioning to `done` without a passing artifact
-(`hooks.specGate.verifyGate`, default on). Other spec types (bug, refactor, perf, rca) close
+(`hooks.specGate.verifyGate`, default on). Other spec types (bug, refactor, perf, rca, port) close
 out through the unconditional protected-path rule, same as before this gate existed.
 
     /sd:verify FEAT-1042
 
 Run it at close-out (Phase 6 of /sd:feature runs it for you) or any time earlier as a
 progress check. A FAIL lists VF0xx findings with file:line citations.
+
+---
+
+## Porting from a donor repository
+
+A `PORT` spec captures reproducing a donor repo's behavior in this host repo: which donor, at
+which commit, which members must land, where each path maps to, and which departures are
+sanctioned. There is no `/sd:port` workflow command yet - authoring one today is a manual
+sequence over the generic spec machinery:
+
+1. Copy `~/.claude/templates/sd/specs/port.template.md` to `.specs/<PORT-ID>/00-spec.md` and fill
+   it (frontmatter provenance, the behavioral contract, and the three fidelity tables - see the
+   **sd-port-fidelity** skill for their column schemas).
+2. Add the new spec's row to `.specs/index.md`.
+3. Capture the donor snapshot under `.specs/<PORT-ID>/04-artifacts/source/`, with a `MANIFEST.md`
+   recording each file's donor path, commit, byte hash, and member line ranges.
+4. **Freeze the snapshot**: append every file under `source/` plus `MANIFEST.md`, as individual
+   literal paths, to `paths.protected` in `.claude/project-config.json`. `/sd:spec` cannot do this
+   step itself (it never touches `.claude/`).
+5. Drive lifecycle with `/sd:spec status <ID> <new-state>` and lint with `/sd:spec validate <ID>`.
+
+**Known limitations** (until the port pipeline lands):
+- `spec-gate`, `prompt-router`, and `subagent-retro` do not recognize the `PORT-` prefix (it is
+  hardcoded in the hook scripts) - a `PORT-` spec is invisible to in-progress-spec detection,
+  context injection, and lesson scoping. Workaround: set `hooks.specGate.mode: "warn"` for the
+  duration of the port, or track the work under an accompanying FEAT spec.
+- `hooks.specGate.verifyGate` is FEAT-scoped, so a port's `done` close-out is not verify-gated.
 
 ---
 

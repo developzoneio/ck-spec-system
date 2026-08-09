@@ -476,9 +476,9 @@
     ],
 
     "budgets": {
-      "commandsBytes": 25978,
-      "agentsBytes": 14671,
-      "skillsBytes": 9134
+      "commandsBytes": 29664,
+      "agentsBytes": 15232,
+      "skillsBytes": 10656
     },
 
     "$budgetsComment": [

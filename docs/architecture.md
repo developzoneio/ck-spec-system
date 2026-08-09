@@ -13,7 +13,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 |    commands/sd/    13 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
-|    templates/sd/   4 setup + 5 spec templates                      |
+|    templates/sd/   4 setup + 6 spec templates                      |
 |    skills/sd/      9 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
@@ -309,7 +309,7 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 ├── 01-plan.md        Phased implementation plan
 ├── 02-tasks.md       Atomic tasks (11 required fields, incl. Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
-├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots
+├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots, donor snapshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups
 ```
 
@@ -326,7 +326,7 @@ append-only memory, not scratch space:
 | `01-plan.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
 | `02-tasks.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
 | `03-decisions.md` | `sd-code-explorer` (impact) + `sd-debugger` (hypotheses / verdicts); append-only | impact + investigation phases | `sd-implementer`, `sd-reviewer` |
-| `04-artifacts/` | any agent (logs, baselines, repro evidence, ticket snapshots) | throughout | any agent + future sessions |
+| `04-artifacts/` | any agent (logs, baselines, repro evidence, ticket snapshots, donor snapshots) | throughout | any agent + future sessions |
 | `05-retro.md` | main thread (status transitions); append-only | every gate transition | resume logic + future sessions |
 
 The cross-phase fields inside `00-spec.md` are intentionally left empty at creation

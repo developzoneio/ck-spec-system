@@ -27,6 +27,7 @@ Each template has a dedicated section below. Read only the section matching the 
 | Refactor | `smell` |
 | Perf | `target_metric` |
 | RCA | `severity`, `incident_started`, `incident_resolved` |
+| Port | `jira` (or `none`), `scope` (`endpoint`\|`module`\|`feature`\|`pattern`), `source_repo`, `source_commit`, `source_license`, `snapshot` (`contract`\|`contract+source`) |
 
 `linked_specs` is always `[]` at authoring time. Cross-references are written later by
 `/sd:spec link`, which maintains the inverse entry on the other spec — never hand-write the list,
@@ -172,6 +173,29 @@ Spec ID format: `RCA-<slug>-<YYYYMMDD>` using UTC date.
 
 ---
 
+## port.template.md
+
+`source_repo` / `source_commit` are required **values**, not just present fields, when `scope` is
+not `pattern` (write `none` for `pattern`). The three fidelity tables - Path mapping table, Member
+manifest, Deviation table - and the mandatory fidelity acceptance criterion (`AC-1`, pre-filled,
+never reworded or renumbered) are owned by **sd-port-fidelity**: read that skill for the column
+schemas and completeness conditions rather than re-deriving them here.
+
+Fill:
+- **Why**, **Donor provenance**, **Behavioral contract** (fixed 7-row table), **Success criteria**
+  `AC-2` onward, **Out of scope**, **Open questions**.
+- **`## Behavioral invariants (non-obvious)`** is mandatory even when short and must never be
+  deleted - it is the single highest-value section in the spec.
+- **`## Spawned specs`** mirrors `rca.template.md`'s 4-column table: one row per donor defect
+  reproduced deliberately, not per sanctioned deviation.
+
+**No `<<PHASE-N: ...>>` tokens exist for this template** - there is no port execution pipeline yet
+to fill them (same as `feature.template.md`). Do not invent one.
+
+Spec ID format: `PORT-<slug>-<YYYYMMDD>` using UTC date.
+
+---
+
 ## Anti-patterns
 
 - Filling cross-phase fields prematurely (bug root cause, perf results log, rca root cause).
@@ -179,3 +203,5 @@ Spec ID format: `RCA-<slug>-<YYYYMMDD>` using UTC date.
 - Hardcoding stack assumptions — always read `CLAUDE.md` first; never default to a stack from prior invocations.
 - Producing the spec text in the prose response — write to the file; return only the summary + path.
 - Glossing over a constitution violation — if §1.1 is at risk, that is an Open question.
+- Inventing a line-range column in the port member manifest — line ranges live only in
+  `04-artifacts/source/MANIFEST.md`, keyed by `(Snapshot path, Ordinal)`.
