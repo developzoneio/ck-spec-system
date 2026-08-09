@@ -14,7 +14,7 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
 |    templates/sd/   4 setup + 5 spec templates                      |
-|    skills/sd/      8 reusable rule packs (referenced by agents)    |
+|    skills/sd/      9 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |
@@ -149,6 +149,8 @@ The split exists for three reasons:
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
 | `sd-replan-loop` | `sd-spec-architect`; `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (runtime read) | Mid-execution re-plan protocol: HARD Gate Re-plan, append-only `## Revisions` log in `01-plan.md`, `Revised-by` task marker. Shared by the two plan+tasks workflows so the revision format is defined once. |
+| `sd-retro-lessons` | `scripts/validate-lessons.*`, `scripts/aggregate-lessons.*` (runtime read) | The `lesson` line format, tag vocabulary, and reusability bar for retro lessons. The one skill with no agent consumer - declared in `contractLint.skillConsumers`. |
+| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror default, four-group deviation allowlist, anti-simplification rules, three gate table schemas, closed hunk-classification vocabulary. |
 
 Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
 

@@ -1,7 +1,7 @@
 # specwright
 
 > **Spec-driven development workflows for Claude Code.**
-> 13 slash commands, 6 specialized subagents, 3 guard-rail hooks, 9 templates, 8 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
+> 13 slash commands, 6 specialized subagents, 3 guard-rail hooks, 9 templates, 9 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
@@ -30,7 +30,7 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 | **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **9 templates** | 4 setup templates + 5 spec templates (feature / bug / refactor / perf / rca) |
-| **8 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline`, `sd-retro-lessons`, `sd-replan-loop` |
+| **9 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline`, `sd-retro-lessons`, `sd-replan-loop`, `sd-port-fidelity` |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
 | **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, your project's database MCP, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
@@ -147,6 +147,8 @@ Skills are shared markdown rules that agents reference via frontmatter. They liv
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca), including which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |
 | `sd-replan-loop` | `sd-spec-architect` (frontmatter); `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (read at runtime) | Sanctioned mid-execution re-plan: the HARD Gate Re-plan, the append-only `## Revisions` log, and the `Revised-by` marker that keeps adaptivity from violating immutability. |
+| `sd-retro-lessons` | `scripts/validate-lessons.*`, `scripts/aggregate-lessons.*` (read at runtime) | The `lesson` line format written into `05-retro.md`, its tag vocabulary, and what makes a lesson reusable rather than a restatement of the spec. |
+| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror as the default, the four-group deviation allowlist, anti-simplification rules, the three gate table schemas, and the closed hunk-classification vocabulary. |
 
 Agents declare the skills they apply via a `skills:` list in their frontmatter, e.g.:
 

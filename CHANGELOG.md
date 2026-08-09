@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`sd-port-fidelity` skill** (SW-37) - cross-project port policy, promoted into a skill because
+  two agents need the same rule body: `sd-spec-architect` authors the deviation table and the port
+  task blocks, `sd-reviewer` judges whether a diff hunk is justified. Defines structural mirror as
+  the default posture, the four-group deviation allowlist (compiler/namespace/assembly, host
+  constitution, host precedent, agreed behavior-parity fix) with a required citation per group, the
+  five anti-simplification rules that reach the implementer through task `Acceptance` rather than
+  through the skill, completeness conditions for the three gate tables (path mapping, member
+  manifest, deviation table) phrased as counting and matching predicates a gate can evaluate
+  without judgement, and the closed four-class hunk vocabulary (`justified` / `unjustified` /
+  `missing` / `extra`). Wired into `agents/spec-architect.md` and `agents/reviewer.md` only; the
+  consumers that enforce it are SW-38 (port spec template), SW-39 (donor extraction), SW-40
+  (justified-diff artifact and reviewer adjudication) and SW-41 (the pipeline itself). Fidelity
+  findings anchor to the port spec's mandatory fidelity acceptance criterion, which is already a
+  legal code anchor - `sd-severity-taxonomy`'s Anchors table is deliberately left untouched.
+- **`contractLint.budgets.agentsBytes` raised 14454 -> 14671** - `agents/spec-architect.md` was the
+  ratchet-setter and sat at the ceiling exactly, so the two-line SW-37 wiring (one `skills:` entry,
+  one `Pattern refs protocol` item) could not land without moving it. Real, reviewed growth on the
+  repo's largest agent, not a reflex to a red run; CL500 is unsuppressible on line 1.
 - **Threshold calibration machinery** (SW-31) - `spec-gate` (`hooks/bash/spec-gate.sh`,
   `hooks/powershell/spec-gate.ps1`) now infers a completed Gate Complexity split from `index.md`'s
   own state (a `FEAT-X` row archived alongside a registered `FEAT-X-<slug>` child) and records it as
