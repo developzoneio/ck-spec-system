@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`## Quickstart` section in `README.md`** (SW-8) - a numbered path (install -> `/sd:setup` ->
+  `/sd:feature <slug>`, with the bundled fixture as the fallback for readers with no project handy)
+  so a new reader reaches their first spec-approval gate without piecing the flow together from
+  separate sections. See the README restructure under **Changed** below for where this section
+  finally landed - it absorbed the install commands outright. Also adds a star / "using this at
+  work" call-to-action to `## Support`, and nine GitHub topics plus a repo description fix (the
+  command count had drifted from what's on disk) via `gh repo edit`.
 - **`## Spawned specs` in the feature, bug, refactor, and perf spec templates** (SW-42) - follow-up
   work discovered mid-spec previously had nowhere to land except prose, where it evaporated. The
   RCA template's reserved-ID table (`Reserved ID | Type | Title | Owner`) is now the one convention
@@ -296,7 +303,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the invocation-contract validator in SW-26 (SW-25). Format documented in `CONTRIBUTING.md`
   under "Agents". No agent behaviour changed.
 
+### Changed
+- **`README.md` restructured to lead with evidence rather than inventory.** The page opened with a
+  feature count and asked the reader to take 330 lines of tables on trust before showing a single
+  line of output. It now opens with `## What it looks like` - a real Gate 1 spec-approval STOP and
+  the real Gate 3 reviewer verdict (`0 BLOCK / 0 WARN / 5 SUGGEST / 7 PASS`, `18/18` tests), both
+  transcribed from the committed `FEAT-todo-priority` run in `examples/fixture-project/`, not
+  invented for the README.
+  - **`## How this differs from prompt-level discipline`** names the four structural properties -
+    gates halt the phase, `spec-gate` denies `Edit`/`Write` at the `PreToolUse` layer rather than in
+    the prompt, the reviewer's allowlist contains no write tools, and specs are subagent inputs
+    rather than write-ups. Previously the README asserted discipline without saying what enforces it.
+  - **The two install sections are one.** `## Quickstart` now carries the install commands inline
+    plus an explicit requirements line; the old `## Quick install` becomes
+    `## Install options and uninstall` and keeps only the advanced path. The reader no longer
+    bounces between two sections that pointed at each other.
+  - **The agent and skill tables shrank to a summary plus a link.** Tool allowlists, the
+    command -> agent routing map, and the nine-row skill catalogue already lived in
+    `docs/architecture.md` verbatim; the README kept a duplicate that could drift. Only the role
+    and model columns stay.
+  - Adds a release badge, surfaces `examples/port-parity-fixture/` and `examples/spec-lint-fixture/`
+    (previously unmentioned anywhere in the README), and replaces the unsourced "typical feature run
+    ~$2-3" with a pointer to `/sd:status`, which reports the reader's own cost from their metrics log.
+- **Two new `docClaims` entries** for the README's prose subagent and skill counts. Both new
+  sentences tripped Check 7's undeclared-claim scan, which is the intended behaviour - the numbers
+  are now derived from disk like every other published count.
+
 ### Fixed
+- **`README.md`'s BMAD acknowledgement pointed at `https://github.com/`** - a placeholder URL that
+  had shipped since the section was written. Now links to `bmad-code-org/BMAD-METHOD`.
+- **`README.md`'s compatibility matrix claimed "Latest as of Jan 2026"** for the Claude Code CLI row,
+  seven months stale. The roadmap's "**Planned** - nothing queued right now" bullet read as a
+  stalled project against a repo that had shipped through v1.5.0; the section now leads with the
+  shipped release and drops the empty bucket.
+- Two em dashes in the README's skills table, the only two in a file that uses `-` roughly 200 times.
 - `docs/architecture.md` listed four items against a gate count of three for `/sd:feature`, one of
   them naming a per-task review gate removed when the workflow moved to batch review. Found by
   writing CL302, fixed before the linter landed.

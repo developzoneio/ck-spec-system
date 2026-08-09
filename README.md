@@ -1,12 +1,65 @@
 # specwright
 
-> **Spec-driven development workflows for Claude Code.**
+> **Claude Code cannot touch your code until a spec is approved.**
 > 14 slash commands, 6 specialized subagents, 3 guard-rail hooks, 10 templates, 9 reusable skills - all under the `sd:` namespace, stack-agnostic, cross-platform, and ready to drop into any project.
 
+[![Release](https://img.shields.io/github/v/release/developzoneio/specwright)](https://github.com/developzoneio/specwright/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://docs.claude.com/en/docs/claude-code)
 [![Cross-platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#compatibility-matrix)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/developzone)
+
+---
+
+## What it looks like
+
+You ask for a feature. Nothing gets written yet - the workflow drafts a spec and **stops**:
+
+```
+> /sd:feature todo-priority
+
+Phase 1  sd-spec-architect -> .specs/FEAT-todo-priority/00-spec.md
+
+  Why               A todo carries no urgency signal. Every caller that needs
+                    ordering keeps that data outside the library, beyond the
+                    reach of the library's own validation.
+  Success criteria  AC-1 .. AC-9, each requiring a file:line or test citation
+  Out of scope      6 items, incl. "no setPriority path in this iteration"
+  Constitution      1.1  Layer rules       OK - validation stays in Domain
+                    2.3  Error handling    OK - one class per failure mode
+                    3    Quality bars      integration test MANDATORY
+                                           (change crosses Domain/Application)
+                    6    Forbidden         1 exception, scoped and recorded
+
+  Gate 1 - Spec approval   [STOP]
+
+  Approve spec FEAT-todo-priority? (yes / refine <feedback> / abort)
+_
+```
+
+That STOP is not a suggestion. Until you answer, the `spec-gate` hook denies every
+`Edit` / `Write` call at the tool layer - so the model cannot quietly start coding while
+you are still reading.
+
+After the work is done, the review gate is just as blunt:
+
+```
+  Gate 3 - Integration + review pass   [STOP]
+
+  Tests    18/18 pass (8 original + 6 Domain + 4 Application), original 8 unedited
+  Review   0 BLOCK / 0 WARN / 5 SUGGEST / 7 PASS
+           S1  .specs/constitution.md:143 - DTO bullet now inconsistent
+               with the refreshed Aggregate-root bullet at :141
+           S2  the approved constitution exception has no ADR of its own,
+               so its provenance dies when this spec is archived
+
+  All clean for FEAT-todo-priority? (yes / address findings / abort)
+_
+```
+
+Every artifact above is real and committed. Read the whole run at
+[`examples/fixture-project/.specs/FEAT-todo-priority/`](examples/fixture-project/.specs/FEAT-todo-priority/) -
+spec, plan, tasks, decisions, retro, verify - for an actual change to a runnable project.
 
 ---
 
@@ -21,6 +74,68 @@ Most AI coding assistants are great at producing diff-shaped output. They are le
 
 The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` at runtime; there are no hardcoded language or framework assumptions.
 
+### How this differs from prompt-level discipline
+
+Plenty of tools ask the model nicely to plan first. Four things here are structural instead:
+
+- **Gates halt the workflow.** Silence is not approval - the phase does not advance without an explicit answer. HARD gates (bug reproduction, perf baseline) have no override path at all.
+- **The block lives outside the prompt.** `spec-gate` is a `PreToolUse` hook: with no in-progress spec, `Edit` / `Write` is denied by the CLI, not discouraged by instructions. A prompt can be argued with; a tool-level deny cannot.
+- **The reviewer physically cannot auto-fix.** Its tool allowlist contains no write tools, so findings must route back through a fresh implementer call. The role separation is enforced by configuration, not by asking the model to behave.
+- **Specs are inputs, not write-ups.** `00-spec.md` through `06-verify.md` are what each subagent is handed on invocation - so they cannot rot into after-the-fact documentation nobody reads.
+
+---
+
+## Quickstart
+
+Goal: your first spec in under 5 minutes.
+
+**Requirements:** the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code), installed and authenticated. PowerShell 5.1+ on Windows, or bash 4+ on macOS/Linux. Node 20+ only if you want to run the bundled example.
+
+**1. Install the engine.**
+
+```powershell
+# Windows (PowerShell 5.1+)
+git clone https://github.com/developzoneio/specwright.git
+cd specwright
+.\install\install.ps1 -DryRun   # preview
+.\install\install.ps1           # install to $env:USERPROFILE\.claude
+```
+
+```bash
+# macOS / Linux (bash 4+)
+git clone https://github.com/developzoneio/specwright.git
+cd specwright
+./install/install.sh --dry-run   # preview
+./install/install.sh             # install to ~/.claude
+```
+
+**2. Scaffold a project.** In any repo:
+
+```
+cd <your-project>
+claude
+> /sd:setup
+```
+
+`/sd:setup` interactively generates `CLAUDE.md`, `.specs/` (constitution + index), and `.claude/project-config.json`. It is idempotent - safe to re-run.
+
+**3. Run a real spec-driven change.**
+
+```
+> /sd:feature <slug>
+```
+
+The workflow walks spec -> impact -> plan -> execute -> review, stopping at Gate 1 for your sign-off. That STOP is your first spec.
+
+**No project handy?** Use the bundled one - zero dependencies, Node's built-in test runner:
+
+```bash
+cd examples/fixture-project
+node --test          # if this passes, your environment is ready
+claude
+> /sd:feature <slug>
+```
+
 ---
 
 ## Features
@@ -31,72 +146,11 @@ The system is **stack-agnostic**. Agents read `CLAUDE.md` and `constitution.md` 
 | **6 specialized subagents** | `sd-spec-architect`, `sd-code-explorer`, `sd-debugger`, `sd-implementer`, `sd-reviewer`, `sd-docs-writer` |
 | **3 cross-platform hooks** | `prompt-router`, `spec-gate`, `subagent-retro` (PowerShell + bash) |
 | **10 templates** | 4 setup templates + 6 spec templates (feature / bug / refactor / perf / rca / port) |
-| **9 reusable skills** | `sd-severity-taxonomy`, `sd-hypothesis-tree`, `sd-atomic-task-format`, `sd-evidence-citation`, `sd-spec-templates`, `sd-pattern-discipline`, `sd-retro-lessons`, `sd-replan-loop`, `sd-port-fidelity` |
+| **9 reusable skills** | Shared rule packs referenced from agent frontmatter - severity taxonomy, hypothesis tree, atomic task format, evidence citation, and more |
 | **Cross-platform installer** | `install.ps1` for Windows, `install.sh` for macOS/Linux. Content-hash dedup, timestamped backups, dry-run mode |
 | **MCP-friendly** | Tooled out of the box for Atlassian, Context7, sequential-thinking, GitNexus, your project's database MCP, Playwright, Tavily |
 | **Stack-agnostic** | Works for .NET, Node, Python, Go, Rust, anything with a `CLAUDE.md` |
-| **Cost-aware** | Sonnet for reasoning, Haiku for execution. Typical feature run ~$2-3 |
-
----
-
-## Quick install
-
-**Windows (PowerShell 5.1+):**
-```powershell
-git clone https://github.com/developzoneio/specwright.git
-cd specwright
-.\install\install.ps1 -DryRun   # preview
-.\install\install.ps1           # install to $env:USERPROFILE\.claude
-```
-
-**macOS / Linux (bash 4+):**
-```bash
-git clone https://github.com/developzoneio/specwright.git
-cd specwright
-./install/install.sh --dry-run   # preview
-./install/install.sh             # install to ~/.claude
-```
-
-Then in a real project:
-```
-cd <your-project>
-claude
-> /sd:setup
-```
-
-That's it. `/sd:setup` will scaffold `CLAUDE.md`, `.specs/`, and `.claude/project-config.json` interactively.
-
-**No project handy yet?** Try the bundled example instead - a tiny, runnable, non-.NET
-(plain Node.js) project, already scaffolded:
-
-```bash
-cd examples/fixture-project
-node --test               # confirm the fixture's own tests pass first
-claude
-> /sd:feature <slug>      # run a real spec-driven change end-to-end
-```
-
-`/sd:setup` will report "already set up" here - `CLAUDE.md`, `.specs/`, and `.claude/` are
-committed. Read `.specs/FEAT-todo-priority/00-spec.md` through `06-verify.md` for a complete
-worked example before running your own. See
-[`examples/fixture-project/README.md`](examples/fixture-project/README.md) for details.
-
-See [`install/README.md`](install/README.md) for advanced options.
-
-### Uninstall
-
-```powershell
-.\install\uninstall.ps1 -DryRun   # preview
-.\install\uninstall.ps1           # remove the five sd/ engine directories
-```
-
-```bash
-./install/uninstall.sh --dry-run   # preview
-./install/uninstall.sh             # remove the five sd/ engine directories
-```
-
-Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouched; see
-[`install/README.md`](install/README.md#uninstall) for details.
+| **Cost-aware** | Sonnet for reasoning, Haiku for execution. `/sd:status` reports your own per-workflow cost from the local metrics log |
 
 ---
 
@@ -119,49 +173,38 @@ Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouc
 | `/sd:verify <spec-ID>` | Utility | - | Verify criterion -> task -> test traceability; writes the close-out gate artifact |
 | `/sd:status` | Utility | - | Read-only summary of the metrics log + spec registry: in progress, gate activity, friction |
 
----
-
-## Agents
-
-| Agent | Model | Tools (minimal allowlist) | Role |
-|---|---|---|---|
-| `sd-spec-architect` | sonnet | Read, Write, Edit, Grep, Glob, Atlassian MCP, Context7 MCP | Create / refine specs, plans, and tasks. Constitution-aware. |
-| `sd-code-explorer` | haiku | Read, Grep, Glob, GitNexus MCP | Read-only navigation. Every finding cites `file:line`. |
-| `sd-debugger` | sonnet | Read, Grep, Glob, Bash, sequential-thinking, GitNexus, Tavily, Context7 | Hypothesis-tree investigation. Distinguishes proximate vs root cause. |
-| `sd-implementer` | haiku | Read, Write, Edit, MultiEdit, Grep, Glob, Bash, Context7 | Executes ONE atomic task. Scope-disciplined, no opportunism. |
-| `sd-reviewer` | sonnet | Read, Grep, Glob, sequential-thinking, GitNexus | Severity-tagged review: BLOCK / WARN / SUGGEST / PASS. |
-| `sd-docs-writer` | sonnet | Read, Write, Glob, Grep | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
-
-All models use **portable aliases** (`sonnet`, `haiku`) so they auto-update.
+Command-by-command reference with worked examples: [`docs/usage.md`](docs/usage.md).
 
 ---
 
-## Skills
+## Agents and skills
 
-Skills are shared markdown rules that agents reference via frontmatter. They live in `~/.claude/skills/sd/` (one folder per skill, each with a `SKILL.md`). Pulling rules out of agent bodies and into skills keeps agent prompts smaller and lets multiple agents share the same canonical rule without copy-paste drift.
+Commands do not do the work themselves - they orchestrate 6 subagents, each with a focused role and a **minimal tool allowlist** that enforces that role structurally.
 
-| Skill | Used by | Purpose |
+| Agent | Model | Role |
 |---|---|---|
-| `sd-severity-taxonomy` | `sd-reviewer` | BLOCK / WARN / SUGGEST / PASS severity rules and the mandatory review output format. |
-| `sd-hypothesis-tree` | `sd-debugger` | Enumerate-and-verify protocol with the 5 mental models, score formula, and proximate-vs-root "why" ladder. |
-| `sd-atomic-task-format` | `sd-spec-architect`, `sd-implementer` | The atomic task block (11 required fields, including `Pattern refs`), canonical enums (`Step type`, `Complexity`, `Reversibility`), and atomicity rules. |
-| `sd-evidence-citation` | `sd-code-explorer`, `sd-debugger`, `sd-reviewer`, `sd-docs-writer` | Citation discipline — every finding cites `file:line`. Snippet length, grouping, and what counts as evidence. |
-| `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules (feature / bug / refactor / perf / rca / port), including which cross-phase fields to leave empty. |
-| `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence — new code mirrors cited precedents (`Pattern refs`); existing utilities are reused, not duplicated. |
-| `sd-replan-loop` | `sd-spec-architect` (frontmatter); `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (read at runtime) | Sanctioned mid-execution re-plan: the HARD Gate Re-plan, the append-only `## Revisions` log, and the `Revised-by` marker that keeps adaptivity from violating immutability. |
-| `sd-retro-lessons` | `scripts/validate-lessons.*`, `scripts/aggregate-lessons.*` (read at runtime) | The `lesson` line format written into `05-retro.md`, its tag vocabulary, and what makes a lesson reusable rather than a restatement of the spec. |
-| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror as the default, the four-group deviation allowlist, anti-simplification rules, the three gate table schemas, and the closed hunk-classification vocabulary. |
+| `sd-spec-architect` | sonnet | Creates and refines specs, plans, and atomic tasks. Constitution-aware. |
+| `sd-code-explorer` | haiku | Read-only navigation. Every finding cites `file:line`. |
+| `sd-debugger` | sonnet | Hypothesis-tree investigation. Distinguishes proximate from root cause. |
+| `sd-implementer` | haiku | Executes ONE atomic task. Scope-disciplined, no opportunism. |
+| `sd-reviewer` | sonnet | Severity-tagged review: BLOCK / WARN / SUGGEST / PASS. **No write tools.** |
+| `sd-docs-writer` | sonnet | Authors one MADR-style ADR from a spec's decisions. Writes only the ADR file. |
 
-Agents declare the skills they apply via a `skills:` list in their frontmatter, e.g.:
+Models use **portable aliases** (`sonnet`, `haiku`) so they auto-update - never a pinned model ID.
+
+Cross-cutting rules live in **9 skills**: markdown rule packs that agents load via a `skills:` list in their frontmatter, rather than copy-pasting the same rule into every agent body that needs it.
 
 ```yaml
 ---
 name: sd-reviewer
+model: sonnet
 skills:
   - sd-severity-taxonomy
   - sd-evidence-citation
 ---
 ```
+
+Full agent tool allowlists, the command -> agent routing map, and the complete skill catalogue: [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -261,7 +304,7 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 
 | Component | Tested on | Notes |
 |---|---|---|
-| Claude Code CLI | Latest as of Jan 2026 | Hook contract: `UserPromptSubmit`, `PreToolUse`, `SubagentStop` |
+| Claude Code CLI | Latest as of Aug 2026 | Hook contract: `UserPromptSubmit`, `PreToolUse`, `SubagentStop` |
 | Windows 11 | PowerShell 5.1 and 7.x | PS 5.1 reads UTF-8 as CP1252 - hooks are pure ASCII |
 | macOS 13+ | bash 4+ via Homebrew | `stat -f %m` syntax supported |
 | Ubuntu 22.04+ | bash 5 | `stat -c %Y` syntax supported |
@@ -272,29 +315,57 @@ Configure per project in `.claude/project-config.json` under the `mcp` section.
 
 ---
 
+## Install options and uninstall
+
+The [Quickstart](#quickstart) covers the common path. For custom install roots, selective areas, and backup behavior, see [`install/README.md`](install/README.md).
+
+### Uninstall
+
+```powershell
+.\install\uninstall.ps1 -DryRun   # preview
+.\install\uninstall.ps1           # remove the five sd/ engine directories
+```
+
+```bash
+./install/uninstall.sh --dry-run   # preview
+./install/uninstall.sh             # remove the five sd/ engine directories
+```
+
+Per-project artifacts (`.specs/`, `.claude/`, project `CLAUDE.md`) remain untouched; see
+[`install/README.md`](install/README.md#uninstall) for details.
+
+---
+
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md) - 3-layer design, lifecycle, cost model
+- [`docs/architecture.md`](docs/architecture.md) - 3-layer design, agent routing, skills, lifecycle, cost model
 - [`docs/usage.md`](docs/usage.md) - Command-by-command reference with examples
 - [`docs/walkthrough.md`](docs/walkthrough.md) - End-to-end fictional project demo (illustrative prose)
-- [`examples/fixture-project/`](examples/fixture-project/) - End-to-end **runnable** non-.NET example, with a committed worked spec
 - [`docs/troubleshooting.md`](docs/troubleshooting.md) - Common issues and fixes
+- [`docs/contract-lint.md`](docs/contract-lint.md) - How cross-file contracts between commands, agents, and skills are machine-checked
 - [`install/README.md`](install/README.md) - Install guide and options
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - PR process and dev guidelines
 - [`CHANGELOG.md`](CHANGELOG.md) - Release notes
 - [`ROADMAP.md`](ROADMAP.md) - Planned and exploratory work
 
+### Runnable examples
+
+- [`examples/fixture-project/`](examples/fixture-project/) - End-to-end **runnable** non-.NET project with a committed worked spec (`FEAT-todo-priority`, `00-spec.md` through `06-verify.md`)
+- [`examples/port-parity-fixture/`](examples/port-parity-fixture/) - Donor/host pair exercising the `/sd:port` fidelity gates
+- [`examples/spec-lint-fixture/`](examples/spec-lint-fixture/) - Deliberately malformed specs that `/sd:spec validate` must catch
+
 ---
 
 ## Roadmap
 
-Forward-looking work lives in [`ROADMAP.md`](ROADMAP.md). Highlights:
+Shipped work is in [`CHANGELOG.md`](CHANGELOG.md) - the latest release is
+[v1.5.0](https://github.com/developzoneio/specwright/releases). Forward-looking work lives in
+[`ROADMAP.md`](ROADMAP.md):
 
 - **Near-term** - GitHub Issue auto-fetch (`gh issue view`) to match the existing JIRA snapshot path.
-- **Planned** - nothing queued right now.
 - **Exploratory** - local-only, opt-in usage analytics.
 
-Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).
+Have a workflow you wish existed? [Open an issue](https://github.com/developzoneio/specwright/issues/new) - the roadmap is shaped by what people actually hit.
 
 ---
 
@@ -302,6 +373,8 @@ Shipped work is in [`CHANGELOG.md`](CHANGELOG.md).
 
 Enjoying `specwright`? A coffee goes a long way toward keeping it maintained -
 [buy me one on Ko-fi](https://ko-fi.com/developzone). Thank you!
+
+A star on the repo helps others find it. Using `specwright` at work? [Open an issue](https://github.com/developzoneio/specwright/issues/new) and let us know - we'd love to list you.
 
 ---
 
@@ -313,4 +386,4 @@ MIT. See [`LICENSE`](LICENSE).
 
 ## Acknowledgements
 
-Inspired by the spec-driven discipline of long-running software teams, and by the [BMAD method](https://github.com/) for structuring AI-assisted workflows. Built on top of [Claude Code](https://docs.claude.com/en/docs/claude-code) by Anthropic.
+Inspired by the spec-driven discipline of long-running software teams, and by the [BMAD method](https://github.com/bmad-code-org/BMAD-METHOD) for structuring AI-assisted workflows. Built on top of [Claude Code](https://docs.claude.com/en/docs/claude-code) by Anthropic.

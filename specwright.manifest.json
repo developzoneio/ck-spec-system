@@ -187,6 +187,8 @@
     { "file": "README.md", "pattern": "templates\\*\\* \\| ([0-9]+) setup templates", "equals": "templatesSetup" },
     { "file": "README.md", "pattern": "setup templates \\+ ([0-9]+) spec templates", "equals": "templatesSpec" },
     { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) reusable skills\\*\\* \\|", "equals": "skills" },
+    { "file": "README.md", "pattern": "they orchestrate ([0-9]+) subagents", "equals": "agents" },
+    { "file": "README.md", "pattern": "Cross-cutting rules live in \\*\\*([0-9]+) skills\\*\\*", "equals": "skills" },
 
     { "file": "CLAUDE.md", "pattern": "commands/sd/` \\| ([0-9]+) slash commands", "equals": "commands" },
     { "file": "CLAUDE.md", "pattern": "agents/sd/` \\| ([0-9]+) subagents", "equals": "agents" },
