@@ -10,6 +10,7 @@ per-file-type guidelines, and how to test changes locally.
 - [Project goals and non-goals](#project-goals-and-non-goals)
 - [Repo layout](#repo-layout)
 - [The manifest](#the-manifest)
+- [Threshold re-calibration](#threshold-re-calibration)
 - [PR process](#pr-process)
 - [Per-file-type guidelines](#per-file-type-guidelines)
   - [Commands (`commands/*.md`)](#commands-commandsmd)
@@ -152,6 +153,24 @@ guard, and invariants C and D in `tests/contract-lint/run-selftest.ps1`.
 a single pwsh script by design: it runs both implementations in one process, so parity is asserted
 rather than inferred. `-SelfTest` swaps in a linter that reports nothing and asserts the harness
 notices.
+
+---
+
+## Threshold re-calibration
+
+Every hardcoded threshold in this repo (Gate Complexity's tasks/layers/files limits,
+`retroStaleMinutes`, `debounceMinutes`, `maxLessons`, `metrics.maxSizeKb`, the perf gate's noise
+floor) started as an estimate, not a measurement - see `docs/adr/0004-threshold-calibration.md`.
+Re-run the calibration pass **every 20 closed specs, or at each minor release, whichever comes
+first**:
+
+1. Run `/sd:status --calibration` against the accumulated `.specs/index.md` and
+   `.specs/_metrics/events.jsonl`.
+2. For each threshold, record the verdict - keep, change, or insufficient data - in a new ADR under
+   `docs/adr/`. "Insufficient data" is a legitimate, expected outcome at a thin corpus size; do not
+   change a threshold without a stated measurement behind it.
+3. Where a threshold's rationale in `templates/project-config.template.json` is still a judgement
+   call (no measured basis), leave its `_..._use` caveat in place rather than removing it.
 
 ---
 

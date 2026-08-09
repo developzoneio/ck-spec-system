@@ -131,10 +131,12 @@
       "retroStaleMinutes": 30,
       "debounceMinutes": 10,
       "_use": "Reminder to update stale retros after subagent runs",
+      "_retroStaleMinutes_use": "Default 30 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md). Re-calibrate per CONTRIBUTING's re-calibration ritual once enough closed specs accumulate.",
+      "_debounceMinutes_use": "Default 10 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md). Re-calibrate per CONTRIBUTING's re-calibration ritual once enough closed specs accumulate.",
       "injectLessons": true,
       "maxLessons": 3,
       "_injectLessons_use": "Surface lessons from <spec.dir>/_lessons/lessons.md when a subagent finishes work on an in-progress spec. Selection is by workflow type - a FEAT- spec pulls feature-scoped lessons - so there is no ranking. Emitted regardless of retro staleness and of debounceMinutes, which gate only the stale-retro reminder.",
-      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder."
+      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder. Default 3 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md)."
     },
     "metrics": {
       "enabled": true,

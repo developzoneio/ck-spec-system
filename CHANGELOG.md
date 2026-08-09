@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Threshold calibration machinery** (SW-31) - `spec-gate` (`hooks/bash/spec-gate.sh`,
+  `hooks/powershell/spec-gate.ps1`) now infers a completed Gate Complexity split from `index.md`'s
+  own state (a `FEAT-X` row archived alongside a registered `FEAT-X-<slug>` child) and records it as
+  a new `gate:"complexity"`/`decision:"split"` metrics event - this repo's first metric for a gate
+  that is otherwise decided as model-executed prose. Recorded only when the `index.md` edit is
+  actually allowed through, never on a `block` exit, so the count under-reports on any project that
+  leaves `index.md` protected (the default). `/sd:status --calibration` (new optional flag,
+  default invocation's read contract unchanged) reports task/layer/file distributions from spec
+  artifacts alongside the new split count, framed as `insufficient data (n=<n>)` below the
+  CONTRIBUTING re-calibration trigger. `docs/adr/0004-threshold-calibration.md` records this run's
+  verdict (insufficient data on every threshold at the current n=1 corpus) and the deliberately
+  declined scope (full trip-rate instrumentation); `templates/project-config.template.json` now
+  marks `retroStaleMinutes`, `debounceMinutes`, and `maxLessons` as unmeasured judgement calls,
+  matching the existing `maxSizeKb` caveat. CONTRIBUTING names the re-calibration ritual (every 20
+  closed specs, or each minor release).
+
 - **Install-time version stamp** (SW-29) - `install/install.ps1` / `install/install.sh` now write
   `specwright-version.txt` into every installed `<area>/sd/` root, parsed at install time from the
   newest dated `## [x.y.z] - <date>` heading in `CHANGELOG.md` - the same source `versionClaims`

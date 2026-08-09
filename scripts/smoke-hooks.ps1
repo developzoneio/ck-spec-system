@@ -174,6 +174,62 @@ Invoke-Hook (Join-Path $repoRoot 'hooks\powershell\spec-gate.ps1') '{not valid j
 Assert-Exit0 'spec-gate (d) malformed JSON' $script:Code
 Assert-Empty 'spec-gate (d) malformed JSON' $script:Stdout
 
+# ---- spec-gate: (e)/(f) archived parent + registered child -> complexity split (SW-31) ----
+# Same pending index.md content in both cases - only paths.protected differs.
+# (e) proves the split is recorded when the edit is actually ALLOWED through.
+# (f) proves it is NOT recorded when the SAME edit is denied (index.md
+# protected, the default) - nothing reached disk, so no split happened.
+
+$splitFixture = Join-Path $env:TEMP "sd-smoke-hooks-split-$PID"
+if (Test-Path -LiteralPath $splitFixture) { Remove-Item -Recurse -Force $splitFixture }
+New-Item -ItemType Directory -Force -Path (Join-Path $splitFixture '.specs') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $splitFixture '.claude') | Out-Null
+$splitIndexContent = @'
+| ID | Type | Status | Created | Title |
+|---|---|---|---|---|
+| FEAT-big | feature | in-progress | 2026-08-01 | Big oversized thing |
+| FEAT-big-partA | feature | draft | 2026-08-09 | Part A |
+'@
+Set-Content -LiteralPath (Join-Path $splitFixture '.specs\index.md') -Value $splitIndexContent -Encoding UTF8 -NoNewline
+$splitNewContent = @'
+| ID | Type | Status | Created | Title |
+|---|---|---|---|---|
+| FEAT-big | feature | archived | 2026-08-01 | Big oversized thing |
+| FEAT-big-partA | feature | draft | 2026-08-09 | Part A |
+'@
+$splitPayload = [pscustomobject]@{
+    tool_name  = 'Write'
+    cwd        = $splitFixture
+    tool_input = [pscustomobject]@{ file_path = '.specs/index.md'; content = $splitNewContent }
+} | ConvertTo-Json -Compress -Depth 5
+$splitConfigPath = Join-Path $splitFixture '.claude\project-config.json'
+$splitEventsPath = Join-Path $splitFixture '.specs\_metrics\events.jsonl'
+
+Write-Section 'spec-gate (PowerShell): (e) allowed edit with archived parent + registered child -> complexity split metric'
+Set-Content -LiteralPath $splitConfigPath -Value '{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[]}}' -Encoding UTF8 -NoNewline
+Invoke-Hook (Join-Path $repoRoot 'hooks\powershell\spec-gate.ps1') $splitPayload
+Assert-Exit0 'spec-gate (e) complexity split, allowed' $script:Code
+$splitEvents = Get-Content -LiteralPath $splitEventsPath -Raw -ErrorAction SilentlyContinue
+if ($null -eq $splitEvents) { $splitEvents = '' }
+Assert-Contains 'spec-gate (e) complexity split, allowed' $splitEvents '"gate":"complexity","decision":"split"'
+Assert-Contains 'spec-gate (e) complexity split, allowed' $splitEvents '"spec_id":"FEAT-big"'
+
+Write-Section 'spec-gate (PowerShell): (f) blocked edit (default protected index.md) -> no complexity split metric'
+Remove-Item -LiteralPath $splitEventsPath -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $splitConfigPath -ErrorAction SilentlyContinue
+Invoke-Hook (Join-Path $repoRoot 'hooks\powershell\spec-gate.ps1') $splitPayload
+Assert-Exit0 'spec-gate (f) complexity split, blocked' $script:Code
+Assert-Contains 'spec-gate (f) complexity split, blocked' $script:Stdout '"decision":"block"'
+$splitEventsBlocked = Get-Content -LiteralPath $splitEventsPath -Raw -ErrorAction SilentlyContinue
+if ($null -eq $splitEventsBlocked) { $splitEventsBlocked = '' }
+if ($splitEventsBlocked.Contains('"gate":"complexity"')) {
+    Add-Bad 'spec-gate (f) complexity split, blocked : split metric wrongly recorded for a denied edit'
+} else {
+    Add-Ok 'spec-gate (f) complexity split, blocked : no split metric recorded'
+}
+
+Remove-Item -Recurse -Force $splitFixture -ErrorAction SilentlyContinue
+
 # ---- subagent-retro: missing retro names the spec, then debounces ----------
 
 Write-Section 'subagent-retro (PowerShell): missing 05-retro.md names the real spec ID'

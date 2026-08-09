@@ -157,6 +157,55 @@ run_hook "$repo_root/hooks/bash/spec-gate.sh" '{not valid json'
 assert_exit0 "spec-gate (d) malformed JSON" "$CODE"
 assert_empty "spec-gate (d) malformed JSON" "$STDOUT"
 
+# ---- spec-gate: (e)/(f) archived parent + registered child -> complexity split (SW-31) ----
+# Same pending index.md content in both cases - only paths.protected differs.
+# (e) proves the split is recorded when the edit is actually ALLOWED through.
+# (f) proves it is NOT recorded when the SAME edit is denied (index.md
+# protected, the default) - nothing reached disk, so no split happened.
+
+split_fixture="$(mktemp -d)"
+mkdir -p "$split_fixture/.specs" "$split_fixture/.claude"
+cat > "$split_fixture/.specs/index.md" <<'MD'
+| ID | Type | Status | Created | Title |
+|---|---|---|---|---|
+| FEAT-big | feature | in-progress | 2026-08-01 | Big oversized thing |
+| FEAT-big-partA | feature | draft | 2026-08-09 | Part A |
+MD
+new_content='| ID | Type | Status | Created | Title |
+|---|---|---|---|---|
+| FEAT-big | feature | archived | 2026-08-01 | Big oversized thing |
+| FEAT-big-partA | feature | draft | 2026-08-09 | Part A |'
+payload="$(jq -n --arg cwd "$split_fixture" --arg fp ".specs/index.md" --arg newc "$new_content" \
+    '{tool_name:"Write",cwd:$cwd,tool_input:{file_path:$fp,content:$newc}}' 2>/dev/null)"
+
+if [[ -n "$payload" ]]; then
+    section "spec-gate (bash): (e) allowed edit with archived parent + registered child -> complexity split metric"
+    cat > "$split_fixture/.claude/project-config.json" <<'JSON'
+{"spec":{"dir":".specs","indexFile":".specs/index.md"},"paths":{"protected":[]}}
+JSON
+    run_hook "$repo_root/hooks/bash/spec-gate.sh" "$payload"
+    assert_exit0 "spec-gate (e) complexity split, allowed" "$CODE"
+    events="$(cat "$split_fixture/.specs/_metrics/events.jsonl" 2>/dev/null)"
+    assert_contains "spec-gate (e) complexity split, allowed" "$events" '"gate":"complexity","decision":"split"'
+    assert_contains "spec-gate (e) complexity split, allowed" "$events" '"spec_id":"FEAT-big"'
+
+    section "spec-gate (bash): (f) blocked edit (default protected index.md) -> no complexity split metric"
+    rm -f "$split_fixture/.specs/_metrics/events.jsonl"
+    rm -f "$split_fixture/.claude/project-config.json"
+    run_hook "$repo_root/hooks/bash/spec-gate.sh" "$payload"
+    assert_exit0 "spec-gate (f) complexity split, blocked" "$CODE"
+    assert_contains "spec-gate (f) complexity split, blocked" "$STDOUT" '"decision":"block"'
+    events="$(cat "$split_fixture/.specs/_metrics/events.jsonl" 2>/dev/null)"
+    if [[ "$events" == *'"gate":"complexity"'* ]]; then
+        bad "spec-gate (f) complexity split, blocked : split metric wrongly recorded for a denied edit"
+    else
+        ok "spec-gate (f) complexity split, blocked : no split metric recorded"
+    fi
+else
+    echo "  [SKIP] jq not available - cannot build (e)/(f) payload"
+fi
+rm -rf "$split_fixture"
+
 # ---- subagent-retro: missing retro names the spec, then debounces ----------
 
 section "subagent-retro (bash): missing 05-retro.md names the real spec ID"
