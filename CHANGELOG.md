@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-10
+
 ### Added
 - **`## Quickstart` section in `README.md`** (SW-8) - a numbered path (install -> `/sd:setup` ->
   `/sd:feature <slug>`, with the bundled fixture as the fallback for readers with no project handy)
@@ -1394,7 +1396,8 @@ Each hook ships in two flavours:
 - Operating systems: Windows 11 + PowerShell 5.1 / 7.x, macOS 13+, Ubuntu 22.04+.
 - Optional MCP servers: Atlassian, Context7, sequential-thinking, GitNexus, MSSQL, Playwright, Tavily.
 
-[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/developzoneio/specwright/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/developzoneio/specwright/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/developzoneio/specwright/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/developzoneio/specwright/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/developzoneio/specwright/compare/v1.2.0...v1.3.0
