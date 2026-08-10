@@ -18,9 +18,12 @@ Scaffolds a project to use `specwright`. Safe to re-run: detects existing state 
    - `~/.claude/skills/sd/`
    - If either is missing -> abort with: "specwright install incomplete — `<missing path>` not found. Run `install/install.ps1` (Windows) or `install/install.sh` (Unix) from the specwright repo first."
 2. Verify the current directory looks like a project root.
-   - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`).
+   - Heuristics: presence of `.git/`, OR a package manifest (`package.json`, `*.csproj`, `*.sln`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`). <!-- contract-lint: allow CL400 - a multi-stack detection heuristic enumerating several ecosystems' manifest filenames, not an assumption that any one of them applies -->
    - If nothing found -> warn and ask: "This directory does not appear to be a project root. Continue anyway? (yes / no)".
 3. Read `~/.claude/templates/sd/CLAUDE.template.md`, `constitution.template.md`, `project-config.template.json`, `settings.template.json` into memory. (Spec templates remain on disk for later.)
+4. Read `~/.claude/templates/sd/specwright-version.txt` into memory as "installed engine version". <!-- contract-lint: allow CL005 - specwright-version.txt is generated at install time from CHANGELOG.md, never a checked-in template source file -->
+   If missing or unreadable (engine installed before this stamp existed), record it as `<unknown>`
+   and do NOT abort Phase 0 over this file specifically - unlike the hard existence checks in step 1.
 
 ---
 
@@ -61,7 +64,7 @@ is generic, so future renames and newly-introduced template fields are caught th
 **A. `.claude/settings.json`**
 
 1. **Hook command paths (HIGH).** Each hook command's script path must use the namespace dir of
-   the loaded `settings.template.json` (currently `.../hooks/sd/`). Flag any `/.claude/hooks/<other>/`
+   the loaded `settings.template.json` (currently `.../hooks/sd/`). Flag any `/.claude/hooks/<other>/` <!-- contract-lint: allow CL402 - describes a settings.json path PATTERN to detect drift in the TARGET project's config, not a filesystem path on this machine -->
    segment (e.g. `.../hooks/ck/`) and record the old -> new rewrite per hook
    (UserPromptSubmit/prompt-router, PreToolUse/spec-gate, SubagentStop/subagent-retro).
 2. **Missing top-level blocks.** Flag any template top-level key absent from the file - currently
@@ -72,17 +75,26 @@ is generic, so future renames and newly-introduced template fields are caught th
 
 **B. `.claude/project-config.json`**
 
-4. **`$schema` URL (MEDIUM).** If it does not equal the template's `$schema`
-   (`.../Developzone/specwright/main/schema/...`), flag the rewrite. Catches the old
-   `.../NXTK/ck-spec-system/...` host/org/repo.
+4. **Stale `$schema` key (MEDIUM).** The current template publishes no `$schema` - no schema file
+   is published for it. If the file still has a `$schema` key (leftover from an older template,
+   e.g. the old `.../NXTK/ck-spec-system/...` host or the later dead `.../Developzone/specwright/...`
+   URL), flag it for removal.
 5. **Command/agent names in `_use` doc strings.** Scan every `_use` / `_*_use` string under
    `mcp.*`, `ticket.*`, `hooks.*`, `paths.*`. Flag old-namespace tokens: `/ck:*` -> `/sd:*` and
    `ck:<role>` / `ck-<role>` -> `sd-<role>`. Rewrite only the token, preserving the rest of the
    wording.
-6. **Missing newly-introduced fields.** Flag template keys the file lacks - currently
-   `ticket.snapshot` (whole object) and `paths.layers` + `paths._layers_use`. Add each from the
-   template's default; `paths.layers` defaults to `[]` (never invent a layer map here - that is
-   Phase 2.5's job on a real scaffold).
+6. **Version gap and missing newly-introduced fields.** Two related sub-findings:
+   - **Version gap.** Compare the file's `version` against the "installed engine version" read in
+     Phase 0. If the installed engine is newer (or the file's version is missing/unrecognized),
+     record `version: <old> -> <new>`. Skip this sub-finding if the installed engine version is
+     `<unknown>`.
+   - **Field diff.** Diff every top-level and nested key of the loaded `project-config.template.json`
+     against the file, excluding: placeholder-only differences (`<<...>>` tokens), and every
+     project-specific value already carved out below (project name/owner/repo, ticket settings,
+     detected commands/paths, filled `paths.layers`, MCP `enabled` flags, `specGate.mode`). Flag
+     any template key genuinely absent from the file, adding each from the template's default;
+     `paths.layers` defaults to `[]` (never invent a layer map here - that is Phase 2.5's job on a
+     real scaffold).
 7. **Pinned model IDs -> aliases.** Under `models.*`, flag any dated/versioned ID
    (`claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, ...) and map to the family alias
    (`claude-sonnet-*` -> `sonnet`, `claude-haiku-*` -> `haiku`, `claude-opus-*` -> `opus`). Leave
@@ -121,8 +133,8 @@ and continue (in `complete` -> clean early exit; in `partial` -> continue fillin
 Otherwise print ONE table grouped by file (each line showing exact before -> after with a
 HIGH/MED/LOW tag), then STOP for explicit approval:
 
-> Reply "go" to apply (each file backed up first), "skip" to leave `.claude/*` untouched, or name
-> specific lines to exclude (e.g. "skip the models lines").
+> Reply to apply every change (each file backed up first), leave `.claude/*` untouched, or name the
+> specific lines to exclude, e.g. "skip the models lines". (go / skip / <lines to exclude>)
 
 This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
 
@@ -134,7 +146,9 @@ This is a confirmation of a batch, not a 4th interrogation question - the 3-ques
    place; add missing keys/blocks from the template at their template position. Do NOT reformat
    untouched content, reorder keys, drop `_`-prefixed comment keys, or change any project-specific
    value (project name, ticket settings, detected commands/paths, filled layers, MCP `enabled`
-   flags, `specGate.mode`). Preserve unfilled `<<placeholder>>` tokens.
+   flags, `specGate.mode`). Preserve unfilled `<<placeholder>>` tokens. Exception: `version` is
+   engine-tracked, not project-specific - when the item-6 version-gap sub-finding is approved,
+   overwrite the file's `version` with the installed engine version from Phase 0.
 3. Validate each patched file still parses as JSON (mirrors Phase 7) and re-run the
    hook-resolution check; report backups written, change counts per file, and post-migration hook
    resolution. Tell the user to restart Claude Code so corrected hooks are picked up.
@@ -149,12 +163,13 @@ Goal: extract stack info to pre-fill answers in Phase 3.
 
 1. Read existing `CLAUDE.md`.
 2. Try to extract:
-   - **Language**: from headers like "## Stack" -> "Language" or "Language:" patterns; from filenames present in root (e.g. `*.csproj` -> .NET / C#).
+   - **Language**: from headers like "## Stack" -> "Language" or "Language:" patterns; from filenames present in root (e.g. `*.csproj` -> .NET / C#). <!-- contract-lint: allow CL401 - illustrative example of the filename-heuristic pattern, not an assumed stack -->
    - **Framework**: similar.
    - **Database**: similar.
    - **Build / Test / Lint commands**: from "## Commands" or "## Scripts" sections.
 3. Store extracted values as defaults for Phase 3. Do not assume; only pre-fill if confidence is high.
 
+<!-- contract-lint: allow CL401 - multi-stack filename-heuristic examples, not an assumed stack -->
 If `CLAUDE.md` does not exist, defaults come from filename heuristics (`*.csproj` -> .NET; `package.json` -> Node; `pyproject.toml` -> Python; etc.).
 
 ---
@@ -173,6 +188,7 @@ constitution rules.
 2. Detect and record:
    - **Stack** (language / framework / db): extend the Phase 2 filename heuristics with a content peek
      at the dominant package manifest (`package.json`, `*.csproj`, `pyproject.toml`, `go.mod`,
+     <!-- contract-lint: allow CL400 - same multi-stack manifest-filename enumeration as Phase 0, not a single-stack assumption -->
      `Cargo.toml`, `pom.xml`, `build.gradle`).
    - **Paths**: `src`, `tests`, `docs` from the directory layout.
    - **Commands** (`build` / `test` / `lint` / `run` / `coverage`): read ONLY what the dominant
@@ -186,7 +202,7 @@ constitution rules.
 
 ### Gate - confirm detected facts (one batch confirmation, not a question)
 
-Print a single table of detected facts and ask the user to confirm before writing:
+Print a single table of detected facts, then STOP for explicit approval before writing:
 
 ```
 Detected (edit any before I write, or say "go"):
@@ -196,7 +212,8 @@ Detected (edit any before I write, or say "go"):
   Commands build/test/lint/run/coverage : <values or "<<placeholder>>">
 ```
 
-> Review these. Reply with corrections (e.g. "tests = test, drop the Infrastructure layer") or "go".
+> Review these. Reply to accept them as-is, or send corrections such as "tests = test, drop the
+> Infrastructure layer". (go / <corrections>)
 
 This is a confirmation of a batch, not a 4th interrogation question - the 3-question rule still holds.
 Anything the user does not correct is used as-is; anything still unknown stays `<<placeholder>>`.
@@ -284,6 +301,8 @@ Active specs (auto-updated by /sd:spec status transitions):
 
 1. Create `.claude/` directory if missing.
 2. Write `.claude/project-config.json` from `~/.claude/templates/sd/project-config.template.json`:
+   - Set `version` to the installed engine version read in Phase 0 (not the template's literal
+     `1.0.0`).
    - Substitute project name, owner (from git config), repo URL (from git remote).
    - Set `ticket.system`, `ticket.pattern`, `ticket.baseUrl` from Phase 3 Q1/Q2.
    - Set `commands.{build,test,lint,coverage,run}` from Phase 2.5 detected facts; any command not
@@ -322,11 +341,11 @@ Setup complete. Generated:
   - .claude/settings.json (hooks: prompt-router, spec-gate, subagent-retro)
 
 Installed engine paths:
-  - ~/.claude/commands/sd/     (13 workflow commands)
+  - ~/.claude/commands/sd/     (14 workflow commands)
   - ~/.claude/agents/sd/       (6 specialist agents)
   - ~/.claude/hooks/sd/        (3 hooks)
   - ~/.claude/templates/sd/    (templates)
-  - ~/.claude/skills/sd/       (8 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline, retro-lessons, replan-loop)
+  - ~/.claude/skills/sd/       (9 skills: severity-taxonomy, hypothesis-tree, atomic-task-format, evidence-citation, spec-templates, pattern-discipline, retro-lessons, replan-loop, port-fidelity)
 
 Next steps:
   1. Fill placeholders in CLAUDE.md and .specs/constitution.md (open them in your editor).
@@ -341,7 +360,7 @@ Next steps:
 
 - **Idempotent.** Safe to re-run. Never overwrites without a timestamped backup.
 - **Migrates drift, never silently.** Phase 1.5 detects content drift in existing `.claude/*` (renamed engine paths/URLs/command names, newly-introduced template fields, pinned model IDs) via rule-based checks against the loaded templates - never a raw line-diff, so `<<placeholder>>` and project-specific values are preserved. Every change is previewed in one batch gate, each file is backed up first, and every hook `command` path is verified to resolve on disk.
-- **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`.
+- **Stack-agnostic.** Inference uses filename heuristics + CLAUDE.md parsing. Never hardcodes .NET / Node / Python assumptions. If inference fails, the field stays as `<<placeholder>>`. <!-- contract-lint: allow CL401 - this line IS the stack-agnostic rule statement; the names are forbidden-example illustration -->
 - **Scan detects facts, never rules.** Phase 2.5 may pre-fill stack, paths, commands, and
   `paths.layers` only. It never writes `.specs/constitution.md` rules - those stay `<<placeholder>>`
   for the user to author explicitly.

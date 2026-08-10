@@ -1,0 +1,12 @@
+{
+  "note": "the same unresolved shape as CL001, but decorated as a skill reference",
+  "findings": [
+    {
+      "rule": "CL003",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unresolved-skill"
+    }
+  ]
+}

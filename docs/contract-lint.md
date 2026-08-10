@@ -1,0 +1,352 @@
+# Contract lint (Check 8)
+
+`scripts/contract-lint.ps1` and `scripts/contract-lint.sh` lint the **relationships between** the
+engine's prompt files: which agent a command invokes, which skill an agent loads, which template a
+prompt reads, how many hard gates a workflow declares.
+
+Check 7 (`docs consistency`) already guards *inventory* -- how many files exist. That closed the
+inventory drift class permanently. This closes the **contract** drift class: relationships that
+were previously asserted in prose and checked only by human review.
+
+Each of these shipped, and each was statically detectable the whole time:
+
+| Shipped defect | Caught by |
+|---|---|
+| An agent told to append to a file with no write tool in its allowlist | CL200 (wave 3) |
+| An input token an invocation never actually passes | CL102 (wave 2) |
+| An `mcp__*` tool name that does not exist | CL202 (wave 3) |
+| README claiming one gate count where `docs/architecture.md` claimed another | CL302 |
+
+It is a **script, not a prompt**: deterministic file operations, no subagent, no model, run per PR
+in CI on all three operating systems like every other check.
+
+## Running it
+
+```bash
+bash scripts/contract-lint.sh --root .              # the repo
+bash scripts/contract-lint.sh --root <tree>         # any tree with a manifest
+bash scripts/contract-lint.sh --root . --rule CL305 # filter the output
+```
+
+```powershell
+.\scripts\contract-lint.ps1 -Root .
+.\scripts\contract-lint.ps1 -Root . -Rule CL305 -Quiet
+```
+
+`--rule` filters what is **printed**, never what runs. Every rule always executes, so `CL902`
+(a suppression that suppressed nothing) stays truthful under a filter.
+
+Output is TSV on stdout and nothing else -- one finding per line, root-relative paths, forward
+slashes, sorted by file then line then rule then message:
+
+```
+CL300	BLOCK	commands/alpha.md	59	gate block contains no literal STOP
+```
+
+Exit codes: `0` no BLOCK findings, `1` at least one BLOCK, **`2` could not run** (bad root, missing
+manifest, `jq` absent, registry parity guard failed). Exit 2 is separate on purpose. A validator
+that cannot tell "clean" from "crashed" is worthless, so validate's Check 8 treats it as a failure.
+
+## Rules
+
+Severity lives in `specwright.manifest.json` under `contractLint.rules[]`, never in a rule's own
+code, so a BLOCK/WARN divergence between the two implementations is structurally impossible.
+
+### CL0xx -- reference resolution
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL001` | BLOCK | an `sd-` token resolves to neither an agent name nor a skill folder |
+| `CL002` | BLOCK | an agent's `skills:` frontmatter entry has no `skills/<name>/SKILL.md` |
+| `CL003` | BLOCK | the same unresolved shape as CL001, on a line that mentions a skill |
+| `CL004` | WARN | a skill folder is referenced by nothing in scan scope and is not declared in `skillConsumers` |
+| `CL005` | BLOCK | a `templates/` path does not exist once the install namespace segment is folded away |
+| `CL006` | BLOCK | a `/sd:<name>` reference has no `commands/<name>.md` |
+| `CL007` | WARN | an agent is mentioned by no command body |
+| `CL008` | BLOCK | a numbered spec-artifact filename is absent from `contractLint.specArtifacts` |
+
+CL001 and CL003 split on whether the offending line mentions a skill; both BLOCK, so the split is
+about the message a reader gets, not about severity.
+
+### CL1xx -- invocation contract
+
+An **invocation** is a `commands/*.md` line mentioning "Invoke"/"invoke" next to a backticked
+`sd-<agent>` token. From there its **token span** runs forward through every backticked
+`` `KEY = value` `` pair -- covering a bullet block, a same-line inline list, and a wrapped
+multi-line inline list alike -- until the next heading, the next invocation, or the next top-level
+numbered step, whichever comes first. A **mode declaration** is an `agents/*.md` heading carrying
+the same kind of `` `KEY = value` `` pair (or, for the `` Task type: `value` `` heading grammar,
+a key named by the agent's own "Read the `KEY` field" prose) immediately followed by
+`Inputs (required):` then `Inputs (optional):` lines.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL100` | BLOCK | an invocation sets `TASK`/`WORKFLOW_TYPE`/`TASK_TYPE` to a mode the target agent does not declare |
+| `CL101` | WARN | an agent declares a mode no command ever invokes |
+| `CL102` | BLOCK | an invocation omits an input the declared mode marks required |
+| `CL103` | WARN | an invocation passes an input token the declared mode declares nowhere |
+| `CL104` | BLOCK | two agent files share a frontmatter `name:` |
+
+CL100/CL102/CL103 skip an invocation whose target agent CL001 already flagged as unresolved --
+one problem, one message. CL104 is independent of the other four: it fires while the disk-derived
+agent inventory is built, the same way CL900/CL901 fire while the suppression index is built,
+rather than in a later Phase B pass.
+
+### CL2xx -- role and tool integrity
+
+Tool allowlists enforce agent roles *structurally* -- the reviewer has no write tool, so it
+cannot auto-fix. That guarantee is only as good as the prompt text agreeing with the frontmatter.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL200` | BLOCK | an agent with no write tool is instructed to write, append or create |
+| `CL201` | BLOCK | an agent listed in `contractLint.readOnlyAgents` declares a write tool |
+| `CL202` | WARN | an `mcp__*` name in scan scope is absent from `contractLint.knownMcpTools` |
+| `CL203` | WARN | an agent's own frontmatter declares a tool its own body never mentions |
+
+A **write tool** is exactly `Write`, `Edit` or `MultiEdit` -- never `Bash`, which technically can
+write a file but is a different, harder problem, deliberately out of scope here.
+
+`CL200` and `CL201` answer two different questions and read two different sources. `CL200` reads
+**disk only**: any agent whose own `tools:` line lacks a write tool is a candidate, full stop, so a
+brand-new read-only agent is protected on day one even if nobody remembers to list it anywhere.
+`CL201` reads the **declared promise**: `contractLint.readOnlyAgents` names agents architecturally
+committed to staying read-only, and `CL201` is the only rule that fires when one of them grows a
+write tool in its own frontmatter -- the same declared-vs-disk shape `CL304` already uses for
+conditional gates.
+
+`CL200`'s imperative-verb scan is line-initial only (after an optional bullet or numbered-step
+marker), which is what lets a negated instruction ("Do not attempt to write files"), a third-person
+subject ("The calling command appends your output") and a mid-sentence use ("write `` `_No
+findings._` ``, after a comma) all pass untouched, with no exclusion list -- the same shape
+`Get-GateClassification`/`classify_heading` already uses for `## Gate activity`. It is the only
+rule in this band that reads prose intent rather than pure structure, which is why it ships WARN
+first: **CL200 promoted to BLOCK on 2026-07-31, once the engine tree ran clean under both
+implementations.**
+
+`CL203` searches an agent's own **body** -- everything after its closing `---` -- for the declared
+tool's exact name. A tool mentioned only inside the `tools:` line itself (its own declaration) does
+not count as "used."
+
+### CL3xx -- gate integrity
+
+A **gate block** runs from its heading to the next heading of any level, or end of file. That
+window is why the roughly twenty literal `STOP`s in Phase 0 bootstrap error paths never satisfy or
+trip a gate rule -- they all sit under a `## Phase 0` heading.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL300` | BLOCK | a gate block contains no literal `STOP` |
+| `CL301` | BLOCK | a gate block offers no option set |
+| `CL302` | BLOCK | the hard gate count on disk disagrees with `contractLint.gates.<file>.hard` |
+| `CL303` | WARN | hard gate labels are not exactly `1..N` without duplicates |
+| `CL304` | BLOCK | a conditional gate is on disk but undeclared, or declared and absent |
+| `CL305` | BLOCK | a HARD gate lists an override token as a selectable option |
+| `CL306` | BLOCK | a HARD gate's prose describes an escape hatch with no `contract-lint: allow CL306` comment nearby |
+
+An **option set** is a slash-separated parenthetical such as `(yes / revise / abort)`, or two or
+more top-level `- ` bullets. `CL303` compares **sets, never file order**: `commands/bug.md` authors
+`Gate 3a` before `Gate 3` and passes.
+
+`CL305` is scoped to the gate's **option set**, never its prose. An override is a *listed choice*,
+not a *described consequence* -- `commands/release.md` may say "the user may override the version
+at this gate" without tripping it, while `(yes / skip / abort)` at a HARD gate fires.
+
+`CL306` is the prose half CLAUDE.md rule 6 calls out by name ("describing one in prose is fine"):
+it scans a HARD gate's remaining prose -- everything that is NOT the option-set parenthetical or a
+backtick-led option bullet, since those are CL305's territory -- against
+`contractLint.gateProseEscapeTokens`. It is deliberately a naive scanner, the same "reads prose
+intent" tradeoff `CL200` already made: it fires on `commands/bug.md`'s logged insist-and-proceed
+sentence and `commands/release.md`'s "may override the version" bullet until each is annotated with
+its own `<!-- contract-lint: allow CL306 - <reason> -->` comment. There is no separate per-gate
+declared-exception surface -- the existing suppression-comment convention already covers "this
+gate's escape hatch is intentional," the same way it covers `CL305` on `commands/perf.md`, so a
+second mechanism saying the same thing was not worth adding.
+
+**`CL306` shipped WARN on 2026-07-30 and promoted to BLOCK on 2026-07-31, once the engine tree ran
+clean under both implementations** -- the same rollout `CL200` used, for the same reason: it reads
+prose intent, not pure structure.
+
+Gate classification needs no exclusion list. `Gate` followed by a lowercase word is never a gate,
+which is what makes `## Gate activity` in `commands/status.md` invisible to all six rules.
+
+### CL4xx -- stack-agnostic prose
+
+CLAUDE.md rule 4 says commands, agents and skills carry no hardcoded stack command or language
+assumption -- everything comes from the target project's `project-config.json` at runtime. This
+band is regression-prevention for that rule: it does not reach beyond `contractLint.scanScope`
+(never `CLAUDE.md`, `CONTRIBUTING.md` or `docs/`, which is exactly why their known sandbox paths
+and frontmatter examples need no special-case handling).
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL400` | BLOCK | a stack command token (`contractLint.stackTokens.commands`) appears outside a `<<placeholder>>`, a fenced code block, or a `contract-lint: allow CL400` comment |
+| `CL401` | WARN (permanent) | a language/framework name (`contractLint.stackTokens.languages`) appears in the same contexts |
+| `CL402` | BLOCK | a hardcoded absolute filesystem path (a Windows drive letter, or a POSIX path with two or more segments) appears in scan scope |
+
+A vocabulary hit is **word-bounded**: the character immediately before and after the token must not
+itself be alphanumeric or `_`, so `npmrc` never trips on `npm` and `Going`/`algorithm` never trip on
+the language token `Go`. `CL401` stays WARN permanently, unlike `CL400` -- a language name in prose
+is often legitimate (an enumerated multi-stack heuristic, or the stack-agnostic rule's own
+"never hardcode X" illustration), while a literal stack **command** is closer to an actual
+instruction and is worth eventually blocking.
+
+`CL402`'s absolute-path match requires a genuine word boundary immediately before the leading `/`
+or drive letter (blank, backtick, quote, paren, or start of line) -- never another path or
+placeholder character. Without that positive boundary, `~/.claude/hooks/sd/` and
+`.specs/<ID>/04-artifacts/` would both mint a phantom absolute path starting at their own interior
+`/`, and `/sd:<name>` would collide with the leading slash of every slash-command reference in the
+engine (a `/prefix:name` command has no second `/`, so it never matches at all).
+
+**`CL400` shipped WARN on 2026-07-30 and promoted to BLOCK on 2026-07-31, once the engine tree ran
+clean under both implementations**, the same rollout `CL200`/`CL306` used. `CL401` and `CL402` do
+not follow this schedule: `CL401` is permanent WARN by design, and `CL402` shipped BLOCK
+immediately since a hardcoded absolute path is a structural fact, not prose intent.
+
+### CL5xx -- file budgets
+
+Prompt files only ever grow, and a file that grows past the point where the model reliably reads
+all of it fails quietly -- the instructions at the bottom just stop being followed, with no error
+and no signal in a diff. This band makes that growth visible in review instead.
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL500` | WARN (permanent) | a file exceeds `contractLint.budgets.<area>Bytes` for its scan-scope area |
+
+There is exactly one rule here on purpose. `CL500` stays WARN forever -- promoting it to BLOCK
+would turn a judgement call (is this growth worth it?) into a build failure, and the judgement is
+the point. The finding reports how far over budget the file is, in bytes, not a bare "over budget":
+`file is 27510 bytes, 1532 over the 25978-byte budget`.
+
+**The byte count is normalized, never a raw disk read.** `contractLint.scanScope` is `text=auto`
+(see `.gitattributes`), so identical content checks out as LF on a Linux CI runner and CRLF on a
+native Windows checkout -- confirmed on this repo: `commands/spec.md` is 25979 bytes as a git blob
+but 26521 bytes checked out on Windows, a 542-byte difference for the same content. A raw byte count
+would make `CL500` disagree with itself between platforms. Instead, both implementations sum each
+line's byte length (already available from the same per-line cache every other rule reads) plus one
+separator per line boundary -- a measure that does not depend on which OS checked the file out.
+
+**Budgets are a ratchet, set at today's largest file per area**, so the repo passes clean on day one
+and every later `CL500` hit is real growth, never a paragraph someone happened to write before the
+rule existed. Raising a ceiling in `contractLint.budgets` is a real decision that belongs in a PR
+description, never a reflex to a red CI run.
+
+### CL9xx -- suppression hygiene
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `CL900` | BLOCK | a suppression carries no usable reason |
+| `CL901` | BLOCK | a suppression names a rule id absent from the registry |
+| `CL902` | WARN | a suppression suppressed nothing |
+
+## Suppressions
+
+```
+<!-- contract-lint: allow CL305 - Case A is the already-at-goal branch, and the option there buys a logged constitution exception rather than a way past the requirement -->
+```
+
+It applies to a finding of that rule, in that file, on the same line or the next one. Indexed only
+inside `contractLint.scanScope` and only outside fenced code blocks, so this page and
+`CONTRIBUTING.md` can show the syntax without minting a phantom suppression that then trips CL902.
+
+**A suppression can never suppress CL900, CL901 or CL902.** That exclusion is hardcoded in both
+implementations rather than manifest-driven, because `<!-- contract-lint: allow CL900 -->` would
+otherwise be a self-authorizing loophole.
+
+The reason is not decoration. CL900 rejects anything under ten non-separator characters, so
+"`- x`" fails and the writer has to say why.
+
+## Manifest surface
+
+Everything configurable lives under one top-level `contractLint` key, so later waves nest inside it
+and never touch `areas`, `derived` or `docClaims`.
+
+| Key | Purpose |
+|---|---|
+| `scanScope` | globs the linter reads. Deliberately `commands/`, `agents/`, `skills/` and nothing else |
+| `installNamespaceSegment` | the `sd` in `templates/sd/...`, folded away before CL005 tests disk |
+| `rules` | the registry: id, severity, wave, summary. The one source of severity |
+| `gates` | per file: the declared hard count, the declared conditional labels, and the Check 7 quantity name |
+| `specArtifacts` | the numbered artifact filenames CL008 accepts |
+| `skillConsumers` | skills whose only consumers live outside scan scope, with the reason |
+| `overrideOptionTokens` | the vocabulary CL305 treats as an escape hatch |
+| `gateProseEscapeTokens` | the phrase vocabulary CL306 scans HARD gate prose for |
+| `stackTokens.commands` / `.languages` | the CL400 / CL401 stack vocabulary |
+| `readOnlyAgents` | agent names CL201 checks for a write tool gained since being declared read-only |
+| `knownMcpTools` | the `mcp__*` allowlist CL202 checks scan-scope tokens against |
+| `budgets.commandsBytes` / `.agentsBytes` / `.skillsBytes` | the per-area byte ceiling CL500 checks a file's normalized size against |
+
+`scanScope` is load-bearing. `CLAUDE.md` and `CONTRIBUTING.md` use `sd-test` as a sandbox path and
+`docs/architecture.md` carries a `name: sd-debugger` frontmatter example, so widening the scope to
+`docs/**` produces a wall of CL001 false positives on day one.
+
+### Why the manifest stores a gate count
+
+The manifest's own charter says it stores no counts, and `gates.<file>.hard` is a literal number.
+The test that resolves it:
+
+> Can a script count it from disk with no judgement calls?
+> **Yes** -- it is inventory, it belongs in `areas`, and it must be derived.
+> **No** -- it is a declared design contract, and it belongs in `contractLint`.
+
+"How many command files exist" passes that test. "How many hard gates `/sd:feature` declares" does
+not: nothing on disk is a second source for it, so a derived value would make CL302 compare disk
+against itself and pass vacuously forever. The number's job is to make deleting a gate heading a
+deliberate two-file edit that shows up in review.
+
+Feeding those counts into Check 7 as quantities gives `README <- manifest` there and
+`manifest <- disk` here, hence transitively `README == disk`, with no gate parser duplicated into
+`scripts/validate.*`.
+
+## Waves
+
+Wave 1 is what ships here. Later waves are pure additions: one registry entry, one function per
+implementation, one fixture, one row in the tables above.
+
+| Wave | Band | Status |
+|---|---|---|
+| 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
+| 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
+| 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, BLOCK (CL200 promoted from WARN; CL202/CL203 stay WARN) |
+| 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30 WARN, now BLOCK (CL400/CL306 promoted 2026-07-31; CL401 stays WARN) |
+| 4 | CL5xx file budgets | shipped 2026-07-30, stays WARN |
+
+Four scope decisions were made deliberately and are recorded here so they read as decisions
+rather than oversights:
+
+- **CL007 is still loose.** "Invoked by" means any mention of the agent name in a command body.
+  CL100-CL104 added a real invocation-token parser but did not fold it back into CL007 -- CL007
+  answers "is this agent mentioned at all", CL1xx answers "does a specific mode match", and
+  merging them would make CL007 depend on the mode-selector convention (`TASK`/`WORKFLOW_TYPE`/
+  `TASK_TYPE`) instead of a plain name match.
+- **CL006 does not scan `hooks/`,** although `/sd:` references live there. That remains a future
+  scope extension.
+- **CL1xx recognizes exactly three mode-selector keys** (`TASK`, `WORKFLOW_TYPE`, `TASK_TYPE`) --
+  the ones actually on disk. An invocation that sets none of them (`sd-docs-writer`'s flat
+  `ADR_NUMBER`/`ADR_PATH`/... contract, which has no modes at all) is invisible to CL100-CL103 by
+  design, not by omission.
+- **`knownMcpTools` is hand-maintained, not derived**, and that is a deliberate acceptance of
+  staleness risk: nothing on disk is a second source for which `mcp__*` tool names are real, since
+  that comes from runtime MCP server configuration this repo cannot see. `CL202` stays WARN
+  forever precisely because of this -- a stale allowlist must never be able to block CI. A `CL202`
+  hit means "update this list or explain why not," never "suppress and move on."
+- **`CL401` stays WARN permanently**, unlike its `CL400`/`CL402`/`CL306` siblings -- a language or
+  framework name in prose is often legitimate (an enumerated multi-stack heuristic, or the
+  stack-agnostic rule's own "never hardcode X" illustration), so the same false-positive band that
+  makes `CL400`/`CL306` promotable makes `CL401` a permanent-WARN rule by design, the same
+  precedent `CL202` already set for `knownMcpTools`.
+- **`CL400`/`CL401`/`CL402` never widen `scanScope`**, on purpose. `CLAUDE.md`, `CONTRIBUTING.md`
+  and `docs/architecture.md` all carry sandbox paths, stack names and a frontmatter example that
+  this band would otherwise light up on day one -- exactly the risk `scanScope`'s own comment
+  already documents for `CL0xx`. Staying inside `commands/`, `agents/`, `skills/` is what lets the
+  positive-boundary path regex and the word-bounded vocabulary match stay this simple.
+- **`CL306` reuses the existing suppression comment instead of a new declared-exception surface.**
+  A `contractLint.gates.<file>.proseExceptions` key was considered (a per-gate list of allowed
+  escape-hatch labels) and rejected: it would say the same thing `<!-- contract-lint: allow CL306 -
+  <reason> -->` already says, just in a second place that could drift out of sync with the first.
+
+## Testing it
+
+`tests/contract-lint/` holds the fixture suite; see its README for the case map and for what to do
+when adding a rule. The load-bearing assertions are the fixture sweep and the line-for-line
+comparison of the two implementations on every case.

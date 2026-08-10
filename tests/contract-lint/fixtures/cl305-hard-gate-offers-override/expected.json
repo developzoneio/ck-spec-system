@@ -1,0 +1,12 @@
+{
+  "note": "an override offered as a LISTED CHOICE at a HARD gate, which is what CL305 scopes to",
+  "findings": [
+    {
+      "rule": "CL305",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "override-option"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "note": "sd-keeper's only declared mode is `TASK = draft`; TASK = archive matches nothing",
+  "findings": [
+    { "rule": "CL100", "severity": "BLOCK", "file": "commands/alpha.md", "anchor": "seed", "seed": "undeclared-mode" }
+  ]
+}

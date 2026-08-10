@@ -1,0 +1,6 @@
+{
+  "note": "mcp__demo__known-tool is declared in knownMcpTools and stays silent; mcp__demo__unknown-tool is not, and fires",
+  "findings": [
+    { "rule": "CL202", "severity": "WARN", "file": "agents/keeper.md", "anchor": "seed", "seed": "unknown-mcp-tool" }
+  ]
+}

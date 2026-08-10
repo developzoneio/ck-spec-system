@@ -1,0 +1,4 @@
+{
+  "note": "MUST STAY SILENT: a language name inside a <<placeholder>> and inside a fenced code block, never in bare prose",
+  "findings": []
+}

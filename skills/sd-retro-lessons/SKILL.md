@@ -65,9 +65,11 @@ One line. Exactly this grammar:
 - `tag` - from the enum above, lowercase kebab.
 - `severity` - `high` | `medium` | `low`. High means it would have shipped a defect or lost
   a day. Low means it cost minutes.
-- `scope` - `feature` | `bug` | `refactor` | `perf` | `rca` | `all`. This is the selector a
-  future run filters on, so `all` must be earned: use it only when the rule genuinely does
-  not depend on the workflow.
+- `scope` - `feature` | `bug` | `refactor` | `perf` | `rca` | `port` | `all`. This is the selector
+  a future run filters on, so `all` must be earned: use it only when the rule genuinely does not
+  depend on the workflow. A `port`-scoped lesson is recorded but not yet selected by
+  `subagent-retro` - the hook's in-progress-spec detection does not recognize the `PORT-` prefix
+  (see `docs/troubleshooting.md`).
 - `Rule sentence` - one sentence, imperative, **120 characters maximum**.
 
 After aggregation a repeat count may be appended - ` (3)`. Authors never write it.
@@ -94,6 +96,7 @@ Forbidden in a rule sentence:
 - snake_case identifiers.
 - Repository, product, team, customer, or person names.
 
+<!-- contract-lint: allow CL401 - naming the allowlist's own example entries, not assuming this project's stack -->
 Technology proper nouns that happen to be PascalCase (PowerShell, TypeScript, PostgreSQL,
 and similar) are allowed via a small allowlist in the validator. Extending that allowlist
 takes a PR - and usually means the lesson is less portable than you think.

@@ -18,3 +18,4 @@ Active specs (auto-updated by /sd:spec status transitions):
 | PERF-BROKEN-012 | perf | done | 2026-07-11 | Cut peak memory on the nightly export job |
 | REF-BROKEN-013 | refactor | done | 2026-07-12 | Split InvoiceHandler |
 | FEAT-BROKEN-014 | feature | in-progress | 2026-07-13 | Add bulk tag assignment |
+| FEAT-BROKEN-015 | feature | done | 2026-07-14 | Add saved-view sharing |

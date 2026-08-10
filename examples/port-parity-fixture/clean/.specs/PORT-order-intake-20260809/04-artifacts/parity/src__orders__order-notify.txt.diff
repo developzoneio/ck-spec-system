@@ -1,0 +1,11 @@
+--- examples/port-parity-fixture/clean/.specs/PORT-order-intake-20260809/04-artifacts/source/orders/order-notify.txt	2026-08-09 18:07:42.998918800 +0700
++++ examples/port-parity-fixture/clean/src/orders/order-notify.txt	2026-08-09 18:07:45.169949800 +0700
+@@ -10,7 +10,7 @@
+ -- this block is unchanged across every donor/host pair. --
+ -- no further remarks. --
+ 
+-member NotifyFailure
++member HandleFailure
+   1. build the failure message
+   2. send the failure message
+   3. log "failure sent: <reference>"

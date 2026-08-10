@@ -8,6 +8,7 @@ Common issues and fixes. Skim the table of contents first; the fix you need is u
 - [Hooks not firing](#hooks-not-firing)
 - [Workflow issues](#workflow-issues)
 - [Spec issues](#spec-issues)
+- [Porting issues](#porting-issues)
 - [Spec-gate blocking unexpectedly](#spec-gate-blocking-unexpectedly)
 - [Spec metrics log](#spec-metrics-log)
 - [MCP issues](#mcp-issues)
@@ -220,6 +221,73 @@ This lists every inconsistency. Then fix manually (recommended) or remove the mi
 ### `/sd:spec stats` shows aging warnings
 
 The aging report flags specs in `in-progress` > 7 days and `draft` > 14 days (defaults). These are signals, not errors. Decide per case: resume, close, or archive.
+
+---
+
+## Porting issues
+
+### spec-gate ignores my `PORT-` spec while it's in-progress
+
+**Cause**: the in-progress-spec scan in `spec-gate`, `prompt-router`, and `subagent-retro` matches
+a hardcoded `(FEAT|BUG|REF|PERF|RCA)` prefix set; it does not read `spec.prefixes` from
+`project-config.json`, so a `PORT-` row is invisible to it. `/sd:port` registers `port` in the
+prompt-router keyword map so a prompt like "backport the order-intake endpoint" still routes to
+the command, but the prefix-blindness itself is unchanged.
+
+**Fix**: set `hooks.specGate.mode: "warn"` for the duration of the port, or track the work under an
+accompanying FEAT spec. The same cause explains why `prompt-router` injects no context for an
+in-progress `PORT-` spec and why `subagent-retro` selects no `port`-scoped lessons.
+
+### The host build or lint now fails on files under `.specs/<PORT-ID>/04-artifacts/source/`
+
+**Cause**: the frozen snapshot is a real subtree of the repo, so a build or lint step that globs
+the whole repo root picks up donor files that were never meant to compile or lint against this
+project's rules.
+
+**Fix**: add a `.specs/` exclusion to the host's own build/lint configuration. `/sd:port` Phase 2
+warns about this when no such exclusion is found, but deliberately does not edit that
+configuration itself (out of scope). Alternatively, freeze with `--snapshot contract` when the
+donor source does not need to sit on disk.
+
+### Coverage dropped the moment the snapshot was frozen
+
+**Cause**: the coverage tool counts the frozen snapshot files as uninstrumented source.
+
+**Fix**: exclude `.specs/` from `commands.coverage`, re-measure, and compare quality bars (e.g.
+`quality.refactorCoverageThreshold`) against the corrected number. `/sd:port` never edits coverage
+configuration itself, same as the build/lint case above.
+
+### `/sd:port` Gate 3 refuses: host production tree is dirty
+
+**Cause**: uncommitted or untracked changes under `paths.src` (or a declared `paths.layers` path)
+make the Phase 8 parity diff unattributable - a hunk in the parity diff could be prior work, not
+part of the port.
+
+**Fix**: commit or stash those changes under their own spec, then re-run the check. The gate has no
+override; it re-runs `git diff --quiet` / `git status --porcelain` and refuses until both are
+empty.
+
+### spec-gate blocks an edit under `04-artifacts/source/`
+
+**Cause**: `/sd:port` Phase 2 appended those exact paths, plus `MANIFEST.md`, to `paths.protected`
+at freeze time - `spec-gate` matches by exact string, not glob.
+
+**Fix**: this is by design - the snapshot is frozen evidence. If the freeze itself was wrong, use
+Gate 1's `re-capture` resolution, which removes exactly the entries it added. Note `spec-gate`
+guards `Edit`/`Write` only - it does not stop a shell delete.
+
+### The port parity diff has to be produced by hand
+
+**Cause**: `sd-reviewer`'s `port-parity` mode reads a diff artifact it cannot produce - it has no
+`Bash` and no write tool, deliberately, because the adjudicator must not be able to fix what it
+judges. `/sd:port` Phase 8 now generates `04-artifacts/parity/` for you before invoking the
+reviewer, so this only applies when adjudicating a port outside the `/sd:port` pipeline.
+
+**Fix**: generate `04-artifacts/parity/` yourself - one unified diff per non-`omit` path mapping
+row (snapshot side first), an all-deletion diff for a row whose host file is absent, an
+all-addition diff for a changeset file with no row, and an `INDEX.md` listing them all. The exact
+layout is in `sd-port-fidelity`'s "Parity artifacts" section, and `examples/port-parity-fixture/`
+is a worked pair whose shape you can copy.
 
 ---
 

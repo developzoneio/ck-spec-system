@@ -1,0 +1,12 @@
+/sd:setup
+
+This is a headless, non-interactive scripted run with no human available to reply mid-workflow.
+Do not stop to wait for a reply. Answer your own Phase 3 questions and any batch-confirmation gates
+using the following, then proceed straight through to writing the files:
+
+- Q1 ticket system: GitHub Issues
+- Q2 ticket pattern: ^#[0-9]+$
+- Q3 shell: Both (write settings.json for both PowerShell and Bash)
+- Any Phase 1.5 / Phase 2.5 batch-confirmation gate: treat as "go" (accept detected facts as-is).
+
+Proceed to completion in this single turn and print the final Phase 7 report.

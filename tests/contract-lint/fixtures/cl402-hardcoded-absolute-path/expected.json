@@ -1,0 +1,12 @@
+{
+  "note": "a hardcoded absolute filesystem path in scan scope",
+  "findings": [
+    {
+      "rule": "CL402",
+      "severity": "BLOCK",
+      "file": "commands/beta.md",
+      "anchor": "seed",
+      "seed": "hardcoded-abspath"
+    }
+  ]
+}

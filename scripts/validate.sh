@@ -12,6 +12,9 @@
 #   6. CHANGELOG gate: the [Unreleased] section is non-empty.
 #   7. Docs consistency: published numbers in the docs match disk, per
 #      specwright.manifest.json.
+#   8. Cross-file contract lint: the relationships between commands, agents and
+#      skills, per the manifest's contractLint subtree. Delegated to
+#      scripts/contract-lint.sh as a child process.
 #
 # Exit 0 = all checks passed; 1 = at least one failed.
 
@@ -30,6 +33,12 @@ EXPECTED_AGENTS="$(find "$repo_root/agents" -maxdepth 1 -type f -name '*.md' | w
 EXPECTED_SKILLS="$(find "$repo_root/skills" -mindepth 2 -maxdepth 2 -type f -name 'SKILL.md' | wc -l | tr -d ' ')"
 EXPECTED_HOOKS="$(find "$repo_root/hooks/bash" -maxdepth 1 -type f -name '*.sh' | wc -l | tr -d ' ')"
 EXPECTED_TEMPLATES="$(find "$repo_root/templates" -type f | wc -l | tr -d ' ')"
+
+# The version stamp has no source-tree counterpart - it is generated at install time from
+# CHANGELOG.md, never copied from a source dir - so unlike the counts above it cannot be
+# derived from a glob. This is the one hand-written constant Check 5 uses: how many stamp
+# files land per installed area.
+STAMP_FILES_PER_AREA=1
 
 for pair in "commands:$EXPECTED_COMMANDS" "agents:$EXPECTED_AGENTS" "skills:$EXPECTED_SKILLS" \
     "hooks:$EXPECTED_HOOKS" "templates:$EXPECTED_TEMPLATES"; do
@@ -66,7 +75,7 @@ echo "  Repo root: $repo_root"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-section "Check 1/7: Pure-ASCII scan (*.ps1)"
+section "Check 1/8: Pure-ASCII scan (*.ps1)"
 ascii_bad=0
 ps1_count=0
 while IFS= read -r -d '' f; do
@@ -83,7 +92,7 @@ if [[ $ascii_bad -eq 0 ]]; then ok "$ps1_count .ps1 file(s) are pure ASCII"; fi
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-section "Check 2/7: bash -n syntax (*.sh)"
+section "Check 2/8: bash -n syntax (*.sh)"
 syn_bad=0
 sh_count=0
 while IFS= read -r -d '' f; do
@@ -100,7 +109,7 @@ if [[ $syn_bad -eq 0 ]]; then ok "$sh_count .sh file(s) pass bash -n"; fi
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-section "Check 3/7: Hook-pair parity"
+section "Check 3/8: Hook-pair parity"
 parity_bad=0
 ps_count=0
 for psf in "$repo_root"/hooks/powershell/*.ps1; do
@@ -126,7 +135,7 @@ if [[ $parity_bad -eq 0 ]]; then ok "$ps_count hook pair(s) present on both plat
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-section "Check 4/7: Agent model aliases"
+section "Check 4/8: Agent model aliases"
 model_bad=0
 agent_count=0
 for af in "$repo_root"/agents/*.md; do
@@ -154,38 +163,180 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-section "Check 5/7: Install-target counts"
+section "Check 5/8: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
-cleanup_tmp() { [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true; }
+tmp_nc_src="${TMPDIR:-/tmp}/sd-validate-nc-src-$$"
+tmp_nc_base="${TMPDIR:-/tmp}/sd-validate-nc-base-$$"
+cleanup_tmp() {
+    [[ -n "${tmp:-}" && -d "$tmp" ]] && rm -rf "$tmp" || true
+    [[ -n "${tmp_nc_src:-}" && -d "$tmp_nc_src" ]] && rm -rf "$tmp_nc_src" || true
+    [[ -n "${tmp_nc_base:-}" && -d "$tmp_nc_base" ]] && rm -rf "$tmp_nc_base" || true
+}
 trap cleanup_tmp EXIT
-rm -rf "$tmp"
+rm -rf "$tmp" "$tmp_nc_src" "$tmp_nc_base"
+# Counts files under dir and compares against expected, reporting through the same
+# fail/ok/add_failure vocabulary as every other check. Reused below for both the
+# fresh install and the idempotent re-run, so both runs are asserted through one
+# code path rather than two hand-copied loops.
+check_count() {
+    local name="$1" dir="$2" expected="$3" cnt=0
+    if [[ -d "$dir" ]]; then cnt="$(find "$dir" -type f | wc -l | tr -d ' ')"; fi
+    if [[ "$cnt" -eq "$expected" ]]; then
+        ok "$name/sd : $cnt file(s)"
+    else
+        fail "$name/sd : expected $expected, found $cnt"
+        add_failure "install: $name/sd expected $expected found $cnt"
+    fi
+}
 if bash "$install_sh" --base-path "$tmp" --force >/dev/null 2>&1; then
-    check_count() {
-        local name="$1" dir="$2" expected="$3" cnt=0
-        if [[ -d "$dir" ]]; then cnt="$(find "$dir" -type f | wc -l | tr -d ' ')"; fi
-        if [[ "$cnt" -eq "$expected" ]]; then
-            ok "$name/sd : $cnt file(s)"
-        else
-            fail "$name/sd : expected $expected, found $cnt"
-            add_failure "install: $name/sd expected $expected found $cnt"
+    EXPECTED_COMMANDS_WITH_STAMP=$((EXPECTED_COMMANDS + STAMP_FILES_PER_AREA))
+    EXPECTED_AGENTS_WITH_STAMP=$((EXPECTED_AGENTS + STAMP_FILES_PER_AREA))
+    EXPECTED_SKILLS_WITH_STAMP=$((EXPECTED_SKILLS + STAMP_FILES_PER_AREA))
+    EXPECTED_HOOKS_WITH_STAMP=$((EXPECTED_HOOKS + STAMP_FILES_PER_AREA))
+    EXPECTED_TEMPLATES_WITH_STAMP=$((EXPECTED_TEMPLATES + STAMP_FILES_PER_AREA))
+    check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS_WITH_STAMP"
+    check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS_WITH_STAMP"
+    check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS_WITH_STAMP"
+    check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS_WITH_STAMP"
+    check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES_WITH_STAMP"
+
+    # ---- stamp content: every area's stamp equals the CHANGELOG-derived version ----
+    stamp_changelog="$repo_root/CHANGELOG.md"
+    stamp_version=""
+    stamp_release_line="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$stamp_changelog" || true)"
+    if [[ "$stamp_release_line" =~ \[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+        stamp_version="${BASH_REMATCH[1]}"
+    fi
+    if [[ -z "$stamp_version" ]]; then
+        fail "CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)"
+        add_failure "install: stamp version source unreadable"
+    else
+        stamp_bad=0
+        for area_dir in commands agents skills hooks templates; do
+            stamp_file="$tmp/$area_dir/sd/specwright-version.txt"
+            if [[ ! -f "$stamp_file" ]]; then
+                fail "$area_dir/sd/specwright-version.txt : not found"
+                add_failure "install: $area_dir/sd stamp missing"
+                stamp_bad=$((stamp_bad + 1))
+                continue
+            fi
+            # Tolerate a stray trailing CR on read - the byte contract itself is
+            # asserted below on one stamp; this comparison only cares about content.
+            stamp_content="$(cat "$stamp_file")"
+            stamp_content="${stamp_content%$'\r'}"
+            if [[ "$stamp_content" != "$stamp_version" ]]; then
+                fail "$area_dir/sd/specwright-version.txt : content '$stamp_content' != CHANGELOG version '$stamp_version'"
+                add_failure "install: $area_dir/sd stamp content mismatch"
+                stamp_bad=$((stamp_bad + 1))
+            fi
+        done
+        if [[ $stamp_bad -eq 0 ]]; then ok "5 stamp(s) match CHANGELOG version $stamp_version"; fi
+
+        # Byte-level contract on one stamp (commands): no BOM, no CR, exactly one trailing LF.
+        byte_stamp="$tmp/commands/sd/specwright-version.txt"
+        if [[ -f "$byte_stamp" ]]; then
+            read -r -a stamp_bytes <<< "$(od -A n -v -t x1 "$byte_stamp")"
+            byte_count=${#stamp_bytes[@]}
+            has_bom=0
+            if [[ $byte_count -ge 3 && "${stamp_bytes[0]}" == "ef" && "${stamp_bytes[1]}" == "bb" && "${stamp_bytes[2]}" == "bf" ]]; then
+                has_bom=1
+            fi
+            has_cr=0
+            for b in "${stamp_bytes[@]}"; do
+                if [[ "$b" == "0d" ]]; then has_cr=1; break; fi
+            done
+            ends_with_lf=0
+            double_lf=0
+            if [[ $byte_count -gt 0 && "${stamp_bytes[$((byte_count - 1))]}" == "0a" ]]; then
+                ends_with_lf=1
+                if [[ $byte_count -gt 1 && "${stamp_bytes[$((byte_count - 2))]}" == "0a" ]]; then
+                    double_lf=1
+                fi
+            fi
+            if [[ $has_bom -eq 1 || $has_cr -eq 1 || $ends_with_lf -eq 0 || $double_lf -eq 1 ]]; then
+                fail "commands/sd/specwright-version.txt : byte contract violated (BOM=$has_bom CR=$has_cr trailingLF=$ends_with_lf doubleLF=$double_lf)"
+                add_failure "install: commands/sd stamp byte contract"
+            else
+                ok "commands/sd/specwright-version.txt : LF, no BOM, no CR, single trailing newline"
+            fi
         fi
-    }
-    check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS"
-    check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS"
-    check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS"
-    check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS"
-    check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES"
+    fi
+
+    # ---- idempotent re-run: second --force pass must be a no-op for the stamp ----
+    if bash "$install_sh" --base-path "$tmp" --force >/dev/null 2>&1; then
+        bak_count="$(find "$tmp" -type f -name '*.bak.*' | wc -l | tr -d ' ')"
+        if [[ "$bak_count" -gt 0 ]]; then
+            fail "second install run created $bak_count *.bak.* file(s) - stamp is not idempotent"
+            add_failure "install: second run produced .bak files"
+        else
+            ok "second --force run created zero *.bak.* file(s)"
+        fi
+        check_count "commands"  "$tmp/commands/sd"  "$EXPECTED_COMMANDS_WITH_STAMP"
+        check_count "agents"    "$tmp/agents/sd"    "$EXPECTED_AGENTS_WITH_STAMP"
+        check_count "skills"    "$tmp/skills/sd"    "$EXPECTED_SKILLS_WITH_STAMP"
+        check_count "hooks"     "$tmp/hooks/sd"     "$EXPECTED_HOOKS_WITH_STAMP"
+        check_count "templates" "$tmp/templates/sd" "$EXPECTED_TEMPLATES_WITH_STAMP"
+    else
+        fail "second installer run failed: bash install.sh --base-path <tmp> --force"
+        add_failure "install: second installer run returned non-zero"
+    fi
 else
     fail "installer failed: bash install.sh --base-path <tmp> --force"
     add_failure "install: installer returned non-zero"
 fi
+
+# ---- negative case: missing version source fails loudly, copies nothing ----
+# The required-source-directory list is mirrored FROM install.sh's own
+# REQUIRED_DIRS array, not hand-duplicated here, so a future added requirement
+# fails this scenario visibly instead of silently changing what it proves.
+required_dirs=()
+while IFS= read -r rd; do
+    required_dirs+=("$rd")
+done < <(grep -m1 '^REQUIRED_DIRS=' "$install_sh" | grep -oE '"[^"]+"' | tr -d '"')
+if [[ ${#required_dirs[@]} -eq 0 ]]; then
+    fail "install.sh : could not parse REQUIRED_DIRS - missing-CHANGELOG scenario skipped"
+    add_failure "install: could not parse install.sh required dirs"
+else
+    mkdir -p "$tmp_nc_src/install"
+    cp "$install_sh" "$tmp_nc_src/install/install.sh"
+    for d in "${required_dirs[@]}"; do
+        mkdir -p "$tmp_nc_src/$d"
+    done
+    nc_out=""
+    nc_exit=0
+    nc_out="$(bash "$tmp_nc_src/install/install.sh" --base-path "$tmp_nc_base" --force 2>&1)" || nc_exit=$?
+    nc_bad=0
+    if [[ $nc_exit -eq 0 ]]; then
+        fail "missing-CHANGELOG scenario: installer exited 0, expected non-zero"
+        add_failure "install: missing-changelog scenario did not fail"
+        nc_bad=$((nc_bad + 1))
+    fi
+    if [[ "$nc_out" != *"CHANGELOG.md"* ]]; then
+        fail "missing-CHANGELOG scenario: installer output did not mention CHANGELOG.md"
+        add_failure "install: missing-changelog scenario message missing CHANGELOG.md"
+        nc_bad=$((nc_bad + 1))
+    fi
+    nc_file_count=0
+    if [[ -d "$tmp_nc_base" ]]; then
+        nc_file_count="$(find "$tmp_nc_base" -type f | wc -l | tr -d ' ')"
+    fi
+    if [[ "$nc_file_count" -ne 0 ]]; then
+        fail "missing-CHANGELOG scenario: base contains $nc_file_count file(s), expected 0"
+        add_failure "install: missing-changelog scenario copied files"
+        nc_bad=$((nc_bad + 1))
+    fi
+    if [[ $nc_bad -eq 0 ]]; then
+        ok "missing-CHANGELOG.md scenario: installer failed loudly and copied nothing"
+    fi
+fi
+
 cleanup_tmp
 trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/7: CHANGELOG [Unreleased] gate"
+section "Check 6/8: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
@@ -210,7 +361,7 @@ fi
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-section "Check 7/7: Docs consistency (published numbers vs disk)"
+section "Check 7/8: Docs consistency (published numbers vs disk)"
 manifest="$repo_root/specwright.manifest.json"
 if [[ ! -f "$manifest" ]]; then
     fail "specwright.manifest.json not found at repo root"
@@ -304,6 +455,31 @@ else
     done < <(mjq '.areas | to_entries[] | "\(.key)\t\(if .value.glob then "glob" else "files" end)\t\(.value.glob // (.value.files | join(" ")))"')
     shopt -u nullglob
 
+    # Stamp count is a THIRD kind of quantity here: not read from a source-tree glob (there
+    # is no stamp source dir) but derived from areas.*.installTo - one stamp lands in each
+    # distinct '<area>/sd/' root the installer writes to. Seeded here, before the derived
+    # loop, so derived.installTotalWithStamps can reference it without depending on JSON key
+    # order, and it self-corrects if an area is added or removed. Plain string + word-split,
+    # not an array: an empty array under `set -u` is not safe on bash 3.2 (macOS).
+    install_roots=""
+    while IFS= read -r install_to; do
+        [[ -z "$install_to" ]] && continue
+        seg1="${install_to%%/*}"
+        rest="${install_to#*/}"
+        seg2="${rest%%/*}"
+        [[ -z "$seg2" ]] && continue
+        root="$seg1/$seg2"
+        case " $install_roots " in
+            *" $root "*) ;;
+            *) install_roots="$install_roots $root" ;;
+        esac
+    done < <(mjq '.areas | to_entries[] | .value.installTo // empty')
+    install_stamps=0
+    for r in $install_roots; do
+        install_stamps=$((install_stamps + 1))
+    done
+    q_set "installStamps" "$install_stamps"
+
     while IFS=$'\t' read -r der_name der_parts; do
         der_total=0
         for part in $der_parts; do
@@ -312,6 +488,17 @@ else
         done
         q_set "$der_name" "$der_total"
     done < <(mjq '.derived | to_entries[] | "\(.key)\t\(.value | join(" "))"')
+
+    # Gate quantities are DECLARED, not derived: nothing on disk is a second
+    # source for "how many hard gates /sd:feature has". Seeding them here gives
+    # the topology README <- manifest (this check) and manifest <- disk (Check
+    # 8's CL302), hence transitively README == disk, with zero duplication of the
+    # gate parser into this file. A null quantity means the gate block is real
+    # but no doc publishes a number for it.
+    while IFS=$'\t' read -r gate_q gate_hard; do
+        [[ -z "$gate_q" || "$gate_q" == "null" ]] && continue
+        q_set "$gate_q" "$gate_hard"
+    done < <(mjq '.contractLint.gates // {} | to_entries[] | "\(.value.quantity)\t\(.value.hard)"')
 
     while IFS=$'\t' read -r c_file c_pattern c_equals; do
         fp_append "$c_file" "$c_pattern"
@@ -355,6 +542,56 @@ else
         fi
     done < <(mjq '.docClaims[] | "\(.file)\t\(.pattern)\t\(.equals)"')
 
+    # ---- Version claims: published version vs newest dated CHANGELOG heading ---
+    # Independent of Check 6's next_header - that variable resolves to whatever line
+    # sits directly below [Unreleased], which is a bullet (not a header) in the normal
+    # non-just-released state, so it cannot be relied on here. Scan the whole file for
+    # the first dated release heading instead.
+    released_version=""
+    release_line="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$changelog" || true)"
+    if [[ "$release_line" =~ \[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+        released_version="${BASH_REMATCH[1]}"
+    fi
+    if [[ -z "$released_version" ]]; then
+        fail "CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)"
+        add_failure "docs: no dated release heading in CHANGELOG.md"
+        docs_bad=$((docs_bad + 1))
+    fi
+
+    while IFS=$'\t' read -r v_file v_pattern; do
+        target="$repo_root/$v_file"
+        if [[ ! -f "$target" ]]; then
+            fail "$v_file : declared version-claim file does not exist"
+            add_failure "docs: missing version-claim file $v_file"
+            docs_bad=$((docs_bad + 1))
+            continue
+        fi
+        [[ -z "$released_version" ]] && continue
+
+        hits=0
+        lineno=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            lineno=$((lineno + 1))
+            if [[ "$line" =~ $v_pattern ]]; then
+                hits=$((hits + 1))
+                found="${BASH_REMATCH[1]}"
+                if [[ "$found" != "$released_version" ]]; then
+                    fail "$v_file:$lineno : says $found, CHANGELOG has $released_version"
+                    add_failure "docs: $v_file:$lineno version says $found not $released_version"
+                    docs_bad=$((docs_bad + 1))
+                fi
+            fi
+        done < "$target"
+
+        # A pattern that matches nothing is a rotted regex, not a pass - same rationale
+        # as the docClaims vacuous-claim check above.
+        if [[ $hits -eq 0 ]]; then
+            fail "$v_file : version pattern matched no lines (reworded?): $v_pattern"
+            add_failure "docs: vacuous version claim in $v_file"
+            docs_bad=$((docs_bad + 1))
+        fi
+    done < <(mjq '.versionClaims[] | "\(.file)\t\(.pattern)"')
+
     # Undeclared-claim scan: any line that looks like an inventory claim but is not
     # covered by a docClaims entry. This is what keeps the manifest canonical - a new
     # doc cannot publish a number that nothing checks.
@@ -395,7 +632,54 @@ else
 
     if [[ $docs_bad -eq 0 ]]; then
         claim_total="$(mjq '.docClaims | length')"
-        ok "$claim_total published claim(s) match disk; no undeclared claims"
+        version_total="$(mjq '.versionClaims | length')"
+        ok "$claim_total published claim(s) + $version_total version claim(s) match disk/CHANGELOG; no undeclared claims"
+    fi
+fi
+
+# ---- Check 8: cross-file contract lint -------------------------------------
+
+section "Check 8/8: Cross-file contract lint (commands / agents / skills)"
+lint_sh="$script_dir/contract-lint.sh"
+if [[ ! -f "$lint_sh" ]]; then
+    fail "scripts/contract-lint.sh not found"
+    add_failure "contract-lint: script missing"
+else
+    # Spawned as a CHILD PROCESS so its `exit` cannot terminate this validator,
+    # and so its stdout stays a clean machine-readable stream. All human
+    # formatting happens here; the linter stays a dumb TSV emitter and the two
+    # linter twins never learn about colours or [OK] tags.
+    lint_out=""
+    lint_exit=0
+    lint_out="$(bash "$lint_sh" --root "$repo_root" --quiet 2>/dev/null)" || lint_exit=$?
+
+    cl_blocks=0
+    cl_warns=0
+    if [[ -n "$lint_out" ]]; then
+        while IFS=$'\t' read -r cl_rule cl_sev cl_file cl_line cl_msg; do
+            [[ -z "$cl_rule" ]] && continue
+            if [[ "$cl_sev" == "BLOCK" ]]; then
+                fail "$cl_file:$cl_line $cl_rule - $cl_msg"
+                add_failure "contract-lint: $cl_rule $cl_file:$cl_line"
+                cl_blocks=$((cl_blocks + 1))
+            else
+                warn "$cl_file:$cl_line $cl_rule - $cl_msg"
+                cl_warns=$((cl_warns + 1))
+            fi
+        done <<< "$lint_out"
+    fi
+
+    if [[ $lint_exit -ge 2 ]]; then
+        # Exit 2 means the linter could not run at all. Treating that as a pass
+        # is the failure mode this whole check exists to prevent.
+        fail "contract-lint could not run (exit $lint_exit)"
+        add_failure "contract-lint: exit $lint_exit"
+    elif [[ $cl_blocks -eq 0 ]]; then
+        if [[ $cl_warns -eq 0 ]]; then
+            ok "no contract violations"
+        else
+            ok "no BLOCK violations ($cl_warns warning(s) above)"
+        fi
     fi
 fi
 

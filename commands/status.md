@@ -1,6 +1,6 @@
 ---
 description: Read-only summary of the metrics log and spec registry - what is in progress, where gates fire, where friction concentrates
-argument-hint: (none)
+argument-hint: (none) or --calibration
 ---
 
 # /sd:status - metrics and registry summary
@@ -15,7 +15,8 @@ The event schema is documented in `docs/architecture.md` - see "Event log". This
 of any read contract: a generation may be discarded on the next roll, so counting it would report a
 window that cannot be reproduced.
 
-Takes no argument.
+Takes no argument, or the single optional flag `--calibration` (SW-31). Plain `/sd:status` never
+reads anything beyond the two files above - `--calibration` is strictly additive: see Phase 3b.
 
 ## State machine
 
@@ -113,6 +114,36 @@ present only lines that have data behind them - omit an empty friction section r
   log. Either the work is not happening or metrics started after the spec did; say which is not
   determinable from the log.
 
+## Phase 3b - Calibration (`--calibration` only)
+
+Skipped entirely for a plain `/sd:status` invocation - the default read contract (`events.jsonl` +
+`index.md`) is unchanged, and Phases 1-3 above already ran unmodified. When `--calibration` is
+passed, additionally glob `<spec.dir>/*/02-tasks.md` and `<spec.dir>/*/03-decisions.md` for every
+spec directory present, at any lifecycle status - a thin corpus needs every data point it has, not
+only `done` ones.
+
+For each spec directory found, from `02-tasks.md`:
+- **Tasks**: count `### T<NN>` headings, tolerant of the `✅`-prefixed variant (`### ✅ T01`) per
+  `docs/adr/0002-complexity-triage-decomposition.md`'s own warning that a naive `^### T<NN>`
+  counter silently reads a checked-off task as zero.
+- **Layers**: count distinct `Layer:` field values across the spec's task blocks, **excluding
+  `Tests`/`Config`** per ADR 0002's own exclusion rule, so this count stays comparable to the
+  threshold it is calibrating. Field values are read with the tolerant grammar in
+  `skills/sd-atomic-task-format/SKILL.md` (bullet `-`/`*`, `**` optional, colon inside or outside
+  the emphasis) - do not write a narrower matcher here.
+- **Files**: count distinct paths across the spec's `Files:` fields, deduplicated within the spec.
+
+From the already-loaded `events.jsonl` (fixed key order, same exact-substring counting as Phase 1):
+- **Complexity-gate splits**: `grep -c '"gate":"complexity","decision":"split"'`. This is an
+  inferred signal, not a direct observation - see `docs/architecture.md` "Event log" for what it
+  can and cannot detect (it never sees a bare trip, only a completed split).
+
+**Sample-size framing.** Let *n* be the number of spec directories found. When *n* is below the
+CONTRIBUTING re-calibration trigger (20 closed specs), render every computed number - never hide a
+count that was actually produced - but prefix the section with `insufficient data (n=<n>)` rather
+than presenting the distribution as a basis for changing any threshold. This mirrors the ST002-ST004
+degrade convention above: a thin corpus is a labelled state, not a silently-confident report.
+
 ## Phase 4 - Render
 
 ```
@@ -150,6 +181,19 @@ Extensions seen on code-edit gates: .cs (12), .ts (4)
 - <spec>: N code-edit warns ignored
 - <spec>: retro stale count reached N
 - <spec>: in progress but absent from the log
+
+<only when --calibration was passed:>
+
+## Calibration (n=<n> specs<, insufficient data when n is below the CONTRIBUTING trigger>)
+
+| Metric | Distribution |
+|---|---|
+| Tasks per spec | ... |
+| Layers touched (excl. Tests/Config) | ... |
+| Files touched | ... |
+
+Complexity-gate splits observed: <count> (inferred from index.md, not a direct trip observation -
+see docs/architecture.md "Event log")
 ```
 
 Degrade states render the same skeleton with the metrics sections replaced by exactly one labelled
@@ -175,3 +219,6 @@ Each names the reason and the path, so "quiet" is never confused with "clean".
   command, or anything from `commands.*` in project-config.
 - Do not guess at numbers. Every figure in the output comes from a counting command that was
   actually run; if a count could not be produced, say so in place of the number.
+- `--calibration` may additionally read `02-tasks.md` / `03-decisions.md` under every spec
+  directory (Phase 3b). It still never writes anything, still never reads `events.jsonl.1`, and a
+  plain `/sd:status` invocation's read set is unaffected by the flag's existence.

@@ -75,6 +75,19 @@ function Get-FileHashSafe {
     }
 }
 
+function Get-EngineVersion {
+    param([string]$RepoRoot)
+    $changelogPath = Join-Path $RepoRoot 'CHANGELOG.md'
+    if (-not (Test-Path -LiteralPath $changelogPath -PathType Leaf)) {
+        return $null
+    }
+    foreach ($line in (Get-Content -LiteralPath $changelogPath)) {
+        $m = [regex]::Match($line, '^##\s+\[([0-9]+\.[0-9]+\.[0-9]+)\]\s+-\s+\S')
+        if ($m.Success) { return $m.Groups[1].Value }
+    }
+    return $null
+}
+
 # ---- prefix safety guard ---------------------------------------------------
 # Mirrors uninstall.ps1's guard exactly - install and uninstall must accept the
 # same set of prefixes, or a prefix legal for one and rejected by the other
@@ -124,6 +137,16 @@ foreach ($d in $requiredDirs) {
 if ($missing.Count -gt 0) {
     Write-Host ''
     Write-Fail "Missing required source directories. Are you running this from a clean specwright checkout?"
+    exit 1
+}
+
+# ---- resolve engine version -------------------------------------------------
+
+$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
+$engineVersion = Get-EngineVersion -RepoRoot $repoRoot
+if ([string]::IsNullOrEmpty($engineVersion)) {
+    Write-Host ''
+    Write-Fail "$changelogPath : no dated release heading found (## [x.y.z] - <date>)"
     exit 1
 }
 
@@ -237,6 +260,32 @@ foreach ($p in $plan) {
             'plan'      { $installed++ }   # dry-run counts as planned
         }
     }
+}
+
+# ---- write version stamp ----------------------------------------------------
+# Route the resolved version through the existing Copy-OneFile so hash-skip,
+# backup, decline and dry-run logic apply identically to every other file.
+# Copy-OneFile returns a status string; increment counters the same way the
+# main copy loop above does.
+
+$stampTempPath = [System.IO.Path]::GetTempFileName()
+try {
+    $stampBytes = [System.Text.Encoding]::ASCII.GetBytes("$engineVersion`n")
+    [System.IO.File]::WriteAllBytes($stampTempPath, $stampBytes)
+
+    foreach ($p in $plan) {
+        $targetRoot = Join-Path $BasePath $p.Target
+        $stampTarget = Join-Path $targetRoot 'specwright-version.txt'
+        $result = Copy-OneFile -SourceFile $stampTempPath -TargetFile $stampTarget
+        switch ($result) {
+            'installed' { $installed++ }
+            'same'      { $skippedSame++ }
+            'decline'   { $skippedDecline++ }
+            'plan'      { $installed++ }   # dry-run counts as planned
+        }
+    }
+} finally {
+    Remove-Item -LiteralPath $stampTempPath -Force -ErrorAction SilentlyContinue
 }
 
 # ---- summary ---------------------------------------------------------------

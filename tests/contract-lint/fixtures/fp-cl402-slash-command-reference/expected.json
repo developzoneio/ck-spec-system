@@ -1,0 +1,4 @@
+{
+  "note": "MUST STAY SILENT: /sd:<name> slash-command references and ~/.claude/... install-target paths are not hardcoded absolute filesystem paths",
+  "findings": []
+}

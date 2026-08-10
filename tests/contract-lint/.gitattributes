@@ -1,0 +1,9 @@
+# Fixtures are pinned to LF so a case's golden means the same thing on every
+# checkout. Without this, Git's default core.autocrlf=true rewrites the .md
+# fixtures to CRLF on Windows and a line-ending bug in one implementation would
+# show up as a mysterious fixture failure instead of a parity failure.
+#
+# This does NOT reduce coverage of the CRLF path: the repo's own *.md files are
+# deliberately left unpinned, so CI's windows-latest job runs both linters over
+# a fully CRLF tree every time.
+* text eol=lf

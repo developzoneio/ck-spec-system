@@ -50,6 +50,8 @@ moved ahead of the write, verified by the failing test added in Phase 4.
 **Status**: Confirmed after root cause.
 
 - Move the idempotency check ahead of the write in `src/Stock/StockDeductionService.cs`.
+- The check could move into a guard clause for readability - deferred to a separate spec, since
+  that is a pure structural cleanup and not part of this fix.
 
 **Scope discipline check**:
 - [x] Fix touches only files implicated by root cause
@@ -59,3 +61,16 @@ moved ahead of the write, verified by the failing test added in Phase 4.
 
 - [x] Failing test added that reproduces the bug (Phase 4 Gate 4)
 - [x] Failing test now passes with fix applied
+
+## Spawned specs
+
+| Reserved ID | Type | Title | Owner |
+|---|---|---|---|
+| REF-CLEAN-004 | refactor | Move the idempotency check into a guard clause | ops |
+
+<!-- The clean half of the SL090 pair. `BUG-CLEAN-003` is `done` and its "Fix approach" section
+     names a follow-up ("deferred to a separate spec"), but the follow-up has a reserved ID here,
+     so SL090 stays silent. `REF-CLEAN-004` has no folder and no index row on purpose: a reserved
+     ID is a placeholder, not a registry entry, and must NOT raise SL032 (ghost row - there is no
+     row) or SL050 (dangling link - it is not in `linked_specs`). A linter that reports either has
+     confused the two. -->

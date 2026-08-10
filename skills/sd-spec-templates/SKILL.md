@@ -27,6 +27,7 @@ Each template has a dedicated section below. Read only the section matching the 
 | Refactor | `smell` |
 | Perf | `target_metric` |
 | RCA | `severity`, `incident_started`, `incident_resolved` |
+| Port | `jira` (or `none`), `scope` (`endpoint`\|`module`\|`feature`\|`pattern`), `source_repo`, `source_commit`, `source_license`, `snapshot` (`contract`\|`contract+source`) |
 
 `linked_specs` is always `[]` at authoring time. Cross-references are written later by
 `/sd:spec link`, which maintains the inverse entry on the other spec — never hand-write the list,
@@ -44,6 +45,10 @@ Fill:
 - **Open questions** — real ambiguities only; don't pad.
 - **`complexity` frontmatter** — the whole-spec size estimate, `S` | `M` | `L`, with a one-line
   rationale in the trailing comment. See "Complexity estimate" below.
+
+**Leave empty**: `## Spawned specs` — header + separator only, no rows and no `<<...>>` token. It
+mirrors `rca.template.md`'s four-column table and is filled at close-out by the owning workflow,
+not at create time. A reserved ID is a placeholder, never an `.specs/index.md` row.
 
 - Scenario headings use stable IDs: `### SC-<n>: <name>`. IDs are sequential from SC-1 and are
   never renumbered or reused after a scenario is deleted - downstream `Covers` fields and
@@ -118,7 +123,10 @@ Fill:
 - **Affected** — components, scope, first introduced (version / PR if known).
 - **Severity** — P0 (production down) / P1 (major feature broken) / P2 (partial degradation) / P3 (minor).
 
-**Leave empty**: Root cause section, Fix approach section — these are filled in Phase 3 (debugger) and Phase 5 (main thread + implementer). Pre-filling breaks the workflow gate discipline.
+**Leave empty**: Root cause section, Fix approach section, `## Spawned specs` (header + separator
+only, no `<<...>>` token) — the first two are filled in Phase 3 (debugger) and Phase 5 (main thread
++ implementer); `## Spawned specs` is filled at close-out by the owning workflow. Pre-filling
+breaks the workflow gate discipline.
 
 ---
 
@@ -134,6 +142,8 @@ Fill:
 Leave TBD:
 - **Impact surface** — Phase 2 explorer fills.
 - **Test coverage prerequisite measurements** — Phase 3 fills.
+- **`## Spawned specs`** — header + separator only, no `<<...>>` token; filled at close-out by the
+  owning workflow, not at create time.
 
 Public API: preserved by default. Any public API change requires explicit mention in the spec.
 
@@ -152,6 +162,7 @@ Leave empty:
 - **Results log** — filled iteratively in Phase 4.
 - **Hypothesis tree** — filled by debugger in Phase 3.
 - **Trade-offs accepted** — filled at close-out.
+- **`## Spawned specs`** — header + separator only, no `<<...>>` token; filled at close-out.
 
 ---
 
@@ -172,6 +183,31 @@ Spec ID format: `RCA-<slug>-<YYYYMMDD>` using UTC date.
 
 ---
 
+## port.template.md
+
+`source_repo` / `source_commit` are required **values**, not just present fields, when `scope` is
+not `pattern` (write `none` for `pattern`). The three fidelity tables - Path mapping table, Member
+manifest, Deviation table - and the mandatory fidelity acceptance criterion (`AC-1`, pre-filled,
+never reworded or renumbered) are owned by **sd-port-fidelity**: read that skill for the column
+schemas and completeness conditions rather than re-deriving them here.
+
+Fill:
+- **Why**, **Donor provenance**, **Behavioral contract** (fixed 7-row table), **Success criteria**
+  `AC-2` onward, **Out of scope**, **Open questions**.
+- **`## Behavioral invariants (non-obvious)`** is mandatory even when short and must never be
+  deleted - it is the single highest-value section in the spec.
+- **`## Spawned specs`** mirrors `rca.template.md`'s 4-column table: one row per donor defect
+  reproduced deliberately, not per sanctioned deviation.
+
+**No `<<PHASE-N: ...>>` tokens exist for this template** (same as `feature.template.md`) - the
+fidelity tables and `Frozen:` line are progressively filled by `sd-spec-architect` `refine` calls
+and main-thread edits across `/sd:port`'s phases, not gated by phase-deferred tokens. Do not invent
+one.
+
+Spec ID format: `PORT-<slug>-<YYYYMMDD>` using UTC date.
+
+---
+
 ## Anti-patterns
 
 - Filling cross-phase fields prematurely (bug root cause, perf results log, rca root cause).
@@ -179,3 +215,5 @@ Spec ID format: `RCA-<slug>-<YYYYMMDD>` using UTC date.
 - Hardcoding stack assumptions — always read `CLAUDE.md` first; never default to a stack from prior invocations.
 - Producing the spec text in the prose response — write to the file; return only the summary + path.
 - Glossing over a constitution violation — if §1.1 is at risk, that is an Open question.
+- Inventing a line-range column in the port member manifest — line ranges live only in
+  `04-artifacts/source/MANIFEST.md`, keyed by `(Snapshot path, Ordinal)`.

@@ -15,6 +15,9 @@
       6. CHANGELOG gate: the [Unreleased] section is non-empty.
       7. Docs consistency: published numbers in the docs match disk, per
          specwright.manifest.json.
+      8. Cross-file contract lint: the relationships between commands, agents
+         and skills, per specwright.manifest.json's contractLint subtree.
+         Delegated to scripts/contract-lint.ps1 as a child process.
 
     Exit code 0 = all checks passed; 1 = at least one check failed.
 
@@ -43,6 +46,12 @@ $ExpectedAgents    = (Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md 
 $ExpectedSkills    = (Get-ChildItem (Join-Path $repoRoot 'skills') -Filter 'SKILL.md' -File -Recurse).Count
 $ExpectedHooks     = (Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File).Count
 $ExpectedTemplates = (Get-ChildItem (Join-Path $repoRoot 'templates') -File -Recurse).Count
+
+# The version stamp has no source-tree counterpart - it is generated at install time from
+# CHANGELOG.md, never copied from a source dir - so unlike the counts above it cannot be
+# derived from a glob. This is the one hand-written constant Check 5 uses: how many stamp
+# files land per installed area.
+$StampFilesPerArea = 1
 
 foreach ($pair in @(
     @{ Name = 'commands';  Count = $ExpectedCommands },
@@ -116,12 +125,30 @@ function Find-WorkingBash {
     return $null
 }
 
+# Counts files under Dir and compares against Expected, reporting through the same
+# Write-Ok / Write-FailMsg / Add-Failure vocabulary as every other check. Reused by
+# Check 5 for both the fresh install and the idempotent re-run, so both runs are
+# asserted through one code path rather than two hand-copied loops.
+function Test-AreaCount {
+    param([string]$Name, [string]$Dir, [int]$Expected)
+    $cnt = 0
+    if (Test-Path -LiteralPath $Dir) {
+        $cnt = (Get-ChildItem -LiteralPath $Dir -Recurse -File).Count
+    }
+    if ($cnt -eq $Expected) {
+        Write-Ok "$Name/sd : $cnt file(s)"
+    } else {
+        Write-FailMsg "$Name/sd : expected $Expected, found $cnt"
+        Add-Failure "install: $Name/sd expected $Expected found $cnt"
+    }
+}
+
 Write-Section 'specwright validate'
 Write-Host "  Repo root: $repoRoot"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-Write-Section 'Check 1/7: Pure-ASCII scan (*.ps1)'
+Write-Section 'Check 1/8: Pure-ASCII scan (*.ps1)'
 $ps1Files = Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
     Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 $asciiBad = 0
@@ -138,7 +165,7 @@ if ($asciiBad -eq 0) { Write-Ok "$($ps1Files.Count) .ps1 file(s) are pure ASCII"
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-Write-Section 'Check 2/7: bash -n syntax (*.sh)'
+Write-Section 'Check 2/8: bash -n syntax (*.sh)'
 $shFiles = @()
 foreach ($sub in @('hooks\bash', 'install', 'scripts')) {
     $dir = Join-Path $repoRoot $sub
@@ -166,7 +193,7 @@ if ($null -eq $bashExe) {
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-Write-Section 'Check 3/7: Hook-pair parity'
+Write-Section 'Check 3/8: Hook-pair parity'
 $psHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File |
     ForEach-Object { $_.BaseName }
 $shHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\bash') -Filter *.sh -File |
@@ -190,7 +217,7 @@ if ($parityBad -eq 0) { Write-Ok "$($psHooks.Count) hook pair(s) present on both
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-Write-Section 'Check 4/7: Agent model aliases'
+Write-Section 'Check 4/8: Agent model aliases'
 $agentFiles = Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File
 $modelBad = 0
 foreach ($f in $agentFiles) {
@@ -213,12 +240,16 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-Write-Section 'Check 5/7: Install-target counts'
+Write-Section 'Check 5/8: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
+$tmpNc = Join-Path $env:TEMP "sd-validate-nc-$PID"
+$tmpNcBase = Join-Path $env:TEMP "sd-validate-nc-base-$PID"
 $psExe = (Get-Process -Id $PID).Path
 try {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -Recurse -Force $tmp }
+    if (Test-Path -LiteralPath $tmpNc) { Remove-Item -Recurse -Force $tmpNc }
+    if (Test-Path -LiteralPath $tmpNcBase) { Remove-Item -Recurse -Force $tmpNcBase }
     if ($env:OS -eq 'Windows_NT') {
         $childArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installPs1, '-BasePath', $tmp, '-Force')
     } else {
@@ -230,34 +261,147 @@ try {
         Add-Failure "install: installer exit $LASTEXITCODE"
     } else {
         $targets = @(
-            [pscustomobject]@{ Name = 'commands';  Path = 'commands\sd';  Expected = $ExpectedCommands },
-            [pscustomobject]@{ Name = 'agents';    Path = 'agents\sd';    Expected = $ExpectedAgents },
-            [pscustomobject]@{ Name = 'skills';    Path = 'skills\sd';    Expected = $ExpectedSkills },
-            [pscustomobject]@{ Name = 'hooks';     Path = 'hooks\sd';     Expected = $ExpectedHooks },
-            [pscustomobject]@{ Name = 'templates'; Path = 'templates\sd'; Expected = $ExpectedTemplates }
+            [pscustomobject]@{ Name = 'commands';  Path = 'commands\sd';  Expected = $ExpectedCommands  + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'agents';    Path = 'agents\sd';    Expected = $ExpectedAgents    + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'skills';    Path = 'skills\sd';    Expected = $ExpectedSkills    + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'hooks';     Path = 'hooks\sd';     Expected = $ExpectedHooks     + $StampFilesPerArea },
+            [pscustomobject]@{ Name = 'templates'; Path = 'templates\sd'; Expected = $ExpectedTemplates + $StampFilesPerArea }
         )
         foreach ($t in $targets) {
-            $full = Join-Path $tmp $t.Path
-            if (Test-Path -LiteralPath $full) {
-                $cnt = (Get-ChildItem -LiteralPath $full -Recurse -File).Count
-            } else {
-                $cnt = 0
+            Test-AreaCount -Name $t.Name -Dir (Join-Path $tmp $t.Path) -Expected $t.Expected
+        }
+
+        # ---- stamp content: every area's stamp equals the CHANGELOG-derived version ----
+        $stampChangelog = Join-Path $repoRoot 'CHANGELOG.md'
+        $stampVersion = $null
+        foreach ($line in (Get-Content -LiteralPath $stampChangelog)) {
+            $m = [regex]::Match($line, '^##\s+\[([0-9]+\.[0-9]+\.[0-9]+)\]\s+-\s+\S')
+            if ($m.Success) { $stampVersion = $m.Groups[1].Value; break }
+        }
+        if ([string]::IsNullOrEmpty($stampVersion)) {
+            Write-FailMsg 'CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)'
+            Add-Failure 'install: stamp version source unreadable'
+        } else {
+            $stampBad = 0
+            foreach ($t in $targets) {
+                $stampPath = Join-Path (Join-Path $tmp $t.Path) 'specwright-version.txt'
+                if (-not (Test-Path -LiteralPath $stampPath -PathType Leaf)) {
+                    Write-FailMsg "$($t.Name)/sd/specwright-version.txt : not found"
+                    Add-Failure "install: $($t.Name)/sd stamp missing"
+                    $stampBad++
+                    continue
+                }
+                # Tolerate a stray trailing CR on read - the byte contract itself is
+                # asserted below on one stamp; this comparison only cares about content.
+                $stampContent = (Get-Content -LiteralPath $stampPath -Raw) -replace '[\r\n]+$', ''
+                if ($stampContent -ne $stampVersion) {
+                    Write-FailMsg "$($t.Name)/sd/specwright-version.txt : content '$stampContent' != CHANGELOG version '$stampVersion'"
+                    Add-Failure "install: $($t.Name)/sd stamp content mismatch"
+                    $stampBad++
+                }
             }
-            if ($cnt -eq $t.Expected) {
-                Write-Ok "$($t.Name)/sd : $cnt file(s)"
-            } else {
-                Write-FailMsg "$($t.Name)/sd : expected $($t.Expected), found $cnt"
-                Add-Failure "install: $($t.Name)/sd expected $($t.Expected) found $cnt"
+            if ($stampBad -eq 0) { Write-Ok "5 stamp(s) match CHANGELOG version $stampVersion" }
+
+            # Byte-level contract on one stamp (commands): no BOM, no CR, exactly one trailing LF.
+            $byteStampPath = Join-Path (Join-Path $tmp 'commands\sd') 'specwright-version.txt'
+            if (Test-Path -LiteralPath $byteStampPath -PathType Leaf) {
+                $stampBytes = [System.IO.File]::ReadAllBytes($byteStampPath)
+                $hasBom = ($stampBytes.Length -ge 3) -and ($stampBytes[0] -eq 0xEF) -and ($stampBytes[1] -eq 0xBB) -and ($stampBytes[2] -eq 0xBF)
+                $hasCr = $stampBytes -contains 0x0D
+                $endsWithLf = ($stampBytes.Length -gt 0) -and ($stampBytes[$stampBytes.Length - 1] -eq 0x0A)
+                $doubleLf = ($stampBytes.Length -gt 1) -and ($stampBytes[$stampBytes.Length - 2] -eq 0x0A)
+                if ($hasBom -or $hasCr -or (-not $endsWithLf) -or $doubleLf) {
+                    Write-FailMsg "commands/sd/specwright-version.txt : byte contract violated (BOM=$hasBom CR=$hasCr trailingLF=$endsWithLf doubleLF=$doubleLf)"
+                    Add-Failure 'install: commands/sd stamp byte contract'
+                } else {
+                    Write-Ok 'commands/sd/specwright-version.txt : LF, no BOM, no CR, single trailing newline'
+                }
             }
+        }
+
+        # ---- idempotent re-run: second -Force pass must be a no-op for the stamp ----
+        & $psExe @childArgs *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-FailMsg "second installer run exited with code $LASTEXITCODE"
+            Add-Failure "install: second installer run exit $LASTEXITCODE"
+        } else {
+            $bakFiles = @(Get-ChildItem -LiteralPath $tmp -Recurse -File -Filter '*.bak.*' -ErrorAction SilentlyContinue)
+            if ($bakFiles.Count -gt 0) {
+                Write-FailMsg "second install run created $($bakFiles.Count) *.bak.* file(s) - stamp is not idempotent"
+                Add-Failure 'install: second run produced .bak files'
+            } else {
+                Write-Ok 'second -Force run created zero *.bak.* file(s)'
+            }
+            foreach ($t in $targets) {
+                Test-AreaCount -Name $t.Name -Dir (Join-Path $tmp $t.Path) -Expected $t.Expected
+            }
+        }
+    }
+
+    # ---- negative case: missing version source fails loudly, copies nothing ----
+    # The required-source-directory list is mirrored FROM install.ps1's own
+    # $requiredDirs block, not hand-duplicated here, so a future added requirement
+    # fails this scenario visibly instead of silently changing what it proves.
+    $reqDirsFromInstaller = New-Object System.Collections.Generic.List[string]
+    $inReqBlock = $false
+    foreach ($line in (Get-Content -LiteralPath $installPs1)) {
+        if ($line -match '^\$requiredDirs\s*=\s*@\(') { $inReqBlock = $true; continue }
+        if ($inReqBlock) {
+            if ($line -match '^\)') { break }
+            $m = [regex]::Match($line, "Path\s*=\s*'([^']+)'")
+            if ($m.Success) { $reqDirsFromInstaller.Add($m.Groups[1].Value) }
+        }
+    }
+    if ($reqDirsFromInstaller.Count -eq 0) {
+        Write-FailMsg 'install.ps1 : could not parse $requiredDirs - missing-CHANGELOG scenario skipped'
+        Add-Failure 'install: could not parse install.ps1 required dirs'
+    } else {
+        New-Item -ItemType Directory -Path (Join-Path $tmpNc 'install') -Force | Out-Null
+        Copy-Item -LiteralPath $installPs1 -Destination (Join-Path $tmpNc 'install\install.ps1') -Force
+        foreach ($d in $reqDirsFromInstaller) {
+            New-Item -ItemType Directory -Path (Join-Path $tmpNc $d) -Force | Out-Null
+        }
+        $ncInstallPs1 = Join-Path $tmpNc 'install\install.ps1'
+        if ($env:OS -eq 'Windows_NT') {
+            $ncArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ncInstallPs1, '-BasePath', $tmpNcBase, '-Force')
+        } else {
+            $ncArgs = @('-NoProfile', '-File', $ncInstallPs1, '-BasePath', $tmpNcBase, '-Force')
+        }
+        $ncOut = & $psExe @ncArgs 2>&1 | Out-String
+        $ncExit = $LASTEXITCODE
+        $ncBad = 0
+        if ($ncExit -eq 0) {
+            Write-FailMsg 'missing-CHANGELOG scenario: installer exited 0, expected non-zero'
+            Add-Failure 'install: missing-changelog scenario did not fail'
+            $ncBad++
+        }
+        if ($ncOut -notmatch 'CHANGELOG\.md') {
+            Write-FailMsg 'missing-CHANGELOG scenario: installer output did not mention CHANGELOG.md'
+            Add-Failure 'install: missing-changelog scenario message missing CHANGELOG.md'
+            $ncBad++
+        }
+        $ncFileCount = 0
+        if (Test-Path -LiteralPath $tmpNcBase) {
+            $ncFileCount = (Get-ChildItem -LiteralPath $tmpNcBase -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+        }
+        if ($ncFileCount -ne 0) {
+            Write-FailMsg "missing-CHANGELOG scenario: base contains $ncFileCount file(s), expected 0"
+            Add-Failure 'install: missing-changelog scenario copied files'
+            $ncBad++
+        }
+        if ($ncBad -eq 0) {
+            Write-Ok 'missing-CHANGELOG.md scenario: installer failed loudly and copied nothing'
         }
     }
 } finally {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $tmpNc) { Remove-Item -Recurse -Force $tmpNc -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $tmpNcBase) { Remove-Item -Recurse -Force $tmpNcBase -ErrorAction SilentlyContinue }
 }
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/7: CHANGELOG [Unreleased] gate'
+Write-Section 'Check 6/8: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -290,7 +434,7 @@ if ($start -lt 0) {
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-Write-Section 'Check 7/7: Docs consistency (published numbers vs disk)'
+Write-Section 'Check 7/8: Docs consistency (published numbers vs disk)'
 $manifestPath = Join-Path $repoRoot 'specwright.manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     Write-FailMsg 'specwright.manifest.json not found at repo root'
@@ -329,12 +473,42 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
         $quantities[$areaName] = $areaCount
     }
 
+    # Stamp count is a THIRD kind of quantity here: not read from a source-tree glob (there
+    # is no stamp source dir) but derived from areas.*.installTo - one stamp lands in each
+    # distinct '<area>/sd/' root the installer writes to. Seeded here, before the derived
+    # loop, so derived.installTotalWithStamps can reference it without depending on JSON key
+    # order, and it self-corrects if an area is added or removed.
+    $installRoots = @()
+    foreach ($areaProp in $manifest.areas.PSObject.Properties) {
+        $installTo = $areaProp.Value.installTo
+        if ([string]::IsNullOrEmpty($installTo)) { continue }
+        $segments = @($installTo -split '/' | Where-Object { $_ -ne '' })
+        if ($segments.Count -lt 2) { continue }
+        $root = "$($segments[0])/$($segments[1])"
+        if ($installRoots -notcontains $root) { $installRoots += $root }
+    }
+    $quantities['installStamps'] = $installRoots.Count
+
     foreach ($derProp in $manifest.derived.PSObject.Properties) {
         $derTotal = 0
         foreach ($part in $derProp.Value) {
             if ($quantities.ContainsKey($part)) { $derTotal += [int]$quantities[$part] }
         }
         $quantities[$derProp.Name] = $derTotal
+    }
+
+    # Gate quantities are DECLARED, not derived: nothing on disk is a second
+    # source for "how many hard gates /sd:feature has". Seeding them here gives
+    # the topology README <- manifest (this check) and manifest <- disk (Check
+    # 8's CL302), hence transitively README == disk, with zero duplication of the
+    # gate parser into this file. A null quantity means the gate block is real
+    # but no doc publishes a number for it.
+    if ($null -ne $manifest.contractLint -and $null -ne $manifest.contractLint.gates) {
+        foreach ($gateProp in $manifest.contractLint.gates.PSObject.Properties) {
+            $qName = $gateProp.Value.quantity
+            if ([string]::IsNullOrEmpty($qName)) { continue }
+            $quantities[$qName] = [int]$gateProp.Value.hard
+        }
     }
 
     foreach ($claim in $manifest.docClaims) {
@@ -385,6 +559,57 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
         }
     }
 
+    # ---- Version claims: published version vs newest dated CHANGELOG heading ---
+    # Independent of Check 6's $nextHeader - that variable stays $null in the normal
+    # non-just-released state, since [Unreleased] currently has bullets right after its
+    # header and the Check 6 loop breaks on the bullet before ever hitting a '## [' line.
+    # Scan the whole file for the first dated release heading instead.
+    $releasedVersion = $null
+    foreach ($line in (Get-Content -LiteralPath $changelog)) {
+        $m = [regex]::Match($line, '^##\s+\[([0-9]+\.[0-9]+\.[0-9]+)\]\s+-\s+\S')
+        if ($m.Success) { $releasedVersion = $m.Groups[1].Value; break }
+    }
+    if ([string]::IsNullOrEmpty($releasedVersion)) {
+        Write-FailMsg 'CHANGELOG.md : no dated release heading found (## [x.y.z] - <date>)'
+        Add-Failure 'docs: no dated release heading in CHANGELOG.md'
+        $docsBad++
+    }
+
+    foreach ($claim in @($manifest.versionClaims)) {
+        $target = Join-Path $repoRoot ($claim.file -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            Write-FailMsg "$($claim.file) : declared version-claim file does not exist"
+            Add-Failure "docs: missing version-claim file $($claim.file)"
+            $docsBad++
+            continue
+        }
+        if ([string]::IsNullOrEmpty($releasedVersion)) { continue }
+
+        $hits = 0
+        $lineNo = 0
+        foreach ($line in (Get-Content -LiteralPath $target)) {
+            $lineNo++
+            $m = [regex]::Match($line, $claim.pattern)
+            if ($m.Success) {
+                $hits++
+                $found = $m.Groups[1].Value
+                if ($found -ne $releasedVersion) {
+                    Write-FailMsg "$($claim.file):$lineNo : says $found, CHANGELOG has $releasedVersion"
+                    Add-Failure "docs: $($claim.file):$lineNo version says $found not $releasedVersion"
+                    $docsBad++
+                }
+            }
+        }
+
+        # A pattern that matches nothing is a rotted regex, not a pass - same rationale
+        # as the docClaims vacuous-claim check above.
+        if ($hits -eq 0) {
+            Write-FailMsg "$($claim.file) : version pattern matched no lines (reworded?): $($claim.pattern)"
+            Add-Failure "docs: vacuous version claim in $($claim.file)"
+            $docsBad++
+        }
+    }
+
     # Undeclared-claim scan: any line that looks like an inventory claim but is not
     # covered by a docClaims entry. This is what keeps the manifest canonical - a new
     # doc cannot publish a number that nothing checks.
@@ -418,7 +643,58 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
     }
 
     if ($docsBad -eq 0) {
-        Write-Ok "$($manifest.docClaims.Count) published claim(s) match disk; no undeclared claims"
+        $versionClaimCount = @($manifest.versionClaims).Count
+        Write-Ok "$($manifest.docClaims.Count) published claim(s) + $versionClaimCount version claim(s) match disk/CHANGELOG; no undeclared claims"
+    }
+}
+
+# ---- Check 8: cross-file contract lint --------------------------------------
+
+Write-Section 'Check 8/8: Cross-file contract lint (commands / agents / skills)'
+$lintPs1 = Join-Path $scriptDir 'contract-lint.ps1'
+if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
+    Write-FailMsg 'scripts/contract-lint.ps1 not found'
+    Add-Failure 'contract-lint: script missing'
+} else {
+    # Spawned as a CHILD PROCESS, never with '&': contract-lint.ps1 calls exit,
+    # and an inline '&' would terminate validate.ps1 outright - leaving a green
+    # Check 7 line already printed and no summary at all. Same pattern as the
+    # installer invocation in Check 5.
+    $lintArgs = @('-NoProfile')
+    if ($env:OS -eq 'Windows_NT') { $lintArgs += @('-ExecutionPolicy', 'Bypass') }
+    $lintArgs += @('-File', $lintPs1, '-Root', $repoRoot, '-Quiet')
+    $lintOut = & $psExe @lintArgs 2>$null
+    $lintExit = $LASTEXITCODE
+
+    # The linter is a dumb TSV emitter; all human formatting happens here, so
+    # both twins stay identical and neither learns about colours or [OK] tags.
+    $clBlocks = 0
+    $clWarns = 0
+    foreach ($row in @($lintOut)) {
+        if ([string]::IsNullOrWhiteSpace($row)) { continue }
+        $parts = $row.Split([char]9)
+        if ($parts.Count -lt 5) { continue }
+        $text = "$($parts[2]):$($parts[3]) $($parts[0]) - $($parts[4])"
+        if ($parts[1] -ceq 'BLOCK') {
+            Write-FailMsg $text
+            Add-Failure "contract-lint: $($parts[0]) $($parts[2]):$($parts[3])"
+            $clBlocks++
+        } else {
+            Write-WarnMsg $text
+            $clWarns++
+        }
+    }
+    if ($lintExit -ge 2) {
+        # Exit 2 means the linter could not run at all. Treating that as a pass
+        # is the failure mode this whole check exists to prevent.
+        Write-FailMsg "contract-lint could not run (exit $lintExit)"
+        Add-Failure "contract-lint: exit $lintExit"
+    } elseif ($clBlocks -eq 0) {
+        if ($clWarns -eq 0) {
+            Write-Ok 'no contract violations'
+        } else {
+            Write-Ok "no BLOCK violations ($clWarns warning(s) above)"
+        }
     }
 }
 

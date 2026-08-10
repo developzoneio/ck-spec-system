@@ -1,0 +1,4 @@
+{
+  "note": "MUST STAY SILENT: Gate 1a is authored BEFORE Gate 2, and CL303 compares sets not order",
+  "findings": []
+}

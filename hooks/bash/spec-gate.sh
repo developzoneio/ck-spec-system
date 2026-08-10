@@ -391,6 +391,73 @@ emit_transition_metrics() {
     done
 }
 
+# --- metrics: complexity-gate split detection (observational, SW-31) ----------
+# Gate Complexity (ADR 0002) is decided as model-executed prose inside
+# /sd:feature Phase 3 Gate 2 - no hook observes that decision directly. What
+# IS observable here is one of its two possible outcomes: an "approve split"
+# resolution always leaves a structural trace in THIS index.md edit or an
+# earlier one - the parent row moves to `archived` (commands/feature.md
+# Face B, "make the parent an umbrella record") and each child is registered
+# under the `FEAT-<parent>-<slug>` naming convention (feature.md's child-ID
+# step). A FEAT-X row newly transitioning to `archived` alongside any
+# already-registered FEAT-X-<slug> row (in the on-disk registry OR this same
+# pending edit) is read as a completed split.
+#
+# This can only ever detect a SPLIT, never a bare trip: Face A (never
+# tripped) and Face B "no-split" (tripped, user declined) both leave the
+# parent `in-progress` with no distinguishing mark in index.md, so trip rate
+# on its own is not recoverable from this signal. See ADR
+# docs/adr/0004-threshold-calibration.md "Scope declined" - deliberately not
+# fixed here to avoid making a HARD gate's prose responsible for feeding a
+# metrics pipeline the rest of this file keeps strictly hook-authored.
+#
+# Callers MUST only invoke this on a path where the edit was actually
+# ALLOWED through (Rule 0's verify-allow exit, Rule 2's allow-listed exit).
+# On a block exit the edit never reached disk, so recording "split" there
+# would assert a split that did not happen - never add a call site here on a
+# block/deny path.
+#
+# Scoped to FEAT- parents only: Gate Complexity decompose is a /sd:feature
+# mechanism (commands/feature.md Face B); BUG-/REF-/PERF-/RCA- rows can never
+# go through it, so matching their prefix too would only add false-positive
+# surface for coincidental id-prefix collisions with no corresponding
+# real-world case.
+emit_complexity_split_metrics() {
+    [[ ${#transition_id[@]} -eq 0 ]] && return 0
+
+    local registry_pairs="" new_fragment="" new_pairs=""
+    if [[ -f "${index_path}" ]]; then
+        registry_pairs="$(extract_id_status_pairs < "${index_path}")"
+    fi
+    case "${tool_name}" in
+        Edit)      new_fragment="$(printf '%s' "${input}" | jq -r '.tool_input.new_string // empty' 2>/dev/null)" ;;
+        Write)     new_fragment="$(printf '%s' "${input}" | jq -r '.tool_input.content // empty' 2>/dev/null)" ;;
+        MultiEdit) new_fragment="$(printf '%s' "${input}" | jq -r '[.tool_input.edits[]?.new_string // empty] | join("\n")' 2>/dev/null)" ;;
+    esac
+    [[ -n "${new_fragment}" ]] && new_pairs="$(printf '%s' "${new_fragment}" | extract_id_status_pairs)"
+
+    local all_ids
+    all_ids="$(printf '%s\n%s\n' "${registry_pairs}" "${new_pairs}" | awk -F'\t' '{if ($1!="") print $1}' | LC_ALL=C sort -u)"
+
+    local i id other child_found
+    for i in "${!transition_id[@]}"; do
+        id="${transition_id[$i]}"
+        [[ "${transition_phase[$i]}" == "archived" ]] || continue
+        case "${id}" in
+            FEAT-*) ;;
+            *) continue ;;
+        esac
+        child_found=0
+        while IFS= read -r other; do
+            [[ -z "${other}" || "${other}" == "${id}" ]] && continue
+            case "${other}" in
+                "${id}-"*) child_found=1; break ;;
+            esac
+        done <<< "${all_ids}"
+        [[ ${child_found} -eq 1 ]] && emit_gate_metric "${id}" "archived" "complexity" "split"
+    done
+}
+
 # --- Rule 0: verify gate on the spec index ------------------------------------
 # A row transitioning to done requires a passing /sd:verify artifact; a
 # verified close-out is allowed through the protected-path rule. Any other
@@ -491,6 +558,10 @@ if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; t
                     emit_gate_metric "${id}" "done" "verify" "${id_decision}"
                 done <<< "${transition_ids}"
                 emit_transition_metrics "block"
+                # No emit_complexity_split_metrics here: the whole edit is
+                # denied, so nothing in it - including any bundled parent
+                # archive + child registration - actually reached disk. See
+                # the function's own comment.
                 exit 0
             fi
             # Every transitioning spec has a passing artifact - allow the close-out.
@@ -499,6 +570,7 @@ if [[ "${verify_gate}" == "true" && "${rel_lower}" == "${index_rel_lower}" ]]; t
                 emit_gate_metric "${id}" "done" "verify" "allow"
             done <<< "${transition_ids}"
             emit_transition_metrics "allow"
+            emit_complexity_split_metrics
             exit 0
         fi
     fi
@@ -525,6 +597,8 @@ if [[ ${is_protected} -eq 1 ]]; then
     emit_block "spec-gate: '${rel}' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
     emit_gate_metric "-" "-" "protected" "block"
     emit_transition_metrics "block"
+    # No emit_complexity_split_metrics here: the edit is denied, so a
+    # detected parent-archive-plus-child pattern in it never reached disk.
     exit 0
 fi
 
@@ -563,6 +637,7 @@ fi
 
 if [[ ${is_allowed} -eq 1 ]]; then
     emit_transition_metrics "allow"
+    emit_complexity_split_metrics
     exit 0
 fi
 

@@ -1,0 +1,458 @@
+#requires -Version 7.0
+<#
+.SYNOPSIS
+    specwright: headless behavioral eval harness for commands and gates (SW-27).
+
+.DESCRIPTION
+    Drives real `claude -p` (headless) sessions against a throwaway copy of a
+    fixture project, one scenario per run, and asserts on PRODUCED ARTIFACTS
+    (files, frontmatter, status values) rather than transcript wording.
+
+    Isolation: each scenario gets a fresh "fake home" directory with the
+    engine installed into it via install.ps1 -BasePath <fakehome>/.claude
+    (the same sandbox pattern CI's install/uninstall round-trip job uses),
+    and a fresh workspace directory holding the project under test. The
+    claude subprocess runs with HOME/USERPROFILE pointed at the fake home and
+    cwd set to the workspace, so `~/.claude/...` (used literally in command
+    prompts, e.g. setup.md Phase 0) and `${HOME}` (used in settings.json hook
+    command strings) both resolve to the sandbox, never the real user
+    install. --setting-sources project is passed as a second, independent
+    guarantee that no real user-scope settings.json can merge in.
+
+    Each scenario directory under scenarios/<name>/ may contain:
+      source.txt   - optional, one line: a repo-relative path to copy as the
+                      base workspace (e.g. examples/fixture-project).
+      workspace/   - optional overlay copied on top of the base afterward
+                      (added/overwritten files only - mirrors the
+                      tests/contract-lint fixture _base + overlay pattern).
+      prompt.txt   - the literal prompt fed to `claude -p`.
+      expect.json  - declarative assertions evaluated after the run.
+      budget.txt   - optional, one line: --max-budget-usd override (default 3).
+
+    -SelfTest re-runs the negative scenarios (03, 04) with spec-gate's
+    installed hook files replaced by an always-allow stub, and asserts they
+    now FAIL - proving the harness would catch a regression that removes the
+    guard (mirrors tests/hooks/run-conformance.ps1 and
+    tests/contract-lint/run-selftest.ps1's own -SelfTest modes).
+
+.NOTES
+    PURE ASCII ONLY (see hooks/powershell/prompt-router.ps1 for why).
+    Single cross-platform runner by design, same posture as
+    tests/hooks/run-conformance.ps1 and tests/contract-lint/run-selftest.ps1:
+    this is a test harness, not a hooks/ file, so the "hooks ship in pairs"
+    rule in CLAUDE.md does not apply.
+#>
+
+[CmdletBinding()]
+param(
+    [string]$Case,
+    [switch]$SelfTest,
+    [int]$TimeoutSeconds = 600
+)
+
+$ErrorActionPreference = 'Stop'
+
+$scriptDir    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot     = (Resolve-Path (Join-Path $scriptDir '..' '..')).Path
+$scenariosDir = Join-Path $scriptDir 'scenarios'
+$installPs1   = Join-Path $repoRoot 'install' 'install.ps1'
+
+$script:pass = 0
+$script:fail = 0
+
+function Write-Ok   { param([string]$m) Write-Host "  [OK]   $m"; $script:pass++ }
+function Write-Bad  { param([string]$m) Write-Host "  [FAIL] $m"; $script:fail++ }
+function Write-Info { param([string]$m) Write-Host "         $m" }
+
+# ---- sandbox construction ---------------------------------------------------
+
+function New-EmptyTempDir {
+    param([string]$Prefix)
+    $name = $Prefix + '-' + [System.Guid]::NewGuid().ToString('N').Substring(0, 12)
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) $name
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    return $dir
+}
+
+$script:warnedNoCredentials = $false
+
+function New-FakeHome {
+    # Fresh, empty "fake home" with the engine installed into <fakehome>/.claude
+    # via the installer's own -BasePath flag - the sandbox recipe from
+    # CLAUDE.md / the CI install-uninstall round-trip job, reused verbatim.
+    $fakeHome = New-EmptyTempDir -Prefix 'sd-e2e-home'
+    $basePath = Join-Path $fakeHome '.claude'
+    & pwsh -NoProfile -File $installPs1 -BasePath $basePath -Force *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "engine install into fake home failed (exit $LASTEXITCODE): $fakeHome"
+    }
+
+    # `claude -p` needs org/identity context from .credentials.json even when
+    # billing resolves through ANTHROPIC_API_KEY - an empty HOME alone is not
+    # enough (verified directly: without it, every headless run fails with
+    # "Not logged in" despite a valid API key). Copied fresh into the
+    # throwaway fake home per run and discarded on cleanup; never written
+    # anywhere persistent. CI has no real credentials file to copy - see
+    # tests/e2e/README.md for how the nightly workflow authenticates instead.
+    $realCreds = Join-Path $HOME '.claude' '.credentials.json'
+    if (Test-Path -LiteralPath $realCreds) {
+        New-Item -ItemType Directory -Path $basePath -Force | Out-Null
+        Copy-Item -LiteralPath $realCreds -Destination (Join-Path $basePath '.credentials.json') -Force
+    } elseif (-not $script:warnedNoCredentials) {
+        Write-Host '  [WARN] no ~/.claude/.credentials.json found to seed the sandbox; headless auth may fail unless CLAUDE_CODE_* CI auth is configured.'
+        $script:warnedNoCredentials = $true
+    }
+
+    return $fakeHome
+}
+
+function Copy-TreeContents {
+    param([string]$Source, [string]$Destination)
+    if (-not (Test-Path -LiteralPath $Source)) {
+        throw "copy source does not exist: $Source"
+    }
+    Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
+    }
+}
+
+function New-ScenarioWorkspace {
+    param([string]$ScenarioDir)
+    $ws = New-EmptyTempDir -Prefix 'sd-e2e-ws'
+
+    $sourceTxt = Join-Path $ScenarioDir 'source.txt'
+    if (Test-Path -LiteralPath $sourceTxt) {
+        $rel = (Get-Content -LiteralPath $sourceTxt -Raw).Trim()
+        $src = Join-Path $repoRoot $rel
+        Copy-TreeContents -Source $src -Destination $ws
+    }
+
+    $overlay = Join-Path $ScenarioDir 'workspace'
+    if (Test-Path -LiteralPath $overlay) {
+        Copy-TreeContents -Source $overlay -Destination $ws
+    }
+
+    return $ws
+}
+
+# ---- guard neutering (for -SelfTest) ----------------------------------------
+
+function Set-SpecGateNeutered {
+    param([string]$FakeHome)
+    # Overwrite the INSTALLED copy in the fake home with an always-allow stub -
+    # never touches the repo's real hooks/ source.
+    $stubPwsh = "#requires -Version 5.1`n[Console]::In.ReadToEnd() | Out-Null`nexit 0`n"
+    $stubBash = "#!/usr/bin/env bash`ncat >/dev/null`nexit 0`n"
+    $pwshPath = Join-Path $FakeHome '.claude' 'hooks' 'sd' 'spec-gate.ps1'
+    $bashPath = Join-Path $FakeHome '.claude' 'hooks' 'sd' 'spec-gate.sh'
+    Set-Content -LiteralPath $pwshPath -Value $stubPwsh -NoNewline -Encoding ascii
+    Set-Content -LiteralPath $bashPath -Value $stubBash -NoNewline -Encoding ascii
+}
+
+# ---- headless invocation -----------------------------------------------------
+
+function Invoke-ClaudeHeadless {
+    param(
+        [string]$Workspace,
+        [string]$FakeHome,
+        [string]$Prompt,
+        [double]$MaxBudgetUsd,
+        [int]$TimeoutSec,
+        [switch]$SkipPermissions,
+        [string[]]$DisallowedTools,
+        [string]$PermissionMode = 'dontAsk'
+    )
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = 'claude'
+    $cliArgs = @(
+        '-p', $Prompt,
+        '--output-format', 'json',
+        '--setting-sources', 'project',
+        '--add-dir', $FakeHome,
+        '--max-budget-usd', $MaxBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture),
+        '--no-session-persistence'
+    )
+    # PermissionMode matters a lot more here than it looks. Verified directly
+    # (minimal repro: a trivial always-deny PreToolUse hook, no spec-gate
+    # involved): under --permission-mode acceptEdits, OR under dontAsk
+    # combined with an explicit --allowedTools grant for Edit/Write, the CLI
+    # auto-approves the tool call and the hook's deny is silently ignored
+    # (0 permission_denials recorded, file still changes). Only "dontAsk"
+    # with NO --allowedTools override actually respects a hook's deny -
+    # everything not explicitly hook/default-allowed is refused, which is
+    # exactly the posture the negative scenarios need. Positive scenarios
+    # (01, 02) that need free writes use SkipPermissions instead of
+    # acceptEdits, for the same reason.
+    $cliArgs += '--permission-mode'
+    $cliArgs += $PermissionMode
+    if ($SkipPermissions) {
+        # Only for scenarios that legitimately need to write files Claude Code
+        # itself treats as sensitive (.claude/settings.json) or run arbitrary
+        # Bash (npm test). NEVER set for the negative scenarios - see above.
+        $cliArgs += '--dangerously-skip-permissions'
+    }
+    if ($DisallowedTools -and $DisallowedTools.Count -gt 0) {
+        $cliArgs += '--disallowedTools'
+        $cliArgs += ($DisallowedTools -join ',')
+    }
+    foreach ($a in $cliArgs) { $psi.ArgumentList.Add($a) }
+    $psi.WorkingDirectory       = $Workspace
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError  = $true
+    $psi.UseShellExecute        = $false
+    $psi.EnvironmentVariables['HOME']        = $FakeHome
+    $psi.EnvironmentVariables['USERPROFILE'] = $FakeHome
+
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+    $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $finished = $proc.WaitForExit($TimeoutSec * 1000)
+    if (-not $finished) {
+        try { $proc.Kill($true) } catch { }
+        return [pscustomobject]@{
+            TimedOut = $true; ExitCode = -1; Stdout = ''; Stderr = ''; Result = $null
+        }
+    }
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
+
+    $resultObj = $null
+    try { $resultObj = $stdout | ConvertFrom-Json -ErrorAction Stop } catch { }
+
+    return [pscustomobject]@{
+        TimedOut = $false
+        ExitCode = $proc.ExitCode
+        Stdout   = $stdout
+        Stderr   = $stderr
+        Result   = $resultObj
+    }
+}
+
+function Get-ScenarioSkipPermissions {
+    param([string]$ScenarioDir)
+    return (Test-Path -LiteralPath (Join-Path $ScenarioDir 'skip-permissions.txt'))
+}
+
+function Get-ScenarioPermissionMode {
+    param([string]$ScenarioDir)
+    $p = Join-Path $ScenarioDir 'permission-mode.txt'
+    if (Test-Path -LiteralPath $p) { return (Get-Content -LiteralPath $p -Raw).Trim() }
+    return 'dontAsk'
+}
+
+function Get-ScenarioDisallowedTools {
+    param([string]$ScenarioDir)
+    $p = Join-Path $ScenarioDir 'disallowed-tools.txt'
+    if (-not (Test-Path -LiteralPath $p)) { return @() }
+    $line = (Get-Content -LiteralPath $p -Raw).Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) { return @() }
+    return @($line -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+# ---- assertions ---------------------------------------------------------------
+
+function Get-ScenarioBudget {
+    param([string]$ScenarioDir)
+    $budgetTxt = Join-Path $ScenarioDir 'budget.txt'
+    if (Test-Path -LiteralPath $budgetTxt) {
+        return [double](Get-Content -LiteralPath $budgetTxt -Raw).Trim()
+    }
+    return 3.0
+}
+
+function Test-OneAssertion {
+    param($Assertion, [string]$Workspace, $Run)
+    $type = $Assertion.type
+    switch ($type) {
+        'file-exists' {
+            $p = Join-Path $Workspace $Assertion.path
+            return (Test-Path -LiteralPath $p)
+        }
+        'file-not-exists' {
+            $p = Join-Path $Workspace $Assertion.path
+            return (-not (Test-Path -LiteralPath $p))
+        }
+        'file-matches' {
+            $p = Join-Path $Workspace $Assertion.path
+            if (-not (Test-Path -LiteralPath $p)) { return $false }
+            $content = Get-Content -LiteralPath $p -Raw
+            return ($content -match $Assertion.pattern)
+        }
+        'file-not-matches' {
+            $p = Join-Path $Workspace $Assertion.path
+            if (-not (Test-Path -LiteralPath $p)) { return $true }
+            $content = Get-Content -LiteralPath $p -Raw
+            return ($content -notmatch $Assertion.pattern)
+        }
+        'output-contains' {
+            $text = if ($Run.Result -and $Run.Result.result) { [string]$Run.Result.result } else { $Run.Stdout }
+            return ($text -match [regex]::Escape($Assertion.value))
+        }
+        'exit-code' {
+            return ($Run.ExitCode -eq [int]$Assertion.value)
+        }
+        'file-no-bom' {
+            $p = Join-Path $Workspace $Assertion.path
+            if (-not (Test-Path -LiteralPath $p)) { return $false }
+            $bytes = [System.IO.File]::ReadAllBytes($p)
+            if ($bytes.Length -lt 3) { return $true }
+            return -not ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+        }
+        default {
+            throw "unknown assertion type '$type'"
+        }
+    }
+}
+
+function Get-AssertionLabel {
+    param($Assertion)
+    switch ($Assertion.type) {
+        'file-exists'      { return "file-exists: $($Assertion.path)" }
+        'file-not-exists'  { return "file-not-exists: $($Assertion.path)" }
+        'file-matches'     { return "file-matches: $($Assertion.path) ~= $($Assertion.pattern)" }
+        'file-not-matches' { return "file-not-matches: $($Assertion.path) !~ $($Assertion.pattern)" }
+        'output-contains'  { return "output-contains: $($Assertion.value)" }
+        'exit-code'        { return "exit-code: $($Assertion.value)" }
+        'file-no-bom'      { return "file-no-bom: $($Assertion.path)" }
+        default            { return "unknown: $($Assertion.type)" }
+    }
+}
+
+# ---- scenario execution -------------------------------------------------------
+
+function Invoke-Scenario {
+    param(
+        [string]$ScenarioDir,
+        [switch]$NeuterGuard,
+        [switch]$ExpectFailure
+    )
+    $name = Split-Path -Leaf $ScenarioDir
+    Write-Host ''
+    Write-Host "=== $name $(if ($NeuterGuard) { '(neutered guard)' }) ==="
+
+    $fakeHome = $null
+    $ws = $null
+    try {
+        $fakeHome = New-FakeHome
+        if ($NeuterGuard) { Set-SpecGateNeutered -FakeHome $fakeHome }
+        $ws = New-ScenarioWorkspace -ScenarioDir $ScenarioDir
+
+        $prompt = Get-Content -LiteralPath (Join-Path $ScenarioDir 'prompt.txt') -Raw
+        $budget = Get-ScenarioBudget -ScenarioDir $ScenarioDir
+        $skipPermissions = Get-ScenarioSkipPermissions -ScenarioDir $ScenarioDir
+        $disallowedTools = Get-ScenarioDisallowedTools -ScenarioDir $ScenarioDir
+        $permissionMode = Get-ScenarioPermissionMode -ScenarioDir $ScenarioDir
+
+        $run = Invoke-ClaudeHeadless -Workspace $ws -FakeHome $fakeHome -Prompt $prompt `
+            -MaxBudgetUsd $budget -TimeoutSec $TimeoutSeconds -PermissionMode $permissionMode `
+            -SkipPermissions:$skipPermissions -DisallowedTools $disallowedTools
+
+        if ($run.TimedOut) {
+            Write-Bad "$name : claude -p timed out after $TimeoutSeconds s"
+            return $false
+        }
+
+        if ($env:SD_E2E_DEBUG) {
+            Write-Info "exit code: $($run.ExitCode)"
+            Write-Info "result   : $($run.Result.result)"
+            Write-Info "is_error : $($run.Result.is_error)  cost: $($run.Result.total_cost_usd)"
+            if ($run.Stderr) { Write-Info "stderr   : $($run.Stderr.Substring(0, [Math]::Min(2000, $run.Stderr.Length)))" }
+        }
+
+        $expectPath = Join-Path $ScenarioDir 'expect.json'
+        $assertions = @(Get-Content -LiteralPath $expectPath -Raw | ConvertFrom-Json)
+
+        $scenarioOk = $true
+        foreach ($a in $assertions) {
+            $label = Get-AssertionLabel -Assertion $a
+            $ok = $false
+            try {
+                $ok = Test-OneAssertion -Assertion $a -Workspace $ws -Run $run
+            } catch {
+                Write-Bad "$name : $label (error: $($_.Exception.Message))"
+                $scenarioOk = $false
+                continue
+            }
+            if ($ok) {
+                Write-Ok "$name : $label"
+            } else {
+                Write-Bad "$name : $label"
+                $scenarioOk = $false
+            }
+        }
+
+        if ($ExpectFailure) {
+            # -SelfTest inverted expectation: the guard is neutered, so the
+            # scenario's assertions (which describe blocked behavior) must
+            # NOT all pass - if they do, the harness failed to notice.
+            return (-not $scenarioOk)
+        }
+        return $scenarioOk
+    } finally {
+        if ($env:SD_E2E_DEBUG -and $ws) {
+            $eventsPath = Join-Path $ws '.specs' '_metrics' 'events.jsonl'
+            if (Test-Path -LiteralPath $eventsPath) {
+                Write-Info 'events.jsonl:'
+                Get-Content -LiteralPath $eventsPath | ForEach-Object { Write-Info "  $_" }
+            }
+        }
+        if (-not $env:SD_E2E_KEEP) {
+            if ($ws) { Remove-Item -LiteralPath $ws -Recurse -Force -ErrorAction SilentlyContinue }
+            if ($fakeHome) { Remove-Item -LiteralPath $fakeHome -Recurse -Force -ErrorAction SilentlyContinue }
+        } elseif ($ws) {
+            Write-Info "kept workspace: $ws"
+            Write-Info "kept fakeHome : $fakeHome"
+        }
+    }
+}
+
+# ---- preconditions ------------------------------------------------------------
+
+if ($null -eq (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Write-Host '[FAIL] claude CLI not found on PATH; the e2e harness requires it (see tests/e2e/README.md).'
+    exit 2
+}
+
+# ---- self-test mode ------------------------------------------------------------
+
+if ($SelfTest) {
+    Write-Host '=== e2e self-test: harness must DETECT a removed guard ==='
+    $negativeScenarios = @('03-spec-gate-negative', '04-closeout-negative')
+    $allDetected = $true
+    foreach ($n in $negativeScenarios) {
+        $dir = Join-Path $scenariosDir $n
+        if (-not (Test-Path -LiteralPath $dir)) {
+            Write-Bad "self-test: scenario '$n' not found"
+            $allDetected = $false
+            continue
+        }
+        $detected = Invoke-Scenario -ScenarioDir $dir -NeuterGuard -ExpectFailure
+        if ($detected) {
+            Write-Ok "self-test: $n : harness detected the neutered guard"
+        } else {
+            Write-Bad "self-test: $n : harness did NOT notice the guard was removed"
+            $allDetected = $false
+        }
+    }
+    if ($allDetected) { exit 0 } else { exit 1 }
+}
+
+# ---- main -----------------------------------------------------------------------
+
+$scenarioDirs = Get-ChildItem -LiteralPath $scenariosDir -Directory | Sort-Object Name
+if ($Case) {
+    $scenarioDirs = @($scenarioDirs | Where-Object { $_.Name -eq $Case })
+    if ($scenarioDirs.Count -eq 0) {
+        Write-Host "[FAIL] no scenario named '$Case' under $scenariosDir"
+        exit 1
+    }
+}
+
+foreach ($s in $scenarioDirs) {
+    Invoke-Scenario -ScenarioDir $s.FullName | Out-Null
+}
+
+Write-Host ''
+Write-Host "=== Summary: $($script:pass) passed, $($script:fail) failed ==="
+if ($script:fail -gt 0) { exit 1 }
+exit 0

@@ -10,6 +10,7 @@ per-file-type guidelines, and how to test changes locally.
 - [Project goals and non-goals](#project-goals-and-non-goals)
 - [Repo layout](#repo-layout)
 - [The manifest](#the-manifest)
+- [Threshold re-calibration](#threshold-re-calibration)
 - [PR process](#pr-process)
 - [Per-file-type guidelines](#per-file-type-guidelines)
   - [Commands (`commands/*.md`)](#commands-commandsmd)
@@ -41,13 +42,13 @@ per-file-type guidelines, and how to test changes locally.
 
 ```
 specwright/
-  commands/         # 13 slash commands (markdown with frontmatter)
+  commands/         # 14 slash commands (markdown with frontmatter)
   agents/           # 6 subagent definitions (markdown with frontmatter)
   hooks/
     powershell/     # 3 PowerShell hooks
     bash/           # 3 bash hooks (parity with PowerShell)
   templates/        # 4 setup templates
-    specs/          # 5 spec templates
+    specs/          # 6 spec templates
   install/          # install.ps1 + install.sh + install/README.md
   docs/             # architecture, usage, walkthrough, troubleshooting
   examples/         # demo references
@@ -79,10 +80,16 @@ What this means in practice:
 - **Writing intentionally historical docs** (superseded counts as a past-state record): put the
   path in `historicalExclusions`. `docs/history/`, `docs/superpowers/` and `CHANGELOG.md` are
   already excluded. Never "fix" their numbers to match today's disk state.
+- **Publishing the current released version**: add a `versionClaims` entry (`file` + a `pattern`
+  with one capture group, no `equals`). It is checked against the newest dated
+  `## [x.y.z] - <date>` heading in `CHANGELOG.md`, not against a manifest quantity - CHANGELOG is
+  the single source of truth for "what version is released." Unlike `docClaims`, there is no
+  undeclared-claim scan for version strings yet: a version claim in a doc that is not listed here
+  is not caught.
 
 Two constraints on `pattern`: it must be valid in **both** POSIX ERE (bash `[[ =~ ]]`) and .NET
 (PowerShell), so use `[0-9]` rather than `\d` and avoid lookarounds; and it is matched
-**case-sensitively** on both platforms.
+**case-sensitively** on both platforms. This applies to `versionClaims` patterns too.
 
 `scripts/selftest-docs.{ps1,sh}` proves Check 7 still bites, by corrupting a throwaway copy of the
 repo and asserting the validator catches it. CI runs it on all three OSes.
@@ -97,6 +104,73 @@ divergence.
 Check 7 needs `jq` on Unix and **fails loudly without it**. This is the opposite of the hook rule
 below (hooks exit `0` silently when `jq` is missing so they never block a user on their own bugs) -
 a validator that skipped itself for a missing tool would turn CI green while checking nothing.
+
+### Contract lint (Check 8)
+
+Where Check 7 guards *inventory*, Check 8 guards the **relationships between** the prompt files:
+which agent a command invokes, which skill an agent loads, which template a prompt reads, how many
+hard gates a workflow declares. It is a script, not a prompt - `scripts/contract-lint.{ps1,sh}`,
+configured entirely from the manifest's `contractLint` subtree. Full rule catalogue and rationale:
+[`docs/contract-lint.md`](docs/contract-lint.md).
+
+Run it directly while iterating:
+
+```bash
+bash scripts/contract-lint.sh --root .
+```
+```powershell
+.\scripts\contract-lint.ps1 -Root .
+```
+
+Exit `0` means no BLOCK findings, `1` means at least one, and **`2` means it could not run at all**
+(missing manifest, missing `jq`, or the registry parity guard tripped). Check 8 treats `2` as a
+failure for the same reason Check 7 refuses to skip itself.
+
+**Suppressing a finding.** Rarely, a violation is correct on purpose. Put a comment on the offending
+line or the line above it, naming the rule and giving a real reason:
+
+```text
+<!-- contract-lint: allow CL305 - the option here buys a logged constitution exception rather than a way past the requirement -->
+```
+
+Three things constrain that escape hatch, and all three are enforced:
+
+- **The reason is mandatory.** Under ten non-separator characters fails as CL900. "`- x`" is not a
+  reason.
+- **The rule id must exist.** A typo fails as CL901 rather than silently suppressing nothing.
+- **It must actually suppress something.** A suppression that outlives the finding it was written
+  for fails as CL902 - the same anti-rot posture as Check 7's vacuous-claim rule.
+
+A suppression can never suppress CL900, CL901 or CL902; that would be a self-authorizing loophole.
+
+**Adding a rule** means four edits, and skipping any one of them fails CI: a `contractLint.rules`
+registry entry, a rule function in *both* implementations, a fixture case under
+`tests/contract-lint/` whose `expected.json` names the rule, and a row in `docs/contract-lint.md`.
+Each edge of that square is guarded by a different mechanism - the linters' own registry parity
+guard, and invariants C and D in `tests/contract-lint/run-selftest.ps1`.
+
+`tests/contract-lint/run-selftest.ps1` is the fixture suite. Like the hook conformance harness it is
+a single pwsh script by design: it runs both implementations in one process, so parity is asserted
+rather than inferred. `-SelfTest` swaps in a linter that reports nothing and asserts the harness
+notices.
+
+---
+
+## Threshold re-calibration
+
+Every hardcoded threshold in this repo (Gate Complexity's tasks/layers/files limits,
+`retroStaleMinutes`, `debounceMinutes`, `maxLessons`, `metrics.maxSizeKb`, the perf gate's noise
+floor) started as an estimate, not a measurement - see `docs/adr/0004-threshold-calibration.md`.
+Re-run the calibration pass **every 20 closed specs, or at each minor release, whichever comes
+first**:
+
+1. Run `/sd:status --calibration` against the accumulated `.specs/index.md` and
+   `.specs/_metrics/events.jsonl`.
+2. For each threshold, record the verdict - keep, change, or insufficient data - in a new ADR under
+   `docs/adr/`. "Insufficient data" is a legitimate, expected outcome at a thin corpus size; do not
+   change a threshold without a stated measurement behind it.
+3. Where a threshold's rationale in `templates/project-config.template.json` is still a judgement
+   call (no measured basis), leave its `_..._use` caveat in place rather than removing it.
 
 ---
 
@@ -188,6 +262,32 @@ skills:
 - `skills:` must list every skill the agent body references (`**skill-name**` in prose). A rule used by multiple agents lives in one `SKILL.md`, never copy-pasted into agent bodies.
 - Agent must read `CLAUDE.md` and `constitution.md` at runtime. No hardcoded stack assumptions (no `cs`, `csproj`, `dotnet`, etc. literal references unless they come from project config).
 - Every finding cites `file:line`. No prose without citations.
+
+**Machine-readable input declarations.** Under every heading that selects a distinct agent
+behavior by field value (`## Mode N: TASK = <mode>`, `## Task type: `<type>``, `### `TASK =
+<type>``, `### `WORKFLOW_TYPE = <type>``), add two lines immediately before the existing prose:
+
+```
+Inputs (required): SPEC, IMPACT
+Inputs (optional): MODE, REPLAN_SCOPE
+```
+
+- Tokens are `UPPER_SNAKE`, comma-separated, exactly the identifiers the calling command sets -
+  never a paraphrase.
+- Write `none` explicitly when a mode has no required (or no optional) inputs. Silence is not an
+  assertion - an omitted line reads as "not yet documented," not as "empty."
+- The existing prose `Inputs: ...` line (with parenthetical caveats, cross-references, etc.) stays
+  below unchanged - the two new lines are additive, for tooling to grep, not a replacement for the
+  explanatory prose.
+- When adding or changing an agent invocation in `commands/*.md`, cross-check it against the
+  target mode's declared inputs: a token the command passes that the mode doesn't declare, or a
+  required token the mode declares that the command omits, is a real defect - fix the mismatch (add
+  the missing token to the declaration or the invocation, whichever is actually correct) rather than
+  leaving the two out of sync.
+- This cross-check is machine-enforced: Check 8's `CL100`-`CL104` rules (`docs/contract-lint.md`)
+  parse both sides and BLOCK on a mode mismatch or a missing required input. A legitimate mismatch
+  the declaration can't express (an either/or required set, for example) gets a
+  `<!-- contract-lint: allow CLxxx - <reason> -->` suppression, not a silent gap.
 
 ### Hooks
 

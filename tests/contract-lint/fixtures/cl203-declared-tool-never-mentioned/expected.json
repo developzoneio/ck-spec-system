@@ -1,0 +1,6 @@
+{
+  "note": "sd-keeper declares Bash in tools: but its body never mentions it",
+  "findings": [
+    { "rule": "CL203", "severity": "WARN", "file": "agents/keeper.md", "anchor": "seed", "seed": "unused-tool-declared" }
+  ]
+}

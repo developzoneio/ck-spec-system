@@ -113,6 +113,21 @@ now_stamp() {
     date +'%Y%m%d-%H%M%S'
 }
 
+engine_version() {
+    local repo_root="$1"
+    local changelog="$repo_root/CHANGELOG.md"
+    if [[ ! -f "$changelog" ]]; then
+        return 1
+    fi
+    local line
+    line="$(grep -m1 -E '^##[[:space:]]+\[[0-9]+\.[0-9]+\.[0-9]+\][[:space:]]+-[[:space:]]+[^[:space:]]' "$changelog" || true)"
+    if [[ "$line" =~ \[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return 0
+    fi
+    return 1
+}
+
 # ---- repo root -------------------------------------------------------------
 
 # Resolve script directory portably
@@ -160,6 +175,16 @@ fi
 # Verify a sha256 tool exists
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
     warn "Neither sha256sum nor shasum found; content-hash dedup will be skipped (all existing files will be treated as differing)."
+fi
+
+# ---- resolve engine version -------------------------------------------------
+
+CHANGELOG_PATH="$REPO_ROOT/CHANGELOG.md"
+ENGINE_VERSION="$(engine_version "$REPO_ROOT")" || true
+if [[ -z "$ENGINE_VERSION" ]]; then
+    echo
+    fail "$CHANGELOG_PATH : no dated release heading found (## [x.y.z] - <date>)"
+    exit 1
 fi
 
 # ---- install plan ----------------------------------------------------------
@@ -280,6 +305,22 @@ for entry in "${PLAN[@]}"; do
         rel="${f#"$src_root"/}"
         copy_one "$f" "$tgt_root/$rel" "$exec_flag"
     done < <(find "$src_root" -type f -print0)
+done
+
+# ---- write version stamp ----------------------------------------------------
+# Route the resolved version through the existing copy_one so hash-skip,
+# backup, decline and dry-run logic apply identically to every other file.
+# copy_one increments the counters itself; do not increment again here. The
+# EXIT trap here is additional to (and does not replace) the ERR trap above.
+
+STAMP_TMP="$(mktemp)"
+trap 'rm -f "$STAMP_TMP"' EXIT
+printf '%s\n' "$ENGINE_VERSION" > "$STAMP_TMP"
+
+for entry in "${PLAN[@]}"; do
+    IFS=':' read -r src tgt _ <<< "$entry"
+    tgt_root="$BASE_PATH/$tgt"
+    copy_one "$STAMP_TMP" "$tgt_root/specwright-version.txt" "0"
 done
 
 # ---- summary ---------------------------------------------------------------

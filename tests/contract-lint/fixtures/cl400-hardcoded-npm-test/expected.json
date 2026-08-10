@@ -1,0 +1,12 @@
+{
+  "note": "a hardcoded stack command token outside any <<placeholder>> or fenced example",
+  "findings": [
+    {
+      "rule": "CL400",
+      "severity": "BLOCK",
+      "file": "commands/beta.md",
+      "anchor": "seed",
+      "seed": "stack-command-hardcoded"
+    }
+  ]
+}

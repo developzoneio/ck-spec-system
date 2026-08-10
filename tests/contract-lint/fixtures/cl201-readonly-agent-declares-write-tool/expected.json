@@ -1,0 +1,6 @@
+{
+  "note": "the manifest declares sd-keeper read-only; its own tools: line adds Edit anyway",
+  "findings": [
+    { "rule": "CL201", "severity": "BLOCK", "file": "agents/keeper.md", "anchor": "seed", "seed": "readonly-agent-gained-write-tool" }
+  ]
+}

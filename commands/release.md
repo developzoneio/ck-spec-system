@@ -44,7 +44,7 @@ This command is **not** multi-phase-resumable like the workflows - it is a singl
 ## Phase 1 - Collect releasable specs
 
 1. Parse `.specs/index.md` rows (`ID | Type | Status | Created | Title`).
-2. Select rows where `Status == done` AND `Type` is one of `feature`, `bug`, `refactor`, `perf`.
+2. Select rows where `Status == done` AND `Type` is one of `feature`, `bug`, `refactor`, `perf`, `port`.
    - **RCA specs are never released or archived by this command.** An RCA is a deliverable, not a shippable code change; its fixes ship as their spawned BUG / REF / PERF specs.
 3. For each selected spec, read `.specs/<ID>/00-spec.md`:
    - Cross-check frontmatter `status == done`. If it disagrees with the index, WARN and skip that spec (index/spec drift - tell the user to run `/sd:spec validate <ID>`).
@@ -64,6 +64,10 @@ Map each spec type to a section:
 | bug | BUG | Fixed |
 | refactor | REF | Changed |
 | perf | PERF | Changed |
+| port | PORT | Added |
+
+A port lands new host capability from the consumer's viewpoint, the same category as a feature -
+donor provenance belongs in the spec, not the changelog line.
 
 Within a section, order entries oldest-completed first. Render one bullet per spec:
 
@@ -87,7 +91,7 @@ If `[version]` was supplied, validate it is SemVer (`MAJOR.MINOR.PATCH`) and use
 
 Otherwise infer from the latest released version in `CHANGELOG.md` (the first `## [X.Y.Z]` heading; default base `0.0.0` if none):
 
-- Any feature (FEAT) in this release -> **MINOR** bump (`X.(Y+1).0`).
+- Any feature (FEAT) or port (PORT) in this release -> **MINOR** bump (`X.(Y+1).0`).
 - Only bug / refactor / perf -> **PATCH** bump (`X.Y.(Z+1)`).
 - **MAJOR is never auto-inferred** - breaking changes are not derivable from spec type. Pass an explicit `[version]` to cut a major.
 
@@ -107,6 +111,7 @@ Display, for explicit approval:
 **STOP. Wait for explicit user approval.** Silence is not approval.
 
 - If `--dry-run` was passed: stop here unconditionally. Report that nothing was written.
+<!-- contract-lint: allow CL306 - version override is a described option, not a listed override token; CL305 already covers listed-choice overrides -->
 - The user may override the version at this gate.
 - On rejection: write nothing; specs stay in `done`.
 
@@ -175,7 +180,7 @@ Print:
 
 - This command NEVER invokes a subagent. Pure file ops, like `/sd:spec`.
 - It writes ONLY: `CHANGELOG.md` (repo root), `.specs/index.md`, and per-released-spec `00-spec.md` frontmatter + `05-retro.md`. It never touches code, the constitution, or `.claude/`.
-- Only `done` specs of type feature / bug / refactor / perf are released and archived. RCA specs are left untouched.
+- Only `done` specs of type feature / bug / refactor / perf / port are released and archived. RCA specs are left untouched.
 - Archiving reuses the validated `done -> archived` state-machine transition; every transition is logged append-only to `05-retro.md`.
 - Exactly ONE hard gate (Phase 4) precedes any write. `--dry-run` stops before writing.
 - MAJOR version bumps are never auto-inferred; pass `[version]` explicitly.

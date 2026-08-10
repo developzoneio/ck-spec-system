@@ -1,0 +1,9 @@
+{
+  "name": "sd-e2e-setup-fixture",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Bare, unscaffolded project used by tests/e2e scenario 01-setup to exercise /sd:setup's fresh-scaffold path.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

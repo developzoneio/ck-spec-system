@@ -1,0 +1,6 @@
+{
+  "note": "TASK = archive declares no REASON input at all, required or optional",
+  "findings": [
+    { "rule": "CL103", "severity": "WARN", "file": "commands/alpha.md", "anchor": "seed", "seed": "undeclared-token" }
+  ]
+}

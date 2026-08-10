@@ -1,0 +1,12 @@
+{
+  "note": "a suppression naming a rule id the registry has never heard of; exempt from CL902",
+  "findings": [
+    {
+      "rule": "CL901",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unknown-rule-suppression"
+    }
+  ]
+}

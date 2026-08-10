@@ -109,7 +109,7 @@ STOP. Compare measured vs threshold.
 
 If user picks (1), enter the characterization sub-loop:
 1. Identify uncovered branches via coverage report.
-2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor` per uncovered area.
+2. Invoke `sd-implementer` with `TASK_DETAILS = <characterization test task for the uncovered area>`, `SPEC_REF = .specs/REF-<slug>-<YYYYMMDD>/00-spec.md`, `WORKFLOW_TYPE = refactor`, `INVARIANTS = <invariants list from spec>` per uncovered area.
 3. Each new test must FAIL FAST if current behavior changes - characterization tests pin the CURRENT behavior, correct or not.
 4. Re-measure coverage.
 
@@ -178,6 +178,7 @@ as planned) **and** Phase 6 (a holistic-review finding that the plan itself is w
 
    > Re-plan REF-<slug>? Discovery: <trigger>. Affects <task IDs>. (approve / revise <feedback> / abort task)
 
+<!-- contract-lint: allow CL102 - scoped re-plan passes REPLAN_SCOPE/REVISION instead of SPEC/IMPACT, per the Scoped re-plan sub-path documented in agents/spec-architect.md -->
 2. `approve` -> invoke `sd-spec-architect` with `TASK = plan`, `MODE = refactor`,
    `REPLAN_SCOPE = <affected task IDs>`, `REVISION = R<n>`. It appends the `## Revisions` entry to
    `01-plan.md` (append-only; original plan prose untouched), regenerates ONLY the affected task
@@ -228,8 +229,14 @@ STOP. Display reviewer verdict counts + invariant verification table. Ask:
    - Invariants verified (table).
    - Surprises (e.g. discovered dead code, unexpected callers).
    - Constitution exceptions (should be none).
-2. Set status=`done`. Update index.
-3. If retro reveals follow-ups (e.g. "this refactor exposes a perf concern"), suggest spawning the relevant spec.
+2. **Spawned specs**: re-read the "Surprises" entry just written to 05-retro.md - dead code found,
+   unexpected callers, invariants that needed propping up, a perf concern this refactor exposed.
+   For each one, ask the user to reserve an ID and add a row to `00-spec.md`'s `## Spawned specs`
+   table (`Reserved ID | Type | Title | Owner`). This is a prompt, not a gate: nothing deferred, or
+   the user declines - leave the table at header + separator and proceed. Do NOT create the child
+   specs here, and do NOT add a reserved ID to `.specs/index.md`; an index row exists only once
+   the real spec directory does (see `/sd:spec`, "Index <-> folder symmetry").
+3. Set status=`done`. Update index.
 
 ---
 

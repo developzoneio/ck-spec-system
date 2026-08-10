@@ -516,6 +516,88 @@ function Write-TransitionMetrics {
     }
 }
 
+# Gate Complexity (ADR 0002) is decided as model-executed prose inside
+# /sd:feature Phase 3 Gate 2 - no hook observes that decision directly. What
+# IS observable here is one of its two possible outcomes: an "approve split"
+# resolution always leaves a structural trace in THIS index.md edit or an
+# earlier one - the parent row moves to 'archived' (commands/feature.md
+# Face B, "make the parent an umbrella record") and each child is registered
+# under the 'FEAT-<parent>-<slug>' naming convention (feature.md's child-ID
+# step). A FEAT-X row newly transitioning to 'archived' alongside any
+# already-registered FEAT-X-<slug> row (in the on-disk registry OR this same
+# pending edit) is read as a completed split.
+#
+# This can only ever detect a SPLIT, never a bare trip: Face A (never
+# tripped) and Face B "no-split" (tripped, user declined) both leave the
+# parent 'in-progress' with no distinguishing mark in index.md, so trip rate
+# on its own is not recoverable from this signal. See ADR
+# docs/adr/0004-threshold-calibration.md "Scope declined" - deliberately not
+# fixed here to avoid making a HARD gate's prose responsible for feeding a
+# metrics pipeline the rest of this file keeps strictly hook-authored.
+#
+# Callers MUST only invoke this on a path where the edit was actually
+# ALLOWED through (Rule 0's verify-allow exit, Rule 2's allow-listed exit).
+# On a block exit the edit never reached disk, so recording "split" there
+# would assert a split that did not happen - never add a call site here on a
+# block/deny path.
+#
+# Scoped to FEAT- parents only: Gate Complexity decompose is a /sd:feature
+# mechanism (commands/feature.md Face B); BUG-/REF-/PERF-/RCA- rows can never
+# go through it, so matching their prefix too would only add false-positive
+# surface for coincidental id-prefix collisions with no corresponding
+# real-world case.
+function Write-ComplexitySplitMetrics {
+    param(
+        [string]$Cwd,
+        [object]$Config,
+        [object[]]$Transitions,
+        [string]$IndexPath,
+        [object]$HookInput
+    )
+    if (-not $Transitions -or $Transitions.Count -eq 0) { return }
+    try {
+        $rowPattern = '\|\s*((?:FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|'
+        $allIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+        if (Test-Path -LiteralPath $IndexPath) {
+            try {
+                foreach ($line in (Get-Content -LiteralPath $IndexPath -Encoding UTF8 -ErrorAction Stop)) {
+                    if ($line -match $rowPattern) { [void]$allIds.Add($Matches[1]) }
+                }
+            } catch { }
+        }
+
+        $fragments = New-Object System.Collections.Generic.List[string]
+        $tool = $HookInput.tool_name
+        if ($tool -eq 'Edit') {
+            if ($HookInput.tool_input.new_string) { $fragments.Add([string]$HookInput.tool_input.new_string) | Out-Null }
+        } elseif ($tool -eq 'Write') {
+            if ($HookInput.tool_input.content) { $fragments.Add([string]$HookInput.tool_input.content) | Out-Null }
+        } elseif ($tool -eq 'MultiEdit') {
+            foreach ($e in @($HookInput.tool_input.edits)) {
+                if ($e.new_string) { $fragments.Add([string]$e.new_string) | Out-Null }
+            }
+        }
+        foreach ($frag in $fragments) {
+            foreach ($line in ($frag -split "`n")) {
+                if ($line -match $rowPattern) { [void]$allIds.Add($Matches[1]) }
+            }
+        }
+
+        foreach ($t in $Transitions) {
+            if ($t.Phase -ne 'archived') { continue }
+            if ($t.Id -notlike 'FEAT-*') { continue }
+            $childFound = $false
+            foreach ($other in $allIds) {
+                if ($other -eq $t.Id) { continue }
+                if ($other.StartsWith("$($t.Id)-", [System.StringComparison]::Ordinal)) { $childFound = $true; break }
+            }
+            if ($childFound) {
+                Write-GateMetric -Cwd $Cwd -Config $Config -SpecId $t.Id -Phase 'archived' -Gate 'complexity' -Decision 'split'
+            }
+        }
+    } catch { }
+}
+
 function Test-VerifyArtifactPass {
     param(
         [string]$Cwd,
@@ -657,6 +739,10 @@ if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringCompariso
                 Write-GateMetric -Cwd $cwd -Config $config -SpecId $id -Phase 'done' -Gate 'verify' -Decision $idDecision
             }
             Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'block'
+            # No Write-ComplexitySplitMetrics here: the whole edit is denied,
+            # so nothing in it - including any bundled parent archive + child
+            # registration - actually reached disk. See the function's own
+            # comment.
             exit 0
         }
         # Every transitioning spec has a passing artifact - allow the close-out.
@@ -666,6 +752,7 @@ if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringCompariso
             Write-GateMetric -Cwd $cwd -Config $config -SpecId $id -Phase 'done' -Gate 'verify' -Decision 'allow'
         }
         Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
+        Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath $indexAbs -HookInput $hookInput
         exit 0
     }
 }
@@ -677,12 +764,15 @@ if (Test-IsProtected -RelPath $rel -Protected $protected) {
     Write-BlockDecision "spec-gate: '$rel' is listed under paths.protected in .claude/project-config.json. Update via /sd:refactor or an ADR; never edit directly."
     Write-GateMetric -Cwd $cwd -Config $config -SpecId '-' -Phase '-' -Gate 'protected' -Decision 'block'
     Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'block'
+    # No Write-ComplexitySplitMetrics here: the edit is denied, so a detected
+    # parent-archive-plus-child pattern in it never reached disk.
     exit 0
 }
 
 # Rule 2: allow-listed paths -> always allow
 if (Test-IsAllowListed -RelPath $rel) {
     Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
+    Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath (Join-Path $cwd $indexRel) -HookInput $hookInput
     exit 0
 }
 

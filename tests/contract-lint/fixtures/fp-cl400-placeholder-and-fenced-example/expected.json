@@ -1,0 +1,4 @@
+{
+  "note": "MUST STAY SILENT: a stack command token inside a <<placeholder>> and inside a fenced code block, never in bare prose",
+  "findings": []
+}

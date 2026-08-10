@@ -41,7 +41,7 @@ If `<subcommand>` is omitted or not recognized, run the `help` subcommand.
 ## list
 
 Args:
-- `[type]` (optional): one of `feature`, `bug`, `refactor`, `perf`, `rca`. Filters by type prefix.
+- `[type]` (optional): one of `feature`, `bug`, `refactor`, `perf`, `rca`, `port`. Filters by type prefix.
 - `[status]` (optional): one of the lifecycle states. Filters by current state in index.
 
 Behavior:
@@ -95,7 +95,7 @@ archived -> in-progress (only via 'revive', with reason)
 The `in-progress -> done` transition of a feature (FEAT) spec is hook-enforced: spec-gate
 blocks the `index.md` edit unless `<spec.dir>/<ID>/06-verify.md` exists and records
 `result: pass`. Run `/sd:verify <ID>` first. Disable only via `hooks.specGate.verifyGate: false`
-in project-config. Other spec types (bug, refactor, perf, rca) close out as before - the hook
+in project-config. Other spec types (bug, refactor, perf, rca, port) close out as before - the hook
 does not gate their `index.md` row.
 
 3. Illegal transitions are REFUSED. Do NOT mutate any file. Print a refusal that names the current
@@ -248,14 +248,16 @@ Behavior:
    - `status` is in `spec.lifecycle` from project-config.
    - Placeholder discipline (see "Placeholder tokens" below).
    - Expected files present per status:
-     - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (feature and refactor
-       only; bug, perf, and rca do not produce plan/tasks artifacts).
+     - status >= `in-progress` -> `01-plan.md` and `02-tasks.md` exist (feature, refactor, and
+       port only; bug, perf, and rca do not produce plan/tasks artifacts).
      - status == `done` -> `05-retro.md` exists with at least one entry.
    - Index row matches frontmatter status.
    - Transition history is legal (see "Transition replay" below).
    - Links resolve and are symmetric (see "Link integrity" below).
    - Task-block content, when `02-tasks.md` exists (see "Task-block checks" below). This is the
      only check that reads inside an artifact rather than around it.
+   - Port-spec table integrity, when `type` is `port` (see "Port-spec checks" below).
+   - Close-out hygiene, when `status` is `done` (see "Close-out hygiene checks" below).
 2. Tree-wide checks (run once, only when the target is `--all`):
    - Index <-> folder symmetry (see below).
 3. Report every finding using the severity taxonomy (see "Output" below). Do not stop at the
@@ -300,6 +302,11 @@ BLOCK or WARN without one. IDs are stable: renumbering them breaks anyone who ha
 | `SL071` | A `## Revisions` entry `R<n>` names an `Affected task` that does not carry `Revised-by: R<n>` (or does not exist) | 🔴 BLOCK |
 | `SL072` | Revision numbering is non-contiguous, duplicated, or a prior entry was rewritten (append-only violated) | 🔴 BLOCK |
 | `SL073` | A `## Revisions` entry is malformed - missing `Trigger`, `Gate: re-plan`, `Phase`, or `revised-from` | 🟠 WARN |
+| `SL080` | `source_repo` or `source_commit` missing, empty, `none`, or still a `<<placeholder>>` on a `port` spec whose `scope` is not `pattern` | 🔴 BLOCK |
+| `SL081` | `## Member manifest` table has no data rows | 🔴 BLOCK |
+| `SL082` | Deviation-table row with an empty `Citation`, or a `Group` that is empty or outside `1`-`4` | 🔴 BLOCK |
+| `SL083` | Path-mapping row whose `Kind` is not `mirror` and whose `Reason` is empty or `-` | 🔴 BLOCK |
+| `SL090` | Status `done`, the spec body names deferred work, and `## Spawned specs` has no data row (or no such section) | 🟡 SUGGEST |
 
 `SL061`-`SL069` are **reserved** for further task-block content rules. Claim from this band rather
 than extending another one - `SL05x` is link integrity and has nothing to do with task content.
@@ -310,11 +317,32 @@ purpose: it is neither task-block *content* (`SL06x`) nor `linked_specs` symmetr
 borrows the two-sided-symmetry shape of the latter. `SL074`-`SL079` are reserved for further
 revision-record rules.
 
+`SL080`-`SL083` are the **port-spec integrity** band - the three fidelity tables (`sd-port-fidelity`)
+a `port` spec must carry, checked from the outside without adjudicating their content. `SL084`-`SL089`
+are reserved for further port rules (ordinal contiguity, `Host path` uniqueness, cross-table
+referential integrity) if they ever move from the gate into this lint. All four are BLOCK: a `port`
+spec that lints clean with an empty member manifest, an uncited deviation, or an unexplained
+non-mirror row is a registry that **lies** about carrying a reviewable fidelity contract -
+`sd-reviewer`'s hunk classification would then emit findings with no legal anchor, and the gate's
+completeness conditions are counted, not judged, so the failure is objective. `SL080` is BLOCK for
+the same reason `SL002` is: `source_repo`/`source_commit` are the only cross-project traceability
+that exists (`linked_specs` cannot reference another repo), so a non-`pattern` port without them is
+unauditable. `validate` does **not** check ordinal contiguity, `Host path` uniqueness, cross-table
+referential integrity (`Deviation ID` <-> deviation row), or one-row-per-donor-file completeness -
+those are `sd-port-fidelity`'s gate-time job, and duplicating them here would create a second source
+of truth for the same predicate.
+
+`SL090` is the **close-out hygiene** band - work the spec named but never gave an owner or an ID.
+It is a new band on purpose: it is not task content (`SL06x`), not the revision log (`SL07x`), and
+not port fidelity (`SL08x`). `SL091`-`SL099` are reserved for further close-out-hygiene rules.
+
 Severity rationale: BLOCK is for a registry that **lies** (its own contents contradict each other,
 so `list` / `stats` / downstream agents read something untrue) or evidence that was **fabricated**
 (`SL011` - a measured field filled from memory). WARN is for a real problem that leaves the
-registry still truthful and is recoverable by re-running a command. There is no SUGGEST rule
-today; the section is still printed, per the taxonomy.
+registry still truthful and is recoverable by re-running a command. SUGGEST is for hygiene that
+costs a future reader but leaves nothing untrue and breaks nothing - `SL090` is the only one
+today, and it is deliberately never a failure: a spec that genuinely deferred nothing must not be
+made to answer for an empty table.
 
 `SL060` is WARN by that same test: a task with no `Pattern refs` leaves the registry truthful and
 is fixed by re-planning the spec. It is deliberately **not** BLOCK - in the only corpus measured,
@@ -378,6 +406,55 @@ undocumented silent edit by diffing - an edit that adds no `Revised-by` marker a
 entry is invisible here and is prevented by the HARD Gate Re-plan, not by this lint. Do not report,
 or imply, a finding the checks above cannot actually decide.
 
+### Port-spec checks
+
+Runs only when frontmatter `type` is `port`. Locate each table by its exact `##` heading and parse
+it as header row + separator row + data rows; a cell counts as empty when blank or `-`. Report one
+finding per offending row or condition, never one finding per table. The three fidelity tables'
+authoritative column schemas and completeness conditions live in
+`~/.claude/skills/sd/sd-port-fidelity/SKILL.md` - read it at runtime rather than restating the
+schemas here, the same pattern `### Output` already uses for `sd-severity-taxonomy` /
+`sd-evidence-citation`.
+
+- **`SL080`.** `scope` is not `pattern` and either `source_repo` or `source_commit` is missing,
+  empty, the literal value `none`, or still an author-fill `<<...>>` token - `none` is a legitimate
+  value only when `scope` is `pattern`. Cite the `scope:` frontmatter line - it is the line that
+  creates the obligation.
+- **`SL081`.** The `## Member manifest` table has a header and separator but no data row. Cite the
+  `## Member manifest` heading line - an empty table has no row of its own to cite.
+- **`SL082`.** A row in `## Deviation table` whose `Citation` cell is empty, or whose `Group` cell
+  is empty or not one of `1`, `2`, `3`, `4`. Cite the offending row.
+- **`SL083`.** A row in `## Path mapping table` whose `Kind` cell is not `mirror` (including a
+  garbled or empty `Kind`) and whose `Reason` cell is empty or `-`. Cite the offending row.
+
+### Close-out hygiene checks
+
+Runs only when frontmatter `status` is `done`. One rule today, `SL090`, and it is 🟡 SUGGEST -
+never a BLOCK, never a WARN, and never a reason for the run to report failure.
+
+`SL090` fires when **both** hold:
+
+1. The spec **named deferred work**. Search `00-spec.md` and `05-retro.md`, case-insensitively,
+   for any of this closed list: `follow-up`, `follow up`, `deferred`, `defer to`, `separate spec`,
+   `spawn a`, `spawned`, `own spec`, `future spec`, `left as-is`, `reproduced as-is`,
+   `not fixed here`, `TODO`. The list is closed on purpose - "deferred-work language" judged
+   freehand is not a decidable predicate, and an advisory that fires on a hunch is noise.
+   Skip HTML comments, fenced code blocks, the `## Out of scope` section, and the
+   `## Spawned specs` section itself. `## Out of scope` is excluded because it declares a
+   boundary rather than deferring work, and it is where the templates put their own example
+   prose - scanning it would fire on template text. `phase-deferred` does not count as a match
+   for `deferred`: it names the `<<PHASE-N: ...>>` token mechanism, not deferred work.
+2. The spec has **no reserved ID**: `## Spawned specs` is absent, or present with a header and
+   separator but no data row.
+
+Cite the first matching line as `file:line` - that line is the deferred work with nowhere to
+land. Name the phrase that matched and the absent or empty table in the finding. Report **one**
+`SL090` per spec, not one per phrase.
+
+Do not fire on a spec that has at least one data row: this rule asks whether follow-up work was
+recorded at all, and never adjudicates whether the rows are the *right* rows. A reserved ID in
+that table is a placeholder, not a registry entry - see "Index <-> folder symmetry".
+
 ### Output
 
 Read `~/.claude/skills/sd/sd-severity-taxonomy/SKILL.md` and
@@ -433,6 +510,13 @@ under `spec.dir` against the set of rows in `spec.indexFile`:
 Directories whose name starts with `_` are engine-reserved (`_explorations/`, `_reviews/`,
 `_adr/`, `_archived/`) and are NOT specs - skip them. Skip `index.md` and `constitution.md` too.
 
+**Reserved IDs are not registry entries.** An ID in a spec's `## Spawned specs` table is a
+placeholder for work that has not been started. It gets an `.specs/index.md` row only once its
+spec directory actually exists - i.e. once someone runs the child workflow. Adding the row first
+manufactures exactly the ghost row `SL032` exists to catch: an index entry pointing at a
+directory that is in no commit. For the same reason a reserved ID never goes in `linked_specs`;
+the link is written by `/sd:spec link` after the child is created.
+
 ### Transition replay
 
 `05-retro.md` is the append-only status log written by `status` / `link`. Replay it against the
@@ -476,10 +560,14 @@ Every type additionally requires `linked_specs` (a YAML list; `[]` when the spec
 | `refactor` | `id`, `type`, `smell`, `status`, `created` |
 | `perf` | `id`, `type`, `status`, `target_metric`, `created` |
 | `rca` | `id`, `type`, `status`, `severity`, `incident_started`, `incident_resolved`, `created` |
+| `port` | `id`, `type`, `status`, `scope`, `source_repo`, `source_commit`, `source_license`, `snapshot`, `jira`, `created` |
 
 `jira` is required to be present but may hold `none`. `incident_resolved` may hold a placeholder
 while an incident is still open - an RCA for an unresolved incident cannot pass `approved`.
 `linked_specs` must be present and a list; `[]` is the valid empty form, a bare `none` is not.
+`source_repo` / `source_commit` are required to be **present** for every port spec (that is
+`SL002`); their **value** must additionally be real when `scope` is not `pattern` (that is
+`SL080`) - a `pattern`-scope port writes `none`.
 
 ### Placeholder tokens
 
@@ -519,7 +607,7 @@ Args: none.
 Behavior:
 1. Parse `.specs/index.md`.
 2. Output:
-   - Counts by type (FEAT / BUG / REF / PERF / RCA).
+   - Counts by type (FEAT / BUG / REF / PERF / RCA / PORT).
    - Counts by status.
    - "Aging" report: specs in `in-progress` for more than 7 days (configurable), specs in `draft` for more than 14 days.
    - Top 5 oldest `in-progress` specs.

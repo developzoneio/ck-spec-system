@@ -8,7 +8,7 @@
     project cwd. Loads .claude/project-config.json (or sane defaults if absent)
     and:
       1. Matches the prompt against workflow keywords (bug / feature / refactor
-         / perf / rca) and suggests the relevant /sd:* command.
+         / perf / rca / port) and suggests the relevant /sd:* command.
       2. Detects ticket IDs in the prompt using ticket.pattern and looks up
          matching folders under .specs/.
       3. Reads .specs/index.md and surfaces any spec currently in-progress.
@@ -45,6 +45,7 @@ $script:DefaultKeywords = [pscustomobject]@{
     refactor = @('refactor','restructure','clean up','extract','rename')
     perf     = @('perf','performance','slow','optimize','latency','throughput')
     rca      = @('incident','outage','rca','root cause','post-mortem','postmortem')
+    port     = @('backport','port from','port the','donor repo','mirror from','replicate from')
 }
 
 function Get-ProjectConfig {
@@ -109,7 +110,7 @@ function Get-KeywordMatches {
     )
     $matches = @{}
     $lower = $Prompt.ToLowerInvariant()
-    foreach ($workflow in @('bug','feature','refactor','perf','rca')) {
+    foreach ($workflow in @('bug','feature','refactor','perf','rca','port')) {
         $list = $null
         if ($null -ne $KeywordMap) { $list = $KeywordMap.$workflow }
         if ($null -eq $list -or @($list).Count -eq 0) {

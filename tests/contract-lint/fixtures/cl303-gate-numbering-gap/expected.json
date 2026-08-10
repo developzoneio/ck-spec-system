@@ -1,0 +1,11 @@
+{
+  "note": "labels {1,4} for a count of two; the count still matches, only the numbering rotted",
+  "findings": [
+    {
+      "rule": "CL303",
+      "severity": "WARN",
+      "file": "commands/alpha.md",
+      "anchor": "file"
+    }
+  ]
+}

@@ -86,9 +86,11 @@ STOP. Display Target + Methodology. Ask:
 STOP. Two cases:
 
 **Case A: baseline already meets SLA goal.**
+<!-- contract-lint: allow CL305 - Case A is the already-at-goal branch; 'proceed anyway' there buys a logged constitution exception, not a way past the baseline requirement, which stays unconditional -->
 > Baseline p95=<X> already meets SLA goal p95<<goal>. No optimization needed. Close PERF-<slug> as 'done' with no changes? (yes / proceed anyway / abort)
 - `yes` -> set status=`in-progress` (no hotspot work occurs, but the state machine has no
   approved -> done shortcut), then jump to Phase 6 close-out with summary "no work needed".
+<!-- contract-lint: allow CL305 - same exception as the option line above; the bullet only explains what selecting it costs -->
 - `proceed anyway` -> requires explicit constitution exception ("optimizing past SLA"). Log to retro.
 
 **Case B: baseline below SLA goal.**
@@ -257,8 +259,17 @@ STOP. Display reviewer verdict. Ask:
    - Reverted attempts (with reasoning).
    - Hotspots deferred (if any).
    - Constitution exceptions (should be none).
-3. Set status=`done`. Update index.
-4. Print 5-line summary: target, baseline, final, kept attempts, deferred hotspots.
+3. **Spawned specs**: re-read the "Hotspots deferred" and "Reverted attempts" entries just written
+   to 05-retro.md, plus the trade-offs accepted in `00-spec.md`, and look for follow-up work that
+   has no home: a hotspot not taken, a reverted approach worth retrying under different
+   constraints, a trade-off that should be revisited. For each one, ask the user to reserve an ID
+   and add a row to `00-spec.md`'s `## Spawned specs` table (`Reserved ID | Type | Title | Owner`).
+   This is a prompt, not a gate: nothing deferred, or the user declines - leave the table at
+   header + separator and proceed. Do NOT create the child specs here, and do NOT add a reserved
+   ID to `.specs/index.md`; an index row exists only once the real spec directory does (see
+   `/sd:spec`, "Index <-> folder symmetry").
+4. Set status=`done`. Update index.
+5. Print 5-line summary: target, baseline, final, kept attempts, deferred hotspots.
 
 ---
 

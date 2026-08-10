@@ -116,6 +116,19 @@ jobs:
         shell: pwsh
         run: ./tests/hooks/run-conformance.ps1 -SelfTest
 
+      # --- Contract-lint fixtures: same posture as the hook conformance pair
+      # above. One pwsh runner drives BOTH linter implementations per case, so
+      # parity is asserted rather than inferred from two green jobs. No `if:`
+      # guard - every OS runs both, which is what makes windows-latest cover the
+      # CRLF path (*.md is deliberately not pinned to LF at the repo root) -----
+      - name: Contract lint fixtures (bash vs PowerShell)
+        shell: pwsh
+        run: ./tests/contract-lint/run-selftest.ps1
+
+      - name: Contract lint self-test (dead-linter detection)
+        shell: pwsh
+        run: ./tests/contract-lint/run-selftest.ps1 -SelfTest
+
       # --- Install -> uninstall round-trip (CLAUDE.md sandbox recipe) --------
       - name: Install -> uninstall round-trip (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -131,6 +144,12 @@ jobs:
           for area in commands agents hooks templates skills; do
             test ! -d "$base/$area/sd" || { echo "FAIL: $area/sd survived uninstall"; exit 1; }
           done
+          remaining="$(find "$base" -type f)"
+          if [ -n "$remaining" ]; then
+            echo "FAIL: files survived uninstall:"
+            echo "$remaining"
+            exit 1
+          fi
           rm -rf "$base"
           echo "round-trip OK"
 
@@ -151,5 +170,7 @@ jobs:
           foreach ($area in 'commands','agents','hooks','templates','skills') {
             if (Test-Path "$base/$area/sd") { Write-Error "FAIL: $area/sd survived uninstall"; exit 1 }
           }
+          $remaining = Get-ChildItem -LiteralPath $base -Recurse -File -Force
+          if ($remaining) { Write-Error "FAIL: files survived uninstall:`n$($remaining.FullName -join "`n")"; exit 1 }
           Remove-Item -Recurse -Force $base
           Write-Host 'round-trip OK'

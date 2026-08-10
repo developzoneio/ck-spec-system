@@ -10,11 +10,11 @@ specwright is a thin layer on top of Claude Code that enforces spec-driven devel
 +--------------------------------------------------------------------+
 |  Layer 1 - USER scope  (~/.claude/, installed once)                |
 |                                                                    |
-|    commands/sd/    13 workflow definitions                         |
+|    commands/sd/    14 workflow definitions                         |
 |    agents/sd/      6 subagent prompt files                         |
 |    hooks/sd/       3 cross-platform hook scripts                   |
-|    templates/sd/   4 setup + 5 spec templates                      |
-|    skills/sd/      8 reusable rule packs (referenced by agents)    |
+|    templates/sd/   4 setup + 6 spec templates                      |
+|    skills/sd/      9 reusable rule packs (referenced by agents)    |
 |                                                                    |
 |  Generic engine. Never changes per project. Updated by re-running  |
 |  the installer.                                                    |
@@ -67,15 +67,16 @@ Phase N - Close-out
 
 A **gate** is a checkpoint where the workflow refuses to proceed without explicit user approval. Silence is not approval. Skipping a gate requires logging a constitution exception to the spec's retro.
 
-The 5 workflow commands have these gate counts:
+The 6 workflow commands have these gate counts:
 
 | Workflow | Gates | Why |
 |---|---|---|
-| `/sd:feature` | 3 | spec, plan, per-task review, integration |
+| `/sd:feature` | 3 | spec, plan, integration + review |
 | `/sd:bug` | 5 | symptom, reproduction (HARD), root cause, failing test, regression |
 | `/sd:rca` | 3 | evidence, hypotheses, root cause |
 | `/sd:refactor` | 6 | spec, coverage, post-test, plan, per-batch tests, holistic review |
 | `/sd:perf` | 8 | target, baseline (HARD), hotspot, hypothesis, correctness, keep/revert, regression, final review |
+| `/sd:port` | 6 | donor set frozen (HARD), fidelity tables (HARD), behavior pinned (HARD), plan, per-batch tests, justified-diff parity (HARD) |
 
 Gates marked HARD (e.g. bug reproduction, perf baseline) have no override path. The point is to force discipline at the moments when shortcuts are most tempting.
 
@@ -111,6 +112,7 @@ fan-out each command performs (left to right = invocation order; `(xN)` = once p
 /sd:refactor  -> spec-architect -> code-explorer -> implementer (coverage) -> spec-architect -> implementer (xN) -> reviewer
 /sd:perf      -> spec-architect -> debugger (hotspot / verify) -> implementer (xN) -> reviewer
 /sd:rca       -> spec-architect -> debugger (enumerate / verify)        [no code change - output IS the spec]
+/sd:port      -> code-explorer (port-extract, in-repo only) -> spec-architect -> code-explorer -> spec-architect -> implementer (xN) -> reviewer (port-parity)
 /sd:explore   -> code-explorer
 /sd:review    -> reviewer
 /sd:adr       -> docs-writer
@@ -127,6 +129,20 @@ backbone: the architect frames the spec, an investigator (explorer or debugger) 
 the implementer makes the change one atomic task at a time, and the reviewer gates the result. The
 reviewer has no write tools, so the loop cannot auto-fix - findings always route back through a
 fresh implementer call.
+
+### Why port parity is a reviewer check, not a `/sd:verify` check
+
+`/sd:verify` and the port parity gate are both close-out gates, so the two whole-artifact checks
+the parity gate performs - member completeness and path conformance - had a plausible home in
+either. The test is whether a check can be decided from `00-spec.md` and `02-tasks.md` with fixed
+regex shapes and nothing else read, which is all `/sd:verify` ever does. Member completeness fails
+it: deciding that a manifest member is present means reading host source and recognizing a member
+boundary in whatever language the host happens to be written in, and that judgement is precisely
+what `/sd:verify` exists in order not to make. Path conformance nearly passes it, but `/sd:verify`
+takes no changeset input at all, and granting it one to serve a single set comparison buys a second
+non-deterministic surface and splits fidelity findings across two reports. Both checks therefore
+live in `sd-reviewer`'s `port-parity` mode, where the diff already is, and `/sd:verify` stays
+deterministic.
 
 ---
 
@@ -149,6 +165,8 @@ The split exists for three reasons:
 | `sd-spec-templates` | `sd-spec-architect` | Per-template authoring rules; which cross-phase fields to leave empty. |
 | `sd-pattern-discipline` | `sd-spec-architect`, `sd-implementer`, `sd-reviewer` | Pattern discovery and adherence: precedent sampling, `Pattern refs` authoring/following, conformance review. |
 | `sd-replan-loop` | `sd-spec-architect`; `/sd:feature`, `/sd:refactor`, `/sd:spec validate` (runtime read) | Mid-execution re-plan protocol: HARD Gate Re-plan, append-only `## Revisions` log in `01-plan.md`, `Revised-by` task marker. Shared by the two plan+tasks workflows so the revision format is defined once. |
+| `sd-retro-lessons` | `scripts/validate-lessons.*`, `scripts/aggregate-lessons.*` (runtime read) | The `lesson` line format, tag vocabulary, and reusability bar for retro lessons. The one skill with no agent consumer - declared in `contractLint.skillConsumers`. |
+| `sd-port-fidelity` | `sd-spec-architect`, `sd-reviewer` | Cross-project port fidelity: structural mirror default, four-group deviation allowlist, anti-simplification rules, three gate table schemas, parity artifact layout, closed five-class hunk vocabulary plus the two whole-artifact checks. |
 
 Agents declare the skills they apply via a `skills:` list in YAML frontmatter:
 
@@ -191,9 +209,10 @@ Runs before any code-editing tool. Decides:
 This catches the common failure mode where the user (or Claude) jumps straight to editing code without creating a spec first.
 
 Alongside guarding, `spec-gate` also **records**: every gate decision (verify / protected /
-code-edit) and every `.specs/index.md` lifecycle transition it observes is appended as one JSON
-line to `.specs/_metrics/events.jsonl`. Recording is purely observational - it never alters a
-gate decision, only measures it after the fact. See the event log section below for the schema.
+code-edit), every inferred Gate Complexity split, and every `.specs/index.md` lifecycle transition
+it observes is appended as one JSON line to `.specs/_metrics/events.jsonl`. Recording is purely
+observational - it never alters a gate decision, only measures it after the fact. See the event
+log section below for the schema.
 
 **Block output schema (dual-format).** When `spec-gate` denies a tool call, it emits a single JSON object that carries **both** the new and the legacy schema fields so it works across Claude Code CLI versions:
 
@@ -233,8 +252,8 @@ the PowerShell and bash implementations produce byte-comparable lines:
 | `spec_id` | always | `FEAT-x` / `BUG-x` / ... , or `-` when no spec is in scope |
 | `phase` | always | lifecycle status of `spec_id` (`draft` / `approved` / `in-progress` / `done`), or `-` |
 | `event` | always | `gate` \| `spec_transition` \| `subagent_stop` |
-| `gate` | when `event` is `gate` | `verify` \| `protected` \| `code-edit` |
-| `decision` | when `event` is `gate` or `spec_transition` | `allow` \| `block` \| `warn` - on a transition, whether the index edit was ultimately allowed through. Most direct index edits are blocked by `paths.protected`, so `block` is the common case; a verified `done` close-out is the path that yields `allow`. |
+| `gate` | when `event` is `gate` | `verify` \| `protected` \| `code-edit` \| `complexity` |
+| `decision` | when `event` is `gate` or `spec_transition` | `allow` \| `block` \| `warn` \| `split` (only on `gate:"complexity"`) - on a transition, whether the index edit was ultimately allowed through. Most direct index edits are blocked by `paths.protected`, so `block` is the common case; a verified `done` close-out is the path that yields `allow`. |
 | `from` | when `event` is `spec_transition` | previous lifecycle status, or `-` if not derivable |
 | `ext` | when `gate` is `code-edit` | lowercased file extension, e.g. `.ps1` - never a path |
 | `stale` | when `event` is `subagent_stop` | `0` or `1` - a flag, not a count. One event is emitted per in-progress spec per subagent stop; `1` means that spec's `05-retro.md` was stale or missing at that moment. Retro pressure is measured by counting `1`s over time, never by reading a single value as a quantity |
@@ -245,7 +264,31 @@ Example lines:
 {"ts":"2026-07-21T09:14:02Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"spec_transition","from":"approved","decision":"block"}
 {"ts":"2026-07-21T09:31:44Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"gate","gate":"code-edit","decision":"warn","ext":".ps1"}
 {"ts":"2026-07-21T09:40:55Z","spec_id":"FEAT-spec-metrics","phase":"in-progress","event":"subagent_stop","stale":1}
+{"ts":"2026-08-09T05:12:33Z","spec_id":"FEAT-big","phase":"archived","event":"gate","gate":"complexity","decision":"split"}
 ```
+
+**`gate:"complexity"` (SW-31) is inference, not observation.** Gate Complexity (ADR
+`docs/adr/0002-complexity-triage-decomposition.md`) is decided as model-executed prose inside
+`/sd:feature` Phase 3 Gate 2 - no hook sees that decision directly. `spec-gate` instead watches
+every `index.md` edit for the structural trace an "approve split" resolution leaves behind
+(`commands/feature.md`'s Face B: the parent row moves to `archived` and each child is registered
+as `FEAT-<parent>-<slug>`) and emits `decision:"split"` when a newly-`archived` `FEAT-X` row is
+seen alongside any `FEAT-X-<slug>` row, in the registry or the same pending edit. This can only
+ever detect a **completed split** - Face A (never tripped) and Face B "no-split" (tripped, user
+declined) both leave the parent `in-progress` with no distinguishing mark in `index.md`, so trip
+rate on its own is not recoverable from this signal alone. See
+`docs/adr/0004-threshold-calibration.md` ("Scope declined") for why that gap is left open rather
+than closed by having the Gate 2 prose itself write a marker.
+
+It is emitted **only on an edit that was actually allowed through** - never on a `block` exit, at
+any of the four rules above. A blocked `index.md` edit never reaches disk, so a detected
+parent-archive-plus-child pattern inside a denied edit did not really happen; recording `split`
+there would be a false positive. Combined with the note on `decision` above (most direct
+`index.md` edits are blocked by `paths.protected` under the default config), this means the split
+count is expected to under-count real splits whenever a project leaves `index.md` protected -
+which is the default. A project that wants this signal to be reliable needs `index.md` reachable
+by whatever edit actually performs the split (see `commands/spec.md`'s existing `verifyGate`
+carve-out for the same tension on the `done` transition).
 
 The log is metadata-only by design: no file paths, no code content, no commit messages - only spec
 IDs, lifecycle phases, decisions, and file extensions. Controlled by `hooks.metrics` in
@@ -278,11 +321,11 @@ Every workflow writes to a structured folder under `.specs/<ID>/`:
 
 ```
 .specs/FEAT-INV-2501/
-├── 00-spec.md        Why / What / Success criteria / Constitution check
+├── 00-spec.md        Why / What / Success criteria / Spawned specs / Constitution check
 ├── 01-plan.md        Phased implementation plan
 ├── 02-tasks.md       Atomic tasks (11 required fields, incl. Pattern refs)
 ├── 03-decisions.md   Impact analysis from sd-code-explorer + debugger output
-├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots
+├── 04-artifacts/     Evidence: logs, queries, traces, baselines, ticket snapshots, donor snapshots
 └── 05-retro.md       Append-only log: status transitions, surprises, follow-ups
 ```
 
@@ -299,7 +342,7 @@ append-only memory, not scratch space:
 | `01-plan.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
 | `02-tasks.md` | `sd-spec-architect` (plan) | feature / refactor plan phase | `sd-implementer` |
 | `03-decisions.md` | `sd-code-explorer` (impact) + `sd-debugger` (hypotheses / verdicts); append-only | impact + investigation phases | `sd-implementer`, `sd-reviewer` |
-| `04-artifacts/` | any agent (logs, baselines, repro evidence, ticket snapshots) | throughout | any agent + future sessions |
+| `04-artifacts/` | any agent (logs, baselines, repro evidence, ticket snapshots, donor snapshots) | throughout | any agent + future sessions |
 | `05-retro.md` | main thread (status transitions); append-only | every gate transition | resume logic + future sessions |
 
 The cross-phase fields inside `00-spec.md` are intentionally left empty at creation
@@ -385,7 +428,7 @@ Every command, agent, and (conceptually) namespaced asset uses the `sd:` prefix:
 The prefix exists for three reasons:
 
 1. **Collision avoidance.** A project may have its own `/feature` or `/review` slash command. `sd:` carves out a namespace.
-2. **Discoverability.** Typing `/sd:` in Claude Code lists all 13 commands. The namespace is its own table of contents.
+2. **Discoverability.** Typing `/sd:` in Claude Code lists all 14 commands. The namespace is its own table of contents.
 3. **Removability.** Uninstalling the engine removes everything under `sd/` subfolders, leaving the rest of `~/.claude/` intact.
 
 ---

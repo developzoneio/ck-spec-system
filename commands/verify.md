@@ -67,6 +67,7 @@ Parsing shapes (exact):
 
 VF022 execution: run `commands.test` via Bash from the project root. Capture the exit code.
 Do not guess a test command when `commands.test` is empty - that is VF023 (stack-agnostic
+<!-- contract-lint: allow CL400 - these are FORBIDDEN examples illustrating the stack-agnostic rule itself, not a hardcoded command this file runs -->
 rule: never hardcode `dotnet test`, `npm test`, etc.).
 
 ## Artifact

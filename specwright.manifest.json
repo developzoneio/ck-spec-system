@@ -60,10 +60,11 @@
         "commands/bug.md",
         "commands/rca.md",
         "commands/refactor.md",
-        "commands/perf.md"
+        "commands/perf.md",
+        "commands/port.md"
       ],
       "installTo": "commands/sd/",
-      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr, verify, status). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 5 of the 13'; the validators also assert each file exists."
+      "description": "Spec-producing pipelines - a SUBSET of commands (the rest are utilities: spec, explore, review, setup, release, adr, verify, status). Docs cite this subset count separately from the total, so it needs its own quantity. Declared as an explicit list because no glob expresses 'these 6 of the 14'; the validators also assert each file exists."
     }
   },
 
@@ -76,6 +77,15 @@
       "hooksPowerShell",
       "templatesSetup",
       "templatesSpec"
+    ],
+    "installTotalWithStamps": [
+      "commands",
+      "agents",
+      "skills",
+      "hooksPowerShell",
+      "templatesSetup",
+      "templatesSpec",
+      "installStamps"
     ]
   },
 
@@ -111,7 +121,9 @@
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (setup|spec) templates",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) templates",
     "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?skills",
-    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?rule packs"
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) (reusable )?rule packs",
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) hard gates?",
+    "([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve|[Tt]hirteen|[Ff]ourteen|[Ff]ifteen|[Ss]ixteen|[Ss]eventeen|[Ee]ighteen|[Nn]ineteen|[Tt]wenty|[0-9]+) version stamps?"
   ],
 
   "$claimPhrasesComment": [
@@ -175,6 +187,8 @@
     { "file": "README.md", "pattern": "templates\\*\\* \\| ([0-9]+) setup templates", "equals": "templatesSetup" },
     { "file": "README.md", "pattern": "setup templates \\+ ([0-9]+) spec templates", "equals": "templatesSpec" },
     { "file": "README.md", "pattern": "^\\| \\*\\*([0-9]+) reusable skills\\*\\* \\|", "equals": "skills" },
+    { "file": "README.md", "pattern": "they orchestrate ([0-9]+) subagents", "equals": "agents" },
+    { "file": "README.md", "pattern": "Cross-cutting rules live in \\*\\*([0-9]+) skills\\*\\*", "equals": "skills" },
 
     { "file": "CLAUDE.md", "pattern": "commands/sd/` \\| ([0-9]+) slash commands", "equals": "commands" },
     { "file": "CLAUDE.md", "pattern": "agents/sd/` \\| ([0-9]+) subagents", "equals": "agents" },
@@ -204,7 +218,8 @@
     { "file": "install/README.md", "pattern": "`templates/sd/` \\| ([0-9]+) \\+ [0-9]+ \\|", "equals": "templatesSetup" },
     { "file": "install/README.md", "pattern": "`templates/sd/` \\| [0-9]+ \\+ ([0-9]+) \\|", "equals": "templatesSpec" },
     { "file": "install/README.md", "pattern": "^\\| `skills/` \\| `skills/sd/` \\| ([0-9]+) \\|", "equals": "skills" },
-    { "file": "install/README.md", "pattern": "\\*\\*Total\\*\\*: ([0-9]+) files per OS", "equals": "installTotal" },
+    { "file": "install/README.md", "pattern": "^\\| _\\(generated at install\\)_ \\| `<area>/sd/specwright-version\\.txt` \\| ([0-9]+) \\|", "equals": "installStamps" },
+    { "file": "install/README.md", "pattern": "\\*\\*Total\\*\\*: ([0-9]+) files per OS", "equals": "installTotalWithStamps" },
 
     { "file": "docs/architecture.md", "pattern": "commands/sd/ +([0-9]+) workflow definitions", "equals": "commands" },
     { "file": "docs/architecture.md", "pattern": "agents/sd/ +([0-9]+) subagent prompt files", "equals": "agents" },
@@ -219,6 +234,279 @@
     { "file": "commands/setup.md", "pattern": "commands/sd/ +\\(([0-9]+) workflow commands\\)", "equals": "commands" },
     { "file": "commands/setup.md", "pattern": "agents/sd/ +\\(([0-9]+) specialist agents\\)", "equals": "agents" },
     { "file": "commands/setup.md", "pattern": "hooks/sd/ +\\(([0-9]+) hooks\\)", "equals": "hooksPowerShell" },
-    { "file": "commands/setup.md", "pattern": "skills/sd/ +\\(([0-9]+) skills:", "equals": "skills" }
-  ]
+    { "file": "commands/setup.md", "pattern": "skills/sd/ +\\(([0-9]+) skills:", "equals": "skills" },
+
+    { "file": "README.md", "pattern": "^\\| `/sd:feature [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesFeature" },
+    { "file": "README.md", "pattern": "^\\| `/sd:bug [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesBug" },
+    { "file": "README.md", "pattern": "^\\| `/sd:rca [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRca" },
+    { "file": "README.md", "pattern": "^\\| `/sd:refactor [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
+    { "file": "README.md", "pattern": "^\\| `/sd:perf [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+    { "file": "README.md", "pattern": "^\\| `/sd:port [^|]*\\| Workflow \\| ([0-9]+) \\|", "equals": "gatesPort" },
+    { "file": "README.md", "pattern": "^\\| `/sd:setup` \\| Utility \\| ([0-9]+) \\|", "equals": "gatesSetup" },
+    { "file": "README.md", "pattern": "^\\| `/sd:release [^|]*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesRelease" },
+    { "file": "README.md", "pattern": "^\\| `/sd:adr .*\\| Utility \\| ([0-9]+) \\|", "equals": "gatesAdr" },
+
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:feature` \\| ([0-9]+) \\|", "equals": "gatesFeature" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:bug` \\| ([0-9]+) \\|", "equals": "gatesBug" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:rca` \\| ([0-9]+) \\|", "equals": "gatesRca" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:refactor` \\| ([0-9]+) \\|", "equals": "gatesRefactor" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:perf` \\| ([0-9]+) \\|", "equals": "gatesPerf" },
+    { "file": "docs/architecture.md", "pattern": "^\\| `/sd:port` \\| ([0-9]+) \\|", "equals": "gatesPort" },
+
+    { "file": "commands/feature.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
+    { "file": "commands/bug.md", "pattern": "([0-9]+) hard gates", "equals": "gatesBug" },
+    { "file": "commands/rca.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRca" },
+    { "file": "commands/refactor.md", "pattern": "([0-9]+) hard gates", "equals": "gatesRefactor" },
+    { "file": "commands/perf.md", "pattern": "([0-9]+) hard gates", "equals": "gatesPerf" },
+    { "file": "commands/port.md", "pattern": "([0-9]+) hard gates", "equals": "gatesPort" },
+    { "file": "commands/adr.md", "pattern": "([0-9]+) hard gate", "equals": "gatesAdr" },
+
+    { "file": "docs/usage.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" },
+    { "file": "docs/adr/0003-adaptive-replan-loop.md", "pattern": "([0-9]+) hard gates", "equals": "gatesFeature" }
+  ],
+
+  "versionClaims": [
+    { "file": "ROADMAP.md", "pattern": "^Current released version: \\*\\*([0-9]+\\.[0-9]+\\.[0-9]+)\\*\\*" }
+  ],
+
+  "$versionClaimsComment": [
+    "A version claim is a different shape from docClaims: docClaims compares a captured integer",
+    "against a manifest 'quantities' value derived from an areas/derived count, and needs 'equals'",
+    "to say which one. A version claim compares a captured x.y.z string against the newest dated",
+    "'## [x.y.z] - <date>' heading in CHANGELOG.md instead - there is no quantities entry for that,",
+    "so 'equals' does not apply here and is intentionally absent from these entries.",
+    "",
+    "v1 is an EXPLICIT LIST ONLY - unlike docClaims there is no undeclared-claim scan for version",
+    "strings. A semver-shaped phrase pattern would collide with legitimate non-claim version",
+    "strings already in the repo (keepachangelog.com/en/1.1.0/, semver.org/spec/v2.0.0.html,",
+    "illustrative versions in commands/release.md, docs/usage.md, template/fixture content), and",
+    "policing that needs a second exclusions/vocabulary surface disproportionate to the one real",
+    "offender this closes (SW-28). If a second tracked doc starts publishing a released-version",
+    "claim, add it here explicitly rather than building the scan; only build the scan if this list",
+    "grows enough that omissions become plausible."
+  ],
+
+  "$contractLintComment": [
+    "Contract contract for specwright's PRODUCT (commands/agents/skills), read by",
+    "scripts/contract-lint.ps1 and scripts/contract-lint.sh (Check 8: cross-file contract lint).",
+    "Where 'areas' above governs INVENTORY (how many files exist), this subtree governs the",
+    "RELATIONSHIPS between those files - which agent a command invokes, which skill an agent",
+    "loads, how many hard gates a workflow declares.",
+    "",
+    "THE COUNTS QUESTION. The manifest's charter at the top says it stores no counts, and",
+    "'gates.<command>.hard' is a literal number. That is deliberate, and the two are not in",
+    "conflict, because the charter governs inventory. The test is:",
+    "",
+    "  Can a script count it from disk with no judgement calls?",
+    "    YES -> it is inventory. It belongs in 'areas' and must be derived.",
+    "    NO  -> it is a declared design contract. It belongs here, written down.",
+    "",
+    "'How many command files exist' passes that test, so hardcoding it is pure liability.",
+    "'How many hard gates /sd:feature declares' does NOT: nothing on disk is a second source",
+    "for it. If it were derived, CL302 would compare disk against itself and pass vacuously",
+    "forever - exactly the rot Check 7's vacuous-claim rule exists to catch. The number's job",
+    "is to make deleting a '### Gate 4' heading a deliberate two-file edit that shows up in",
+    "review. Feeding these into Check 7 as quantities gives README <- manifest <- disk, hence",
+    "transitively README == disk, with no gate parser duplicated into validate.",
+    "",
+    "FOUR FALSE POSITIVES the gate parser handles WITHOUT an exclusion list. Do not re-add one:",
+    "  1. 'commands/status.md' - '## Gate activity' is a report section, not a gate. Rejected",
+    "     because 'Gate' followed by a lowercase word is never a gate heading.",
+    "  2. 'commands/feature.md' - '**Face B - Gate Complexity (HARD)**' is bold text, not a",
+    "     heading. Rejected because a gate must match '^#{2,3} '.",
+    "  3. 'commands/bug.md' - 'Gate 3a' is authored BEFORE 'Gate 3'. CL303 compares SETS, never",
+    "     file order.",
+    "  4. The ~20 literal STOPs in Phase 0 bootstrap error paths. CL300 only looks inside a gate",
+    "     block, which ends at the next heading of any level.",
+    "",
+    "SCAN SCOPE IS LOAD-BEARING. It is commands/ agents/ skills/ and nothing else on purpose.",
+    "CLAUDE.md and CONTRIBUTING.md use 'sd-test' as a sandbox path and docs/architecture.md",
+    "carries a 'name: sd-debugger' frontmatter example - adding docs/** here produces ~18 CL001",
+    "false positives on day one.",
+    "",
+    "SEVERITY LIVES HERE, NEVER IN A RULE. Both linters look severity up from rules[] below, so",
+    "a BLOCK/WARN divergence between the PowerShell and bash twins is structurally impossible.",
+    "A registry parity guard inside each linter asserts that the set of ids below equals the set",
+    "of rules it dispatches, and exits 2 if not - so adding a wave-2 rule cannot be half-done."
+  ],
+
+  "contractLint": {
+    "scanScope": ["commands/*.md", "agents/*.md", "skills/*/SKILL.md"],
+
+    "installNamespaceSegment": "sd",
+
+    "rules": [
+      { "id": "CL001", "severity": "BLOCK", "wave": 1, "summary": "sd- reference resolving to no agent and no skill" },
+      { "id": "CL002", "severity": "BLOCK", "wave": 1, "summary": "skills: frontmatter entry with no matching SKILL.md" },
+      { "id": "CL003", "severity": "BLOCK", "wave": 1, "summary": "unresolved sd- reference on a skill-decorated line" },
+      { "id": "CL004", "severity": "WARN",  "wave": 1, "summary": "skill referenced by nobody in scan scope and not declared in skillConsumers" },
+      { "id": "CL005", "severity": "BLOCK", "wave": 1, "summary": "templates/ path that does not exist on disk" },
+      { "id": "CL006", "severity": "BLOCK", "wave": 1, "summary": "/sd:<name> reference with no matching command file" },
+      { "id": "CL007", "severity": "WARN",  "wave": 1, "summary": "agent mentioned by no command body" },
+      { "id": "CL008", "severity": "BLOCK", "wave": 1, "summary": "numbered .specs artifact filename absent from specArtifacts" },
+
+      { "id": "CL100", "severity": "BLOCK", "wave": 2, "summary": "invocation sets TASK/WORKFLOW_TYPE/TASK_TYPE to a mode the target agent does not declare" },
+      { "id": "CL101", "severity": "WARN",  "wave": 2, "summary": "agent declares a mode no command ever invokes" },
+      { "id": "CL102", "severity": "BLOCK", "wave": 2, "summary": "invocation omits an input the declared mode marks required" },
+      { "id": "CL103", "severity": "WARN",  "wave": 2, "summary": "invocation passes an input token the declared mode declares nowhere" },
+      { "id": "CL104", "severity": "BLOCK", "wave": 2, "summary": "two agent files share a frontmatter name:" },
+
+      { "id": "CL200", "severity": "BLOCK", "wave": 3, "summary": "agent with no write tool is instructed to write, append or create" },
+      { "id": "CL201", "severity": "BLOCK", "wave": 3, "summary": "agent listed in contractLint.readOnlyAgents declares a write tool" },
+      { "id": "CL202", "severity": "WARN",  "wave": 3, "summary": "mcp__* name absent from contractLint.knownMcpTools" },
+      { "id": "CL203", "severity": "WARN",  "wave": 3, "summary": "agent frontmatter declares a tool never mentioned in its own body" },
+
+      { "id": "CL300", "severity": "BLOCK", "wave": 1, "summary": "gate block containing no literal STOP" },
+      { "id": "CL301", "severity": "BLOCK", "wave": 1, "summary": "gate block offering no option set" },
+      { "id": "CL302", "severity": "BLOCK", "wave": 1, "summary": "hard gate count on disk disagrees with gates.<file>.hard" },
+      { "id": "CL303", "severity": "WARN",  "wave": 1, "summary": "hard gate numbering is not exactly 1..N without duplicates" },
+      { "id": "CL304", "severity": "BLOCK", "wave": 1, "summary": "conditional gate on disk undeclared, or declared and absent" },
+      { "id": "CL305", "severity": "BLOCK", "wave": 1, "summary": "HARD gate listing an override token as a selectable option" },
+      { "id": "CL306", "severity": "BLOCK", "wave": 3, "summary": "HARD gate prose describes an escape hatch with no contract-lint: allow suppression" },
+
+      { "id": "CL400", "severity": "BLOCK", "wave": 3, "summary": "hardcoded stack command token outside a <<placeholder>>, fenced example or suppression comment" },
+      { "id": "CL401", "severity": "WARN",  "wave": 3, "summary": "hardcoded language/framework name in the same contexts (stays WARN permanently - often legitimate in prose)" },
+      { "id": "CL402", "severity": "BLOCK", "wave": 3, "summary": "hardcoded absolute filesystem path (Windows drive letter or POSIX multi-segment) in scan scope" },
+
+      { "id": "CL500", "severity": "WARN",  "wave": 4, "summary": "file exceeds contractLint.budgets.<area>Bytes (stays WARN permanently - a ratchet, not a build gate)" },
+
+      { "id": "CL900", "severity": "BLOCK", "wave": 1, "summary": "suppression comment carrying no usable reason" },
+      { "id": "CL901", "severity": "BLOCK", "wave": 1, "summary": "suppression naming a rule id absent from this registry" },
+      { "id": "CL902", "severity": "WARN",  "wave": 1, "summary": "suppression that suppressed no finding" }
+    ],
+
+    "gates": {
+      "commands/feature.md":  { "quantity": "gatesFeature",  "hard": 3, "conditional": ["Re-plan"] },
+      "commands/bug.md":      { "quantity": "gatesBug",      "hard": 5, "conditional": ["3a"] },
+      "commands/rca.md":      { "quantity": "gatesRca",      "hard": 3, "conditional": [] },
+      "commands/refactor.md": { "quantity": "gatesRefactor", "hard": 6, "conditional": ["Re-plan"] },
+      "commands/perf.md":     { "quantity": "gatesPerf",     "hard": 8, "conditional": [] },
+      "commands/port.md":     { "quantity": "gatesPort",     "hard": 6, "conditional": [] },
+      "commands/setup.md":    { "quantity": "gatesSetup",    "hard": 2, "conditional": [] },
+      "commands/release.md":  { "quantity": "gatesRelease",  "hard": 1, "conditional": [] },
+      "commands/adr.md":      { "quantity": "gatesAdr",      "hard": 1, "conditional": [] },
+
+      "skills/sd-replan-loop/SKILL.md": { "quantity": null, "hard": 0, "conditional": ["Re-plan"] }
+    },
+
+    "$gatesComment": [
+      "quantity is the Check 7 name this gate count is published under. null means the gate",
+      "block is real but nothing in the docs cites a number for it - the Re-plan protocol is",
+      "defined once in the skill and reached from commands/feature.md and commands/refactor.md,",
+      "so its count belongs to those workflows, not to the skill. Check 7's seeding loop skips",
+      "null quantities; CL302 and CL304 do not care either way."
+    ],
+
+    "specArtifacts": [
+      "00-spec.md",
+      "01-plan.md",
+      "02-tasks.md",
+      "03-decisions.md",
+      "05-retro.md",
+      "06-verify.md"
+    ],
+
+    "skillConsumers": {
+      "sd-retro-lessons": "scripts/validate-lessons.{ps1,sh}, scripts/aggregate-lessons.{ps1,sh}"
+    },
+
+    "overrideOptionTokens": ["skip", "override", "proceed anyway", "bypass", "force", "ignore"],
+
+    "gateProseEscapeTokens": ["insists on", "may override", "proceed anyway", "bypass this gate"],
+
+    "$gateProseEscapeTokensComment": [
+      "CL306's vocabulary, scoped to HARD gate blocks only. Deliberately narrow to control the",
+      "false-positive band this rule occupies (see docs/contract-lint.md) - it does not try to",
+      "catch every conceivable escape hatch, only the phrasings already proven to appear in",
+      "commands/bug.md and commands/release.md. A HARD gate whose prose matches one of these",
+      "phrases needs a '<!-- contract-lint: allow CL306 - <reason> -->' comment, the same",
+      "suppression convention CL305 already uses on commands/perf.md - there is no separate",
+      "per-gate declared-exception surface, on purpose."
+    ],
+
+    "stackTokens": {
+      "commands": ["dotnet", "npm", "npx", "yarn", "pnpm", "pytest", "mvn", "gradle", "cargo", "go test", "rake", "bundle exec", "composer"],
+      "languages": ["C#", ".NET", "TypeScript", "JavaScript", "Python", "Java", "Go", "Rust", "Ruby", "PHP", "MSSQL", "SQL Server", "PostgreSQL", "MySQL", "MongoDB"]
+    },
+
+    "$stackTokensComment": [
+      "Hand-maintained, same category as overrideOptionTokens and knownMcpTools - nothing on",
+      "disk is a second source for 'which tokens count as a hardcoded stack assumption'.",
+      "commands.* is CL400's vocabulary (BLOCK, promoted from WARN 2026-07-31 after a clean",
+      "run across the engine tree under both implementations);",
+      "languages.* is CL401's (permanent WARN - a language name in prose is often legitimate,",
+      "e.g. an 'or the project's equivalent' example list). Both rules skip text inside",
+      "<<...>> placeholders, fenced code blocks, and lines covered by a",
+      "'<!-- contract-lint: allow CL40x - <reason> -->' comment."
+    ],
+
+    "readOnlyAgents": ["sd-code-explorer", "sd-reviewer", "sd-debugger"],
+
+    "$readOnlyAgentsComment": [
+      "A DECLARED promise, not a derived fact: these three agents are architecturally",
+      "committed to staying read-only, and CL201 is the only rule that reads this list -",
+      "it fires the moment one of them grows Write/Edit/MultiEdit in its own tools: line.",
+      "CL200 does NOT consult this list. CL200 asks 'does THIS agent's frontmatter carry a",
+      "write tool right now', straight off disk, for every agent - so a new read-only agent",
+      "is protected on day one even if nobody remembers to add it here. This list exists so",
+      "the THREE AGENTS ABOVE SPECIFICALLY can never quietly gain a write tool, the same",
+      "declared-vs-disk shape CL304 already uses for conditional gates."
+    ],
+
+    "knownMcpTools": [
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__gitnexus__context",
+      "mcp__gitnexus__impact",
+      "mcp__gitnexus__query",
+      "mcp__gitnexus__list_repos",
+      "mcp__tavily__tavily_search",
+      "mcp__context7__query-docs",
+      "mcp__context7__resolve-library-id",
+      "mcp__atlassian__getJiraIssue",
+      "mcp__atlassian__searchJiraIssuesUsingJql",
+      "mcp__atlassian__getJiraIssueRemoteIssueLinks",
+      "mcp__atlassian__getConfluencePage"
+    ],
+
+    "$knownMcpToolsComment": [
+      "Hand-maintained on purpose, not derived: nothing on disk is a second source for",
+      "which mcp__* tool names are real, since that comes from runtime MCP server",
+      "configuration this repo cannot see. That fails the manifest's own derivability",
+      "test (see $contractLintComment above), so it belongs here, written down, same",
+      "category as overrideOptionTokens and skillConsumers.",
+      "",
+      "THE DELIBERATE FAILURE MODE: this list goes stale the moment a new MCP tool is",
+      "wired into an agent and this file is not updated in the same PR. CL202 stays WARN",
+      "forever (see contractLint.rules above) specifically because of that risk - a stale",
+      "allowlist must never be able to block CI. Treat a CL202 hit as 'update this list or",
+      "explain why not', never as 'suppress and move on'."
+    ],
+
+    "budgets": {
+      "commandsBytes": 32677,
+      "agentsBytes": 15232,
+      "skillsBytes": 12412
+    },
+
+    "$budgetsComment": [
+      "CL500's vocabulary. A RATCHET, not a design target: each ceiling is set at today's",
+      "largest file in that area, so the repo is green by construction on day one and every",
+      "later WARN is real growth, never a paragraph someone happened to write. CL500 stays",
+      "WARN forever (see contractLint.rules above) - promoting it to BLOCK would turn a",
+      "judgement call into a build failure, and the judgement is the valuable part. Raising",
+      "a number here is a real decision that belongs in a PR description, never a reflex to",
+      "a red CI run.",
+      "",
+      "The byte count is NORMALIZED, never a raw disk read: the sum of each line's UTF-8",
+      "byte length plus one separator per line boundary, computed off the same per-line",
+      "cache every other rule already reads. A raw ReadAllBytes().Length / `wc -c` would",
+      "make this rule disagree with itself between platforms for byte-identical content -",
+      "contractLint.scanScope is 'text=auto' (see .gitattributes), so *.md checks out LF on",
+      "a Linux CI runner and CRLF on Windows. Confirmed on this repo: commands/spec.md is",
+      "25979 bytes as a git blob (LF) but 26521 bytes on a native Windows checkout - a 542",
+      "byte, ~2% difference for identical content. Line count was rejected for the same",
+      "reason CLAUDE.md rejects it elsewhere: it is not a measure both implementations can",
+      "agree on without arguing about line endings."
+    ]
+  }
 }

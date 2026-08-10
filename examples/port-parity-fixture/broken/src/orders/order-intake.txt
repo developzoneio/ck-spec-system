@@ -1,0 +1,26 @@
+member CreateOrder
+  1. trim the customer reference
+  2. reject an empty reference
+  3. reject a reference already in orderLedger
+  4. append the order to orderLedger
+  5. log "order accepted: <reference>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --
+
+member CheckTotals
+  1. sum the line amounts
+  2. compare the sum to the declared total
+  3. reject on mismatch
+  4. log "totals validated: <total>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --

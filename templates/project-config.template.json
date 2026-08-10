@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Developzone/specwright/main/schema/project-config.schema.json",
   "version": "1.0.0",
 
   "project": {
@@ -30,7 +29,8 @@
       "bug": "BUG",
       "refactor": "REF",
       "perf": "PERF",
-      "rca": "RCA"
+      "rca": "RCA",
+      "port": "PORT"
     },
     "lifecycle": ["draft", "approved", "in-progress", "done", "archived"],
     "archiveAfterDays": 90
@@ -63,7 +63,8 @@
       "feature": ["feature", "add", "implement", "new", "support"],
       "refactor": ["refactor", "restructure", "clean up", "extract", "rename"],
       "perf": ["perf", "performance", "slow", "optimize", "latency", "throughput"],
-      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"]
+      "rca": ["incident", "outage", "rca", "root cause", "post-mortem", "postmortem"],
+      "port": ["backport", "port from", "port the", "donor repo", "mirror from", "replicate from"]
     },
     "gates": {
       "_comment": "Descriptive only - no hook or command reads this block today; it documents each workflow's hard-gate sequence for humans/tooling that may consume it later.",
@@ -71,7 +72,8 @@
       "bug": ["symptom-captured", "reproduction-confirmed", "root-cause-confirmed", "failing-test-written", "regression-pass"],
       "rca": ["evidence-gathered", "hypotheses-enumerated", "root-cause-confirmed"],
       "refactor": ["spec-approved", "coverage-threshold-met", "post-test-added", "plan-approved", "batch-tests-green", "holistic-review-pass"],
-      "perf": ["target-defined", "baseline-measured", "hotspot-identified", "hypothesis-selected", "correctness-verified", "keep-or-revert-decided", "regression-pass", "final-review-pass"]
+      "perf": ["target-defined", "baseline-measured", "hotspot-identified", "hypothesis-selected", "correctness-verified", "keep-or-revert-decided", "regression-pass", "final-review-pass"],
+      "port": ["donor-set-frozen", "tables-complete", "behavior-pinned", "plan-approved", "batch-tests-green", "parity-clean"]
     }
   },
 
@@ -125,17 +127,19 @@
       "_modes": "block = refuse Edit/Write on code without in-progress spec; warn = log to stderr only; off = skip",
       "_use": "Guard rail blocking code edits when no spec is in-progress",
       "verifyGate": true,
-      "_verifyGate_use": "Scoped to FEAT- (feature-spec) rows only - other types (bug, refactor, perf, rca) have no /sd:verify integration yet. true: a FEAT- row may transition to done only when <spec.dir>/<ID>/06-verify.md records 'result: pass' (written by /sd:verify); non-FEAT rows and any false setting keep index.md fully protected as before SW-6."
+      "_verifyGate_use": "Scoped to FEAT- (feature-spec) rows only - other types (bug, refactor, perf, rca, port) have no /sd:verify integration yet. true: a FEAT- row may transition to done only when <spec.dir>/<ID>/06-verify.md records 'result: pass' (written by /sd:verify); non-FEAT rows and any false setting keep index.md fully protected as before SW-6."
     },
     "subagentRetro": {
       "enabled": true,
       "retroStaleMinutes": 30,
       "debounceMinutes": 10,
       "_use": "Reminder to update stale retros after subagent runs",
+      "_retroStaleMinutes_use": "Default 30 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md). Re-calibrate per CONTRIBUTING's re-calibration ritual once enough closed specs accumulate.",
+      "_debounceMinutes_use": "Default 10 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md). Re-calibrate per CONTRIBUTING's re-calibration ritual once enough closed specs accumulate.",
       "injectLessons": true,
       "maxLessons": 3,
       "_injectLessons_use": "Surface lessons from <spec.dir>/_lessons/lessons.md when a subagent finishes work on an in-progress spec. Selection is by workflow type - a FEAT- spec pulls feature-scoped lessons - so there is no ranking. Emitted regardless of retro staleness and of debounceMinutes, which gate only the stale-retro reminder.",
-      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder."
+      "_maxLessons_use": "Cap on NEW lessons surfaced per subagent stop. Already-surfaced lessons are recorded per session, so a session converges to silence rather than repeating itself. Set to 0 to surface none without disabling the reminder. Default 3 - a guess, not tuned against a measured corpus (see docs/adr/0004-threshold-calibration.md)."
     },
     "metrics": {
       "enabled": true,

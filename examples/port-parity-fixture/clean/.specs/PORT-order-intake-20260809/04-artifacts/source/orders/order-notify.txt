@@ -1,0 +1,23 @@
+member NotifyDispatch
+  1. build the dispatch message
+  2. send the dispatch message
+  3. log "dispatch sent: <reference>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --
+
+member NotifyFailure
+  1. build the failure message
+  2. send the failure message
+  3. log "failure sent: <reference>"
+end member
+
+-- member boundary --
+-- unrelated members are separated by this block so each --
+-- seeded change lands in its own diff hunk. --
+-- this block is unchanged across every donor/host pair. --
+-- no further remarks. --

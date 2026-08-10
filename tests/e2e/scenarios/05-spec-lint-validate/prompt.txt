@@ -1,0 +1,4 @@
+/sd:spec validate --all
+
+This is a headless, scripted test run. Run the validation over every spec in this tree now and
+print the full findings report in this single turn - do not stop to ask anything.

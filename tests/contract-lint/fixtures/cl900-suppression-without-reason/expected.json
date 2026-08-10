@@ -1,0 +1,12 @@
+{
+  "note": "a suppression with no reason worth reading; the CL001 it covers is correctly silenced",
+  "findings": [
+    {
+      "rule": "CL900",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "reasonless-suppression"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[
+  { "type": "file-exists", "path": "CLAUDE.md" },
+  { "type": "file-exists", "path": ".specs/constitution.md" },
+  { "type": "file-exists", "path": ".specs/index.md" },
+  { "type": "file-exists", "path": ".claude/project-config.json" },
+  { "type": "file-exists", "path": ".claude/settings.json" },
+  { "type": "file-matches", "path": ".claude/project-config.json", "pattern": "\\^#\\[0-9\\]\\+\\$" },
+  { "type": "file-matches", "path": ".specs/index.md", "pattern": "ID\\s*\\|\\s*Type\\s*\\|\\s*Status" },
+  { "type": "file-no-bom", "path": "CLAUDE.md" },
+  { "type": "file-no-bom", "path": ".specs/constitution.md" },
+  { "type": "file-no-bom", "path": ".claude/project-config.json" },
+  { "type": "file-no-bom", "path": ".claude/settings.json" }
+]

@@ -1,0 +1,12 @@
+{
+  "note": "a /sd: reference with no command file behind it",
+  "findings": [
+    {
+      "rule": "CL006",
+      "severity": "BLOCK",
+      "file": "commands/alpha.md",
+      "anchor": "seed",
+      "seed": "unknown-command"
+    }
+  ]
+}

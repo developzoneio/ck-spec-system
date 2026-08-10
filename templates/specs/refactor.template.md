@@ -82,6 +82,21 @@ linked_specs: []
 - <<e.g. Updating consumer projects - they will continue to work via unchanged public API>>
 - <<e.g. Performance optimization - any perf gain is incidental, not a goal>>
 
+## Spawned specs
+
+<!-- Follow-up work discovered while doing this spec. IDs are RESERVED, not created: this section
+     records the intent; the child spec is created later by running its own workflow. Same
+     four-column shape as rca.template.md, so there is one convention and not two.
+     Filled at close-out - i.e. after `approved` - so it deliberately carries NO `<<...>>` token:
+     an author-fill token here would still be unfilled at `approved` and fail /sd:spec validate
+     (SL010). Leave the table at header + separator when nothing was deferred.
+     Example row:  | BUG-1310 | bug | Guard the empty-prefix match | alice |
+     A reserved ID is NOT a registry entry. Never add it to `.specs/index.md` until the real spec
+     directory exists - see /sd:spec, "Index <-> folder symmetry". -->
+
+| Reserved ID | Type | Title | Owner |
+|---|---|---|---|
+
 ## Constitution check
 
 - **§1.1 Layer rules**: <<does the refactor preserve / improve layer boundaries?>>

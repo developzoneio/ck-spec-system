@@ -41,6 +41,12 @@ remaining") this correct spec FAILED, while `broken/PERF-BROKEN-002` — the sam
 baseline invented from memory — PASSED. The two perf specs are a matched pair: any change that
 makes one behave like the other has reintroduced the bug SW-4 seam 1 fixed.
 
+`clean/BUG-CLEAN-003` is `done` and its "Fix approach" section names a follow-up deferred to a
+separate spec - but that follow-up carries a reserved ID (`REF-CLEAN-004`) in its
+`## Spawned specs` table, so `SL090` stays silent. `broken/FEAT-BROKEN-015` is the same shape with
+the table left empty, and `SL090` fires. The two are a second matched pair: any change that makes
+`BUG-CLEAN-003` behave like `FEAT-BROKEN-015` has broken `SL090`.
+
 ---
 
 ## Expected findings in `broken/`
@@ -75,6 +81,7 @@ can be traced to an intentional seed rather than an accident.
 | `PERF-BROKEN-012` | `SL021` | BLOCK | `done` with a `05-retro.md` that has only its header |
 | `REF-BROKEN-013` | `SL041` | BLOCK | Retro jumps `approved` -> an entry opening at `in-progress` |
 | `FEAT-BROKEN-014` | `SL044` | WARN | `archived -> in-progress` logged with an empty reason |
+| `FEAT-BROKEN-015` | `SL090` | SUGGEST | `done` spec names deferred work; `## Spawned specs` table is empty |
 | _(tree-wide)_ | `SL032` | BLOCK | `BUG-GHOST-006` row in `index.md` has no folder |
 
 `FEAT-BROKEN-011` is the one spec that seeds two rules on purpose. An illegal `status` cannot
@@ -92,6 +99,7 @@ own rule fire. Each `00-spec.md` explains its own boundary; the summary:
 | `PERF-BROKEN-012` | `SL021` | `SL043` (the retro file exists) and `SL042` (no last entry to disagree with) |
 | `REF-BROKEN-013` | `SL041` | `SL040` (both edges are legal), `SL042` (last entry matches frontmatter), `SL043` (a retro exists) |
 | `FEAT-BROKEN-014` | `SL044` at **WARN** | `SL040` / `SL041` / `SL042` - the chain is contiguous, legal, and ends where frontmatter says |
+| `FEAT-BROKEN-015` | `SL090` at **SUGGEST** | `SL010` / `SL012` / `SL020` / `SL021` / `SL055` - plan, tasks, retro and a passing `06-verify.md` are all present, and the feature template has no phase-deferred token |
 
 ---
 
@@ -104,7 +112,9 @@ of the rules, which is precisely the drift that SW-1 and SW-3 exist to prevent. 
 trade-off is decided, this fixture makes the acceptance criterion **reproducible**, not
 **enforced**.
 
-**Rule coverage is partial: 24 of the 26 rules are seeded.** Not seeded, and why:
+**Rule coverage is partial: 25 of the 37 rules are seeded.** The `SL06x` task-content, `SL07x`
+revision-log, and `SL08x` port-fidelity bands are exercised by their own fixtures and are not
+duplicated here. Not seeded in this fixture, and why:
 
 | Rule | Why not seeded |
 |---|---|
