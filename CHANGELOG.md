@@ -302,6 +302,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `implementer`, `reviewer`, `spec-architect`; `docs-writer` has no mode dispatch) - prerequisite
   for the invocation-contract validator in SW-26 (SW-25). Format documented in `CONTRIBUTING.md`
   under "Agents". No agent behaviour changed.
+- **Check 9: root-level ad-hoc notes guard** (SW-47) - `scripts/validate.{sh,ps1}` now fails when
+  a root-level file matches a declared ad-hoc-notes pattern (`specwright.manifest.json`'s new
+  `adHocNotesGuard.patterns`: `REVIEW-TODO.md`, `TODO.md`, `FIXME.md`, `NOTES.md`,
+  `*-FINDINGS.md`, matched case-insensitively - NTFS/APFS are case-insensitive filesystems, so a
+  case-sensitive guard would let a differently-cased file through on most contributors' machines);
+  `ROADMAP.md` is deliberately excluded as a maintained project document, not an ad-hoc findings
+  snapshot. `scripts/selftest-root-guard.{sh,ps1}` proves the check bites, same posture as
+  `selftest-docs.{sh,ps1}`. `CONTRIBUTING.md` now states explicitly that review findings become
+  Jira issues, not files in the tree.
 
 ### Changed
 - **`README.md` cut from 390 to 282 lines (-28%) with no claim dropped.** The restructure below
@@ -528,6 +537,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blocks that plan area's directory creation (`commands/`, plan position 1, has already installed
   successfully by then), asserting the guard message fires with the exact remedy on the sabotaged
   run. `uninstall.sh`/`uninstall.ps1` have no partial-state guard either - out of scope here.
+
+### Removed
+- **`REVIEW-TODO.md`** (SW-47) - its ten items are each fixed or tracked: items 1/2 by SW-45/SW-46,
+  item 3 verified fixed in place (`hooks/bash/subagent-retro.sh:533` already parses the UTC
+  timestamp with `date -u -j -f`), item 4 by SW-51, items 7/8 by SW-52, item 9 by SW-54, item 10 by
+  SW-53, item 6 already closed by SW-3's manifest, and item 5's residual `agents/debugger.md` gap
+  tracked under new child issue SW-64. Nothing is carried forward as a markdown file; Check 9 above
+  guards against recurrence.
 
 ## [1.5.0] - 2026-07-23
 

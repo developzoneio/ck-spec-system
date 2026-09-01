@@ -103,6 +103,19 @@ jobs:
         shell: pwsh
         run: ./scripts/selftest-docs.ps1
 
+      # --- Root ad-hoc notes guard self-test: the validator above proves the
+      # root is clean; this proves Check 9 would NOTICE a REVIEW-TODO.md-shaped
+      # file reappearing, on both OSes and in both case variants -------------
+      - name: Root notes guard self-test (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/selftest-root-guard.sh
+
+      - name: Root notes guard self-test (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/selftest-root-guard.ps1
+
       # --- Cross-impl hook conformance: pipe each golden fixture into BOTH
       # implementations (bash + pwsh); normalized decisions must match the
       # golden and each other. Runs under pwsh on every OS: ubuntu/macos get

@@ -15,6 +15,9 @@
 #   8. Cross-file contract lint: the relationships between commands, agents and
 #      skills, per the manifest's contractLint subtree. Delegated to
 #      scripts/contract-lint.sh as a child process.
+#   9. Root-level ad-hoc notes guard: no root-level file matches a declared
+#      ad-hoc-notes pattern (specwright.manifest.json's adHocNotesGuard), e.g.
+#      REVIEW-TODO.md, TODO.md, FIXME.md, NOTES.md, *-FINDINGS.md.
 #
 # Exit 0 = all checks passed; 1 = at least one failed.
 
@@ -75,7 +78,7 @@ echo "  Repo root: $repo_root"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-section "Check 1/8: Pure-ASCII scan (*.ps1)"
+section "Check 1/9: Pure-ASCII scan (*.ps1)"
 ascii_bad=0
 ps1_count=0
 while IFS= read -r -d '' f; do
@@ -92,7 +95,7 @@ if [[ $ascii_bad -eq 0 ]]; then ok "$ps1_count .ps1 file(s) are pure ASCII"; fi
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-section "Check 2/8: bash -n syntax (*.sh)"
+section "Check 2/9: bash -n syntax (*.sh)"
 syn_bad=0
 sh_count=0
 while IFS= read -r -d '' f; do
@@ -109,7 +112,7 @@ if [[ $syn_bad -eq 0 ]]; then ok "$sh_count .sh file(s) pass bash -n"; fi
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-section "Check 3/8: Hook-pair parity"
+section "Check 3/9: Hook-pair parity"
 parity_bad=0
 ps_count=0
 for psf in "$repo_root"/hooks/powershell/*.ps1; do
@@ -135,7 +138,7 @@ if [[ $parity_bad -eq 0 ]]; then ok "$ps_count hook pair(s) present on both plat
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-section "Check 4/8: Agent model aliases"
+section "Check 4/9: Agent model aliases"
 model_bad=0
 agent_count=0
 for af in "$repo_root"/agents/*.md; do
@@ -163,7 +166,7 @@ if [[ $model_bad -eq 0 ]]; then ok "$agent_count agent(s) use a model alias"; fi
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-section "Check 5/8: Install-target counts"
+section "Check 5/9: Install-target counts"
 install_sh="$repo_root/install/install.sh"
 tmp="${TMPDIR:-/tmp}/sd-validate-$$"
 tmp_nc_src="${TMPDIR:-/tmp}/sd-validate-nc-src-$$"
@@ -336,7 +339,7 @@ trap - EXIT
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-section "Check 6/8: CHANGELOG [Unreleased] gate"
+section "Check 6/9: CHANGELOG [Unreleased] gate"
 changelog="$repo_root/CHANGELOG.md"
 block="$(awk '
     /^##[[:space:]]+\[Unreleased\]/ { f=1; next }
@@ -361,7 +364,7 @@ fi
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-section "Check 7/8: Docs consistency (published numbers vs disk)"
+section "Check 7/9: Docs consistency (published numbers vs disk)"
 manifest="$repo_root/specwright.manifest.json"
 if [[ ! -f "$manifest" ]]; then
     fail "specwright.manifest.json not found at repo root"
@@ -639,7 +642,7 @@ fi
 
 # ---- Check 8: cross-file contract lint -------------------------------------
 
-section "Check 8/8: Cross-file contract lint (commands / agents / skills)"
+section "Check 8/9: Cross-file contract lint (commands / agents / skills)"
 lint_sh="$script_dir/contract-lint.sh"
 if [[ ! -f "$lint_sh" ]]; then
     fail "scripts/contract-lint.sh not found"
@@ -680,6 +683,44 @@ else
         else
             ok "no BLOCK violations ($cl_warns warning(s) above)"
         fi
+    fi
+fi
+
+# ---- Check 9: root-level ad-hoc notes guard --------------------------------
+
+section "Check 9/9: Root-level ad-hoc notes guard"
+if [[ ! -f "$manifest" ]]; then
+    fail "specwright.manifest.json not found at repo root"
+    add_failure "root-guard: manifest missing"
+elif ! command -v jq >/dev/null 2>&1; then
+    fail "jq is required to parse specwright.manifest.json - install jq"
+    add_failure "root-guard: jq not installed"
+else
+    guard_patterns=()
+    while IFS= read -r pat; do
+        [[ -z "$pat" ]] && continue
+        guard_patterns+=("$pat")
+    done < <(jq -r '.adHocNotesGuard.patterns[]' "$manifest" | tr -d '\r')
+
+    shopt -s nocasematch
+    guard_bad=0
+    for f in "$repo_root"/*; do
+        [[ -f "$f" ]] || continue
+        base="$(basename "$f")"
+        for pat in "${guard_patterns[@]}"; do
+            case "$base" in
+                $pat)
+                    fail "$base : matches ad-hoc notes pattern '$pat' - file review findings as a Jira issue instead (see CONTRIBUTING.md), then delete this file"
+                    add_failure "root-guard: $base matches $pat"
+                    guard_bad=$((guard_bad + 1))
+                    break
+                    ;;
+            esac
+        done
+    done
+    shopt -u nocasematch
+    if [[ $guard_bad -eq 0 ]]; then
+        ok "no ad-hoc review-findings files at repo root (${#guard_patterns[@]} pattern(s) checked)"
     fi
 fi
 

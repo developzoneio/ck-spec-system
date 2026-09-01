@@ -154,6 +154,19 @@ a single pwsh script by design: it runs both implementations in one process, so 
 rather than inferred. `-SelfTest` swaps in a linter that reports nothing and asserts the harness
 notices.
 
+### Root-level ad-hoc notes guard (Check 9)
+
+Review findings become Jira issues, not files in the tree. If you find a defect while reviewing a
+PR or doing an audit, file it (or fix it directly) instead of leaving a `REVIEW-TODO.md`-style
+snapshot at the repo root - a hand-maintained defect list that no gate reads is exactly the kind of
+honour-system drift this repo exists to eliminate. Check 9 of `scripts/validate.{ps1,sh}` enforces
+this mechanically: it fails the build when a root-level file matches a declared ad-hoc-notes
+pattern in `specwright.manifest.json`'s `adHocNotesGuard` (`TODO.md`, `FIXME.md`, `NOTES.md`, and
+similarly-named findings snapshots). `ROADMAP.md` is a deliberately maintained project document and
+is excluded on purpose - the distinction is "ad-hoc findings snapshot" vs "maintained project
+document," not file extension. `scripts/selftest-root-guard.{ps1,sh}` proves Check 9 still bites,
+the same posture as `scripts/selftest-docs.{ps1,sh}` for Check 7.
+
 ---
 
 ## Threshold re-calibration
@@ -191,9 +204,9 @@ first**:
 
 4. **Run the validator** before opening the PR: `scripts/validate.ps1` (Windows) or
    `scripts/validate.sh` (Unix) runs every engine-invariant check at once (ASCII, hook-pair parity,
-   model aliases, install-target counts, changelog gate, docs consistency). CI runs the same on
-   Windows + Ubuntu. See also the [Local install test](#local-install-test) for a manual install
-   smoke test, and [The manifest](#the-manifest) for what Check 7 enforces.
+   model aliases, install-target counts, changelog gate, docs consistency, root-level notes guard).
+   CI runs the same on Windows + Ubuntu. See also the [Local install test](#local-install-test) for
+   a manual install smoke test, and [The manifest](#the-manifest) for what Check 7 enforces.
 
 5. **Update the changelog.** Add a line under `## [Unreleased]` in `CHANGELOG.md`.
 

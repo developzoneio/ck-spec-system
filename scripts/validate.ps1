@@ -18,6 +18,9 @@
       8. Cross-file contract lint: the relationships between commands, agents
          and skills, per specwright.manifest.json's contractLint subtree.
          Delegated to scripts/contract-lint.ps1 as a child process.
+      9. Root-level ad-hoc notes guard: no root-level file matches a declared
+         ad-hoc-notes pattern (specwright.manifest.json's adHocNotesGuard),
+         e.g. REVIEW-TODO.md, TODO.md, FIXME.md, NOTES.md, *-FINDINGS.md.
 
     Exit code 0 = all checks passed; 1 = at least one check failed.
 
@@ -148,7 +151,7 @@ Write-Host "  Repo root: $repoRoot"
 
 # ---- Check 1: pure-ASCII scan ----------------------------------------------
 
-Write-Section 'Check 1/8: Pure-ASCII scan (*.ps1)'
+Write-Section 'Check 1/9: Pure-ASCII scan (*.ps1)'
 $ps1Files = Get-ChildItem -Path $repoRoot -Recurse -Filter *.ps1 -File |
     Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 $asciiBad = 0
@@ -165,7 +168,7 @@ if ($asciiBad -eq 0) { Write-Ok "$($ps1Files.Count) .ps1 file(s) are pure ASCII"
 
 # ---- Check 2: bash -n syntax -----------------------------------------------
 
-Write-Section 'Check 2/8: bash -n syntax (*.sh)'
+Write-Section 'Check 2/9: bash -n syntax (*.sh)'
 $shFiles = @()
 foreach ($sub in @('hooks\bash', 'install', 'scripts')) {
     $dir = Join-Path $repoRoot $sub
@@ -193,7 +196,7 @@ if ($null -eq $bashExe) {
 
 # ---- Check 3: hook-pair parity ---------------------------------------------
 
-Write-Section 'Check 3/8: Hook-pair parity'
+Write-Section 'Check 3/9: Hook-pair parity'
 $psHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\powershell') -Filter *.ps1 -File |
     ForEach-Object { $_.BaseName }
 $shHooks = Get-ChildItem (Join-Path $repoRoot 'hooks\bash') -Filter *.sh -File |
@@ -217,7 +220,7 @@ if ($parityBad -eq 0) { Write-Ok "$($psHooks.Count) hook pair(s) present on both
 
 # ---- Check 4: agent model aliases ------------------------------------------
 
-Write-Section 'Check 4/8: Agent model aliases'
+Write-Section 'Check 4/9: Agent model aliases'
 $agentFiles = Get-ChildItem (Join-Path $repoRoot 'agents') -Filter *.md -File
 $modelBad = 0
 foreach ($f in $agentFiles) {
@@ -240,7 +243,7 @@ if ($modelBad -eq 0) { Write-Ok "$($agentFiles.Count) agent(s) use a model alias
 
 # ---- Check 5: install-target counts ----------------------------------------
 
-Write-Section 'Check 5/8: Install-target counts'
+Write-Section 'Check 5/9: Install-target counts'
 $installPs1 = Join-Path $repoRoot 'install\install.ps1'
 $tmp = Join-Path $env:TEMP "sd-validate-$PID"
 $tmpNc = Join-Path $env:TEMP "sd-validate-nc-$PID"
@@ -401,7 +404,7 @@ try {
 
 # ---- Check 6: CHANGELOG [Unreleased] non-empty -----------------------------
 
-Write-Section 'Check 6/8: CHANGELOG [Unreleased] gate'
+Write-Section 'Check 6/9: CHANGELOG [Unreleased] gate'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 $lines = Get-Content -LiteralPath $changelog
 $start = -1
@@ -434,7 +437,7 @@ if ($start -lt 0) {
 
 # ---- Check 7: docs consistency ---------------------------------------------
 
-Write-Section 'Check 7/8: Docs consistency (published numbers vs disk)'
+Write-Section 'Check 7/9: Docs consistency (published numbers vs disk)'
 $manifestPath = Join-Path $repoRoot 'specwright.manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     Write-FailMsg 'specwright.manifest.json not found at repo root'
@@ -650,7 +653,7 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 
 # ---- Check 8: cross-file contract lint --------------------------------------
 
-Write-Section 'Check 8/8: Cross-file contract lint (commands / agents / skills)'
+Write-Section 'Check 8/9: Cross-file contract lint (commands / agents / skills)'
 $lintPs1 = Join-Path $scriptDir 'contract-lint.ps1'
 if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
     Write-FailMsg 'scripts/contract-lint.ps1 not found'
@@ -695,6 +698,31 @@ if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
         } else {
             Write-Ok "no BLOCK violations ($clWarns warning(s) above)"
         }
+    }
+}
+
+# ---- Check 9: root-level ad-hoc notes guard ---------------------------------
+
+Write-Section 'Check 9/9: Root-level ad-hoc notes guard'
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+    Write-FailMsg 'specwright.manifest.json not found at repo root'
+    Add-Failure 'root-guard: manifest missing'
+} else {
+    $guardManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $guardPatterns = @($guardManifest.adHocNotesGuard.patterns)
+    $guardBad = 0
+    foreach ($item in (Get-ChildItem -LiteralPath $repoRoot -File)) {
+        foreach ($pat in $guardPatterns) {
+            if ($item.Name -like $pat) {
+                Write-FailMsg "$($item.Name) : matches ad-hoc notes pattern '$pat' - file review findings as a Jira issue instead (see CONTRIBUTING.md), then delete this file"
+                Add-Failure "root-guard: $($item.Name) matches $pat"
+                $guardBad++
+                break
+            }
+        }
+    }
+    if ($guardBad -eq 0) {
+        Write-Ok "no ad-hoc review-findings files at repo root ($($guardPatterns.Count) pattern(s) checked)"
     }
 }
 

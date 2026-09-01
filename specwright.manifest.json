@@ -1,7 +1,8 @@
 {
   "$comment": [
     "Canonical inventory contract for specwright. Read by scripts/validate.ps1 and",
-    "scripts/validate.sh (Check 7: docs consistency).",
+    "scripts/validate.sh (Check 7: docs consistency; Check 9 also reads adHocNotesGuard",
+    "below).",
     "",
     "This file stores NO counts. Counts are derived from the globs below at runtime, so",
     "adding a command/agent/skill means adding the file and nothing else. A manifest that",
@@ -508,5 +509,20 @@
       "reason CLAUDE.md rejects it elsewhere: it is not a measure both implementations can",
       "agree on without arguing about line endings."
     ]
-  }
+  },
+
+  "adHocNotesGuard": {
+    "patterns": ["REVIEW-TODO.md", "TODO.md", "FIXME.md", "NOTES.md", "*-FINDINGS.md"]
+  },
+
+  "$adHocNotesGuardComment": [
+    "Check 9's vocabulary (root-level ad-hoc review-findings guard, SW-47). Matched against",
+    "ROOT-LEVEL FILES ONLY (non-recursive), case-insensitively (NTFS/APFS are case-insensitive,",
+    "so a case-sensitive guard would let 'todo.md' through on most contributors' machines).",
+    "One flat list, not split into literal-names vs glob-patterns - both bash 'case' and",
+    "PowerShell '-like' already treat a wildcard-free string as an exact match, and this",
+    "ticket asks to keep the list explicit and short rather than clever.",
+    "ROADMAP.md matches none of these on purpose - it is a maintained project document, not",
+    "an ad-hoc findings snapshot; see CONTRIBUTING.md."
+  ]
 }
