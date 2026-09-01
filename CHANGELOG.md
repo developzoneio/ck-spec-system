@@ -513,6 +513,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whitespace-only, and missing-value, asserting exit code and zero files written. Relative
   `BASE_PATH` normalization and the `--base-path --force`-value-looks-like-a-flag case are
   deliberately out of scope, deferred to a follow-up ticket.
+- **`install.sh`'s partial-install guard never fired** (SW-46) - `on_error()` was registered via
+  `trap on_error ERR`, but the script ran under `set -euo pipefail` (no `-E`/errtrace), and bash
+  does not propagate an ERR trap into shell functions without `-E`. Every copy happens inside
+  `copy_one()`, so a failure there produced a bare non-zero exit with no partial-install warning
+  and no cleanup instructions - exactly the half-populated `~/.claude/` the guard existed to
+  prevent. `install.sh` now runs under `set -Eeuo pipefail`; the existing `$STAMP_TMP` `EXIT`
+  trap (`install.sh:339`) is untouched and continues to fire independently. `install.ps1` had no
+  equivalent guard at all - it gains one now: the copy phase (main loop plus the version-stamp
+  write) is wrapped in `try`/`catch`, and an unexpected mid-copy failure prints the same
+  three-line remedy as bash's `on_error()` (installed-file count, base path + prefix, and the
+  exact `uninstall.ps1` command to run), gated on `-not $DryRun -and $installed -gt 0` to match.
+  CI gains a negative case on both platforms: a plain file pre-created at `<base>/agents/sd`
+  blocks that plan area's directory creation (`commands/`, plan position 1, has already installed
+  successfully by then), asserting the guard message fires with the exact remedy on the sabotaged
+  run. `uninstall.sh`/`uninstall.ps1` have no partial-state guard either - out of scope here.
 
 ## [1.5.0] - 2026-07-23
 

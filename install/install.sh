@@ -13,7 +13,7 @@
 #   - Interactive prompt on differing files (y / N / a=all). Suppressed by --force.
 #   - chmod +x for bash hooks after install.
 
-set -euo pipefail
+set -Eeuo pipefail
 
 # ---- defaults --------------------------------------------------------------
 

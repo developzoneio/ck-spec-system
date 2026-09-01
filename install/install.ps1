@@ -88,6 +88,25 @@ function Get-EngineVersion {
     return $null
 }
 
+# ---- partial-install guard --------------------------------------------------
+# No transactional rollback (per-file backups already protect overwritten
+# files) - on an unexpected failure mid-copy, tell the user what already
+# landed and how to clean up rather than leaving a silent partial install.
+# Mirrors install.sh's on_error() (same three-line remedy, same gate on
+# DryRun/installed-count) so a user following either message ends in the
+# same state (SW-46).
+
+function Write-PartialInstallGuard {
+    param([int]$Installed)
+    if (-not $DryRun -and $Installed -gt 0) {
+        Write-Host ''
+        Write-Fail "Install aborted (exit 1) after installing $Installed file(s)."
+        Write-Warn "Partial install at '$BasePath' (prefix '$Prefix'). Run:"
+        Write-Warn "  .\install\uninstall.ps1 -BasePath `"$BasePath`" -Prefix `"$Prefix`" -Force"
+        Write-Warn 'then retry the install.'
+    }
+}
+
 # ---- prefix safety guard ---------------------------------------------------
 # Mirrors uninstall.ps1's guard exactly - install and uninstall must accept the
 # same set of prefixes, or a prefix legal for one and rejected by the other
@@ -248,54 +267,62 @@ function Copy-OneFile {
 
 Write-Section 'Copying files'
 
-foreach ($p in $plan) {
-    $sourceRoot = Join-Path $repoRoot $p.Source
-    $targetRoot = Join-Path $BasePath $p.Target
-
-    if ($p.Recursive) {
-        $files = Get-ChildItem -LiteralPath $sourceRoot -File -Recurse
-    } else {
-        $files = Get-ChildItem -LiteralPath $sourceRoot -File
-    }
-
-    foreach ($f in $files) {
-        $rel = $f.FullName.Substring($sourceRoot.Length).TrimStart('\','/')
-        $target = Join-Path $targetRoot $rel
-
-        $result = Copy-OneFile -SourceFile $f.FullName -TargetFile $target
-        switch ($result) {
-            'installed' { $installed++ }
-            'same'      { $skippedSame++ }
-            'decline'   { $skippedDecline++ }
-            'plan'      { $installed++ }   # dry-run counts as planned
-        }
-    }
-}
-
-# ---- write version stamp ----------------------------------------------------
-# Route the resolved version through the existing Copy-OneFile so hash-skip,
-# backup, decline and dry-run logic apply identically to every other file.
-# Copy-OneFile returns a status string; increment counters the same way the
-# main copy loop above does.
-
-$stampTempPath = [System.IO.Path]::GetTempFileName()
+# The whole copy phase (main loop + version-stamp write) is wrapped so an
+# unexpected mid-copy failure reports the partial-install remedy instead of
+# aborting silently (SW-46).
 try {
-    $stampBytes = [System.Text.Encoding]::ASCII.GetBytes("$engineVersion`n")
-    [System.IO.File]::WriteAllBytes($stampTempPath, $stampBytes)
-
     foreach ($p in $plan) {
+        $sourceRoot = Join-Path $repoRoot $p.Source
         $targetRoot = Join-Path $BasePath $p.Target
-        $stampTarget = Join-Path $targetRoot 'specwright-version.txt'
-        $result = Copy-OneFile -SourceFile $stampTempPath -TargetFile $stampTarget
-        switch ($result) {
-            'installed' { $installed++ }
-            'same'      { $skippedSame++ }
-            'decline'   { $skippedDecline++ }
-            'plan'      { $installed++ }   # dry-run counts as planned
+
+        if ($p.Recursive) {
+            $files = Get-ChildItem -LiteralPath $sourceRoot -File -Recurse
+        } else {
+            $files = Get-ChildItem -LiteralPath $sourceRoot -File
+        }
+
+        foreach ($f in $files) {
+            $rel = $f.FullName.Substring($sourceRoot.Length).TrimStart('\','/')
+            $target = Join-Path $targetRoot $rel
+
+            $result = Copy-OneFile -SourceFile $f.FullName -TargetFile $target
+            switch ($result) {
+                'installed' { $installed++ }
+                'same'      { $skippedSame++ }
+                'decline'   { $skippedDecline++ }
+                'plan'      { $installed++ }   # dry-run counts as planned
+            }
         }
     }
-} finally {
-    Remove-Item -LiteralPath $stampTempPath -Force -ErrorAction SilentlyContinue
+
+    # ---- write version stamp ------------------------------------------------
+    # Route the resolved version through the existing Copy-OneFile so hash-skip,
+    # backup, decline and dry-run logic apply identically to every other file.
+    # Copy-OneFile returns a status string; increment counters the same way the
+    # main copy loop above does.
+
+    $stampTempPath = [System.IO.Path]::GetTempFileName()
+    try {
+        $stampBytes = [System.Text.Encoding]::ASCII.GetBytes("$engineVersion`n")
+        [System.IO.File]::WriteAllBytes($stampTempPath, $stampBytes)
+
+        foreach ($p in $plan) {
+            $targetRoot = Join-Path $BasePath $p.Target
+            $stampTarget = Join-Path $targetRoot 'specwright-version.txt'
+            $result = Copy-OneFile -SourceFile $stampTempPath -TargetFile $stampTarget
+            switch ($result) {
+                'installed' { $installed++ }
+                'same'      { $skippedSame++ }
+                'decline'   { $skippedDecline++ }
+                'plan'      { $installed++ }   # dry-run counts as planned
+            }
+        }
+    } finally {
+        Remove-Item -LiteralPath $stampTempPath -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-PartialInstallGuard -Installed $installed
+    exit 1
 }
 
 # ---- summary ---------------------------------------------------------------
