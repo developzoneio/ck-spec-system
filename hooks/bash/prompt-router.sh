@@ -62,6 +62,38 @@ ticket_pat="$(printf '%s' "${config_json}" | jq -r '.ticket.pattern // "^[A-Z]+-
 spec_path="${cwd}/${spec_dir}"
 index_path="${cwd}/${index_rel}"
 
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates. Must stay in sync with
+# Get-SpecPrefixAlternation in prompt-router.ps1.
+readonly SD_DEFAULT_SPEC_PREFIXES='FEAT|BUG|REF|PERF|RCA|PORT'
+
+resolve_spec_prefixes() {
+    local raw valid=() p
+    raw="$(printf '%s' "${config_json}" | jq -r '.spec.prefixes // {} | to_entries[]?.value // empty' 2>/dev/null)"
+    if [[ -z "${raw}" ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    while IFS= read -r p; do
+        [[ -z "${p}" ]] && continue
+        if [[ "${p}" =~ ^[A-Z][A-Z0-9]{1,9}$ ]]; then
+            valid+=("${p}")
+        fi
+    done <<< "${raw}"
+    if [[ ${#valid[@]} -eq 0 ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    local IFS='|'
+    printf '%s' "${valid[*]}"
+}
+
+spec_prefixes="$(resolve_spec_prefixes)"
+
 # --- keyword match ------------------------------------------------------------
 
 prompt_lower="$(printf '%s' "${prompt}" | tr '[:upper:]' '[:lower:]')"
@@ -153,7 +185,7 @@ if [[ -f "${index_path}" ]]; then
             if [[ "${existing}" == "${id}" ]]; then dup=1; break; fi
         done
         [[ ${dup} -eq 0 ]] && in_progress+=("${id}")
-    done < <(grep 'in-progress' "${index_path}" 2>/dev/null | grep -oE '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' || true)
+    done < <(grep 'in-progress' "${index_path}" 2>/dev/null | grep -oE "(${spec_prefixes})-[A-Za-z0-9_-]+" || true)
 fi
 
 # --- nothing to say? ----------------------------------------------------------

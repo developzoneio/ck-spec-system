@@ -74,6 +74,51 @@ function Get-ProjectConfig {
     }
 }
 
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates - a config with one bad entry among
+# good ones still uses the good ones. Must stay in sync with
+# resolve_spec_prefixes in spec-gate.sh.
+$script:DefaultSpecPrefixes = @('FEAT','BUG','REF','PERF','RCA','PORT')
+
+function Get-SpecPrefixAlternation {
+    param([object]$Config)
+    $raw = $null
+    try { $raw = $Config.spec.prefixes } catch { $raw = $null }
+    if ($null -eq $raw) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    $valid = New-Object System.Collections.Generic.List[string]
+    foreach ($prop in $raw.PSObject.Properties) {
+        $val = [string]$prop.Value
+        if ($val -match '^[A-Z][A-Z0-9]{1,9}$') {
+            $valid.Add($val)
+        }
+    }
+    if ($valid.Count -eq 0) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    return ($valid -join '|')
+}
+
+# Single-prefix lookup (used by Write-ComplexitySplitMetrics, which is
+# deliberately scoped to the 'feature' prefix only - see that function's
+# comment). Falls back to $DefaultValue when the key is absent or the
+# declared value fails the same shape check as Get-SpecPrefixAlternation.
+function Get-SpecPrefixValue {
+    param([object]$Config, [string]$Key, [string]$DefaultValue)
+    try {
+        $val = $Config.spec.prefixes.$Key
+        if ($val -and ([string]$val -match '^[A-Z][A-Z0-9]{1,9}$')) {
+            return [string]$val
+        }
+    } catch { }
+    return $DefaultValue
+}
+
 function Test-IsRootedPath {
     param([string]$Path)
     # Mirrors spec-gate.sh's rootedness test ("${fp}" != /* && "${fp}" != ?:*),
@@ -246,7 +291,7 @@ function Test-IsCodeFile {
 }
 
 function Get-InProgressSpecs {
-    param([string]$IndexPath)
+    param([string]$IndexPath, [string]$Prefixes)
     $result = New-Object System.Collections.Generic.List[string]
     if (-not (Test-Path -LiteralPath $IndexPath)) { return $result }
     try {
@@ -255,7 +300,7 @@ function Get-InProgressSpecs {
         return $result
     }
     foreach ($line in $lines) {
-        if ($line -match 'in-progress' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+        if ($line -match 'in-progress' -and $line -match "($Prefixes)-[A-Za-z0-9_\-]+") {
             $result.Add($Matches[0]) | Out-Null
         }
     }
@@ -317,17 +362,18 @@ function Get-DoneTransitionIds {
 function Get-SpecStatusTransitions {
     param(
         [object]$HookInput,
-        [string]$IndexPath
+        [string]$IndexPath,
+        [string]$Prefixes
     )
-    # Read-only, general-purpose lifecycle scan (all 5 prefixes x all 5
-    # statuses) that backs the observational spec_transition metric. This is
+    # Read-only, general-purpose lifecycle scan (all configured prefixes x all
+    # 5 statuses) that backs the observational spec_transition metric. This is
     # DELIBERATELY a separate function from Get-DoneTransitionIds above - that
     # one is FEAT-/done-only and backs the live Rule 0 gate decision (see its
     # Rule 0 scope comment). Folding the two together would make a future
     # edit to either accidentally change the other's behavior.
     $result = New-Object System.Collections.Generic.List[object]
     try {
-        $rowPattern = '\|\s*((?:FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|'
+        $rowPattern = "\|\s*((?:$Prefixes)-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|"
 
         # Statuses recorded on disk BEFORE this pending edit lands - PreToolUse
         # runs before the write, so the file still reflects the prior state.
@@ -552,11 +598,15 @@ function Write-ComplexitySplitMetrics {
         [object]$Config,
         [object[]]$Transitions,
         [string]$IndexPath,
-        [object]$HookInput
+        [object]$HookInput,
+        [string]$FeaturePrefix = 'FEAT'
     )
     if (-not $Transitions -or $Transitions.Count -eq 0) { return }
     try {
-        $rowPattern = '\|\s*((?:FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|'
+        # Scoped to the single 'feature' prefix (see the function-level
+        # comment above) - not the full multi-prefix alternation, since a
+        # split's children always share the parent's own (feature) prefix.
+        $rowPattern = "\|\s*($FeaturePrefix-[A-Za-z0-9_\-]+)\s*\|\s*[^|]*\|\s*(draft|approved|in-progress|done|archived)\s*\|"
         $allIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
         if (Test-Path -LiteralPath $IndexPath) {
             try {
@@ -585,7 +635,7 @@ function Write-ComplexitySplitMetrics {
 
         foreach ($t in $Transitions) {
             if ($t.Phase -ne 'archived') { continue }
-            if ($t.Id -notlike 'FEAT-*') { continue }
+            if ($t.Id -notlike "$FeaturePrefix-*") { continue }
             $childFound = $false
             foreach ($other in $allIds) {
                 if ($other -eq $t.Id) { continue }
@@ -641,6 +691,8 @@ $cwd = $hookInput.cwd
 if ([string]::IsNullOrWhiteSpace($cwd)) { $cwd = (Get-Location).Path }
 
 $config = Get-ProjectConfig -Cwd $cwd
+$specPrefixes = Get-SpecPrefixAlternation -Config $config
+$featurePrefix = Get-SpecPrefixValue -Config $config -Key 'feature' -DefaultValue 'FEAT'
 
 # Hook globally disabled?
 try {
@@ -705,7 +757,7 @@ try { if ($config.spec.dir) { $specDir = [string]$config.spec.dir } } catch { }
 # is actually reached. Empty (a no-op below) whenever $rel is not the index.
 $transitions = @()
 if ([string]::Equals($rel, $indexRel, [System.StringComparison]::OrdinalIgnoreCase)) {
-    $transitions = Get-SpecStatusTransitions -HookInput $hookInput -IndexPath (Join-Path $cwd $indexRel)
+    $transitions = Get-SpecStatusTransitions -HookInput $hookInput -IndexPath (Join-Path $cwd $indexRel) -Prefixes $specPrefixes
 }
 
 if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -752,7 +804,7 @@ if ($verifyGateOn -and [string]::Equals($rel, $indexRel, [System.StringCompariso
             Write-GateMetric -Cwd $cwd -Config $config -SpecId $id -Phase 'done' -Gate 'verify' -Decision 'allow'
         }
         Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
-        Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath $indexAbs -HookInput $hookInput
+        Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath $indexAbs -HookInput $hookInput -FeaturePrefix $featurePrefix
         exit 0
     }
 }
@@ -772,7 +824,7 @@ if (Test-IsProtected -RelPath $rel -Protected $protected) {
 # Rule 2: allow-listed paths -> always allow
 if (Test-IsAllowListed -RelPath $rel) {
     Write-TransitionMetrics -Cwd $cwd -Config $config -Transitions $transitions -Decision 'allow'
-    Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath (Join-Path $cwd $indexRel) -HookInput $hookInput
+    Write-ComplexitySplitMetrics -Cwd $cwd -Config $config -Transitions $transitions -IndexPath (Join-Path $cwd $indexRel) -HookInput $hookInput -FeaturePrefix $featurePrefix
     exit 0
 }
 
@@ -784,7 +836,7 @@ if (Test-IsCodeFile -RelPath $rel) {
     # found - PowerShell's pipeline otherwise unwraps a single-element
     # List[string] into a bare string, which would make $inProgress[0]
     # below silently index a CHARACTER of the id instead of the id itself.
-    $inProgress = @(Get-InProgressSpecs -IndexPath $indexFile)
+    $inProgress = @(Get-InProgressSpecs -IndexPath $indexFile -Prefixes $specPrefixes)
     if ($inProgress.Count -eq 0) {
         $msg = "spec-gate: editing code file '$rel' but no in-progress spec is recorded in .specs/index.md. Run /sd:feature, /sd:bug, /sd:refactor, or /sd:perf first to create a spec, or set hooks.specGate.mode='off' in .claude/project-config.json to disable."
         if ($mode -eq 'block') {

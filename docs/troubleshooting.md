@@ -226,18 +226,6 @@ The aging report flags specs in `in-progress` > 7 days and `draft` > 14 days (de
 
 ## Porting issues
 
-### spec-gate ignores my `PORT-` spec while it's in-progress
-
-**Cause**: the in-progress-spec scan in `spec-gate`, `prompt-router`, and `subagent-retro` matches
-a hardcoded `(FEAT|BUG|REF|PERF|RCA)` prefix set; it does not read `spec.prefixes` from
-`project-config.json`, so a `PORT-` row is invisible to it. `/sd:port` registers `port` in the
-prompt-router keyword map so a prompt like "backport the order-intake endpoint" still routes to
-the command, but the prefix-blindness itself is unchanged.
-
-**Fix**: set `hooks.specGate.mode: "warn"` for the duration of the port, or track the work under an
-accompanying FEAT spec. The same cause explains why `prompt-router` injects no context for an
-in-progress `PORT-` spec and why `subagent-retro` selects no `port`-scoped lessons.
-
 ### The host build or lint now fails on files under `.specs/<PORT-ID>/04-artifacts/source/`
 
 **Cause**: the frozen snapshot is a real subtree of the repo, so a build or lint step that globs

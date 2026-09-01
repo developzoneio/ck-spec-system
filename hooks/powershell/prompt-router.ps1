@@ -173,7 +173,7 @@ function Find-SpecsByTicket {
 }
 
 function Get-InProgressSpecs {
-    param([string]$IndexPath)
+    param([string]$IndexPath, [string]$Prefixes)
     $result = New-Object System.Collections.Generic.List[string]
     if (-not (Test-Path -LiteralPath $IndexPath)) { return $result }
     try {
@@ -183,11 +183,40 @@ function Get-InProgressSpecs {
     }
     foreach ($line in $lines) {
         # Match a table row containing "in-progress" and an ID like FEAT-..., BUG-..., REF-...
-        if ($line -match 'in-progress' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+        if ($line -match 'in-progress' -and $line -match "($Prefixes)-[A-Za-z0-9_\-]+") {
             $result.Add($Matches[0]) | Out-Null
         }
     }
     return $result
+}
+
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates. Must stay in sync with
+# resolve_spec_prefixes in prompt-router.sh.
+$script:DefaultSpecPrefixes = @('FEAT','BUG','REF','PERF','RCA','PORT')
+
+function Get-SpecPrefixAlternation {
+    param([object]$Config)
+    $raw = $null
+    try { $raw = $Config.spec.prefixes } catch { $raw = $null }
+    if ($null -eq $raw) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    $valid = New-Object System.Collections.Generic.List[string]
+    foreach ($prop in $raw.PSObject.Properties) {
+        $val = [string]$prop.Value
+        if ($val -match '^[A-Z][A-Z0-9]{1,9}$') {
+            $valid.Add($val)
+        }
+    }
+    if ($valid.Count -eq 0) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    return ($valid -join '|')
 }
 
 # ---- main ----
@@ -211,7 +240,8 @@ $kwMap     = $config.workflow.keywords
 $workflowMatches = Get-KeywordMatches -Prompt $prompt -KeywordMap $kwMap -DefaultKeywordMap $script:DefaultKeywords
 $ticketIds       = Get-TicketIds      -Prompt $prompt -Pattern $pattern
 $ticketSpecs     = Find-SpecsByTicket -SpecDir $specDir -TicketIds $ticketIds
-$inProgress      = Get-InProgressSpecs -IndexPath $indexFile
+$specPrefixes    = Get-SpecPrefixAlternation -Config $config
+$inProgress      = Get-InProgressSpecs -IndexPath $indexFile -Prefixes $specPrefixes
 
 if ($workflowMatches.Count -eq 0 -and $ticketIds.Count -eq 0 -and $inProgress.Count -eq 0) {
     exit 0

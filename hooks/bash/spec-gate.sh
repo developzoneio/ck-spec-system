@@ -71,6 +71,39 @@ fi
 index_rel="$(printf '%s' "${config_json}" | jq -r '.spec.indexFile // ".specs/index.md"' 2>/dev/null)"
 index_path="${cwd}/${index_rel}"
 
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates - a config with one bad entry among
+# good ones still uses the good ones. Must stay in sync with
+# Get-SpecPrefixAlternation in spec-gate.ps1.
+readonly SD_DEFAULT_SPEC_PREFIXES='FEAT|BUG|REF|PERF|RCA|PORT'
+
+resolve_spec_prefixes() {
+    local raw valid=() p
+    raw="$(printf '%s' "${config_json}" | jq -r '.spec.prefixes // {} | to_entries[]?.value // empty' 2>/dev/null)"
+    if [[ -z "${raw}" ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    while IFS= read -r p; do
+        [[ -z "${p}" ]] && continue
+        if [[ "${p}" =~ ^[A-Z][A-Z0-9]{1,9}$ ]]; then
+            valid+=("${p}")
+        fi
+    done <<< "${raw}"
+    if [[ ${#valid[@]} -eq 0 ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    local IFS='|'
+    printf '%s' "${valid[*]}"
+}
+
+spec_prefixes="$(resolve_spec_prefixes)"
+
 # --- path helpers -------------------------------------------------------------
 
 # All path comparisons in this hook are case-INSENSITIVE, matching
@@ -327,11 +360,11 @@ emit_transition_metric() {
 # rather than a loose substring match, so a Title that happens to mention
 # another id/status word cannot be misread as that row's own id or status.
 extract_id_status_pairs() {
-    awk -F'|' '
+    awk -F'|' -v prefixes="${spec_prefixes}" '
         NF >= 5 {
             id = $2; gsub(/^[ \t]+|[ \t]+$/, "", id)
             status = $4; gsub(/^[ \t]+|[ \t]+$/, "", status)
-            if (id ~ /^(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+$/ && status ~ /^(draft|approved|in-progress|done|archived)$/) {
+            if (id ~ ("^(" prefixes ")-[A-Za-z0-9_-]+$") && status ~ /^(draft|approved|in-progress|done|archived)$/) {
                 print id "\t" status
             }
         }
@@ -672,7 +705,7 @@ has_in_progress=0
 first_in_progress=""
 if [[ -f "${index_path}" ]]; then
     first_in_progress="$(grep -E 'in-progress' "${index_path}" 2>/dev/null \
-        | awk 'match($0, /(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+/) { print substr($0, RSTART, RLENGTH); exit }')"
+        | awk -v prefixes="${spec_prefixes}" 'match($0, "(" prefixes ")-[A-Za-z0-9_-]+") { print substr($0, RSTART, RLENGTH); exit }')"
     if [[ -n "${first_in_progress}" ]]; then
         has_in_progress=1
     fi

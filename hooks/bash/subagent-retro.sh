@@ -64,6 +64,38 @@ fi
 spec_dir_rel="$(printf '%s' "${config_json}" | jq -r '.spec.dir       // ".specs"'         2>/dev/null)"
 index_rel="$(printf '%s' "${config_json}"    | jq -r '.spec.indexFile // ".specs/index.md"' 2>/dev/null)"
 
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates. Must stay in sync with
+# Get-SpecPrefixAlternation in subagent-retro.ps1.
+readonly SD_DEFAULT_SPEC_PREFIXES='FEAT|BUG|REF|PERF|RCA|PORT'
+
+resolve_spec_prefixes() {
+    local raw valid=() p
+    raw="$(printf '%s' "${config_json}" | jq -r '.spec.prefixes // {} | to_entries[]?.value // empty' 2>/dev/null)"
+    if [[ -z "${raw}" ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    while IFS= read -r p; do
+        [[ -z "${p}" ]] && continue
+        if [[ "${p}" =~ ^[A-Z][A-Z0-9]{1,9}$ ]]; then
+            valid+=("${p}")
+        fi
+    done <<< "${raw}"
+    if [[ ${#valid[@]} -eq 0 ]]; then
+        printf '%s' "${SD_DEFAULT_SPEC_PREFIXES}"
+        return 0
+    fi
+    local IFS='|'
+    printf '%s' "${valid[*]}"
+}
+
+spec_prefixes="$(resolve_spec_prefixes)"
+
 spec_dir="${cwd}/${spec_dir_rel}"
 index_path="${cwd}/${index_rel}"
 
@@ -314,7 +346,7 @@ if [[ -f "${index_path}" ]]; then
     while IFS= read -r line; do
         [[ -z "${line}" ]] && continue
         if [[ "${line}" == *in-progress* ]]; then
-            id="$(printf '%s' "${line}" | grep -oE '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_-]+' | head -n1)"
+            id="$(printf '%s' "${line}" | grep -oE "(${spec_prefixes})-[A-Za-z0-9_-]+" | head -n1)"
             if [[ -n "${id}" ]]; then
                 dup=0
                 for existing in "${specs[@]:-}"; do
@@ -421,6 +453,7 @@ emit_lessons() {
             REF)  wanted="${wanted}refactor " ;;
             PERF) wanted="${wanted}perf " ;;
             RCA)  wanted="${wanted}rca " ;;
+            PORT) wanted="${wanted}port " ;;
         esac
     done
 

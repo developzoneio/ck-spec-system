@@ -351,6 +351,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are now derived from disk like every other published count.
 
 ### Fixed
+- **Hooks hardcoded the spec-prefix alternation, making `PORT-` specs invisible to enforcement**
+  (SW-44). `spec-gate`, `prompt-router`, and `subagent-retro` - both bash and PowerShell - matched
+  in-progress specs against a literal `(FEAT|BUG|REF|PERF|RCA)` alternation instead of reading
+  `spec.prefixes` from `.claude/project-config.json`, even though the template has shipped a
+  `port: "PORT"` entry since `/sd:port` landed in SW-41. A `PORT-` spec was therefore invisible to
+  `spec-gate`'s in-progress check, `prompt-router`'s context injection, and `subagent-retro`'s
+  lesson scoping - the four HARD gates `/sd:port` documents had no hook backing. Both
+  implementations now derive the alternation from `spec.prefixes` at runtime (each config-declared
+  value validated against `^[A-Z][A-Z0-9]{1,9}$`; invalid entries are dropped individually rather
+  than invalidating the whole set), falling back to a built-in six-prefix default
+  (`FEAT|BUG|REF|PERF|RCA|PORT`) when the config is absent, unreadable, or has nothing valid
+  declared - hooks still never fail noisily. Five new fixtures cover a `PORT-` spec detected by
+  `spec-gate`, `port`-scoped lesson selection in `subagent-retro`, a custom seventh prefix, and
+  both branches of the malformed-prefix fallback. Removes the now-stale `docs/troubleshooting.md`
+  entry describing this gap.
 - **`README.md`'s BMAD acknowledgement pointed at `https://github.com/`** - a placeholder URL that
   had shipped since the section was written. Now links to `bmad-code-org/BMAD-METHOD`.
 - **`README.md`'s compatibility matrix claimed "Latest as of Jan 2026"** for the Claude Code CLI row,

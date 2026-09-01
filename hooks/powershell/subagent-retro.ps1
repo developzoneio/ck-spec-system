@@ -270,7 +270,7 @@ function Write-SubagentStopMetric {
 }
 
 function Get-IndexSpecs {
-    param([string]$IndexPath)
+    param([string]$IndexPath, [string]$Prefixes)
     # Returns array of objects: @{Id, Type, Status}
     $result = New-Object System.Collections.Generic.List[object]
     if (-not (Test-Path -LiteralPath $IndexPath)) { return $result }
@@ -280,7 +280,7 @@ function Get-IndexSpecs {
         return $result
     }
     foreach ($line in $lines) {
-        if ($line -match 'in-progress' -and $line -match '(FEAT|BUG|REF|PERF|RCA)-[A-Za-z0-9_\-]+') {
+        if ($line -match 'in-progress' -and $line -match "($Prefixes)-[A-Za-z0-9_\-]+") {
             $id = $Matches[0]
             $type = ($id -split '-')[0]
             $obj = [pscustomobject]@{
@@ -292,6 +292,35 @@ function Get-IndexSpecs {
         }
     }
     return $result
+}
+
+# --- spec prefix alternation (SW-44) ------------------------------------------
+# Built-in fallback covers every prefix shipped in
+# templates/project-config.template.json (FEAT, BUG, REF, PERF, RCA, PORT).
+# Any config-declared prefix that fails the shape check
+# ^[A-Z][A-Z0-9]{1,9}$ is dropped silently and the built-in default is used
+# only if NOTHING declared validates. Must stay in sync with
+# resolve_spec_prefixes in subagent-retro.sh.
+$script:DefaultSpecPrefixes = @('FEAT','BUG','REF','PERF','RCA','PORT')
+
+function Get-SpecPrefixAlternation {
+    param([object]$Config)
+    $raw = $null
+    try { $raw = $Config.spec.prefixes } catch { $raw = $null }
+    if ($null -eq $raw) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    $valid = New-Object System.Collections.Generic.List[string]
+    foreach ($prop in $raw.PSObject.Properties) {
+        $val = [string]$prop.Value
+        if ($val -match '^[A-Z][A-Z0-9]{1,9}$') {
+            $valid.Add($val)
+        }
+    }
+    if ($valid.Count -eq 0) {
+        return ($script:DefaultSpecPrefixes -join '|')
+    }
+    return ($valid -join '|')
 }
 
 function Get-StaleRetros {
@@ -427,6 +456,7 @@ function Select-Lessons {
             'REF'  { [void]$wanted.Add('refactor') }
             'PERF' { [void]$wanted.Add('perf') }
             'RCA'  { [void]$wanted.Add('rca') }
+            'PORT' { [void]$wanted.Add('port') }
         }
     }
 
@@ -523,7 +553,8 @@ Remove-StaleStateFiles -StateDir $stateDir
 
 $state = Read-State -StatePath $statePath
 
-$specs = Get-IndexSpecs -IndexPath $indexFile
+$specPrefixes = Get-SpecPrefixAlternation -Config $config
+$specs = Get-IndexSpecs -IndexPath $indexFile -Prefixes $specPrefixes
 if ($specs.Count -eq 0) { exit 0 }
 
 $stale = Get-StaleRetros -SpecDir $specDir -Specs $specs -StaleMinutes $staleMinutes
