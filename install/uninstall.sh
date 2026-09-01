@@ -73,9 +73,17 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base-path)
-            BASE_PATH="${2:-}"; shift 2 ;;
+            if [[ $# -lt 2 ]]; then
+                fail "Missing value for $1"
+                usage; exit 2
+            fi
+            BASE_PATH="$2"; shift 2 ;;
         --prefix)
-            PREFIX="${2:-}"; shift 2 ;;
+            if [[ $# -lt 2 ]]; then
+                fail "Missing value for $1"
+                usage; exit 2
+            fi
+            PREFIX="$2"; shift 2 ;;
         --dry-run)
             DRY_RUN=1; shift ;;
         --force)
@@ -93,6 +101,20 @@ done
 if [[ -z "${PREFIX// /}" || "$PREFIX" == */* || "$PREFIX" == *\\* || "$PREFIX" == *..* ]]; then
     fail "Invalid prefix '$PREFIX'. Must be a plain folder name (no separators, no '..')."
     exit 1
+fi
+
+# ---- base-path safety guard -------------------------------------------------
+# Mirrors install.sh's guard exactly - install and uninstall must accept the
+# same set of base paths, or a base path legal for one and rejected by the
+# other leaves orphaned or unreachable files.
+#
+# Uses [[:space:]] rather than the PREFIX guard's `// /` (spaces-only) idiom
+# on purpose - PowerShell's IsNullOrWhiteSpace also catches tabs/CR/LF, and a
+# narrower check here would accept inputs bash and PowerShell disagree on.
+
+if [[ -z "${BASE_PATH//[[:space:]]/}" ]]; then
+    fail "Invalid base path '$BASE_PATH'. Must not be empty or whitespace-only."
+    exit 2
 fi
 
 section "specwright uninstaller"

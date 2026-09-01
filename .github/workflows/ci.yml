@@ -174,3 +174,121 @@ jobs:
           if ($remaining) { Write-Error "FAIL: files survived uninstall:`n$($remaining.FullName -join "`n")"; exit 1 }
           Remove-Item -Recurse -Force $base
           Write-Host 'round-trip OK'
+
+      # --- BASE_PATH/--prefix validation negative cases (SW-45) --------------
+      - name: Install/uninstall argument validation negative cases (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -uo pipefail
+          repo_root="$(pwd)"
+          scratch="$(mktemp -d)"
+
+          # Empty BASE_PATH resolves to an absolute root path ("" + "/commands/sd"),
+          # so the load-bearing assertion is "no top-level area dir appeared at /",
+          # not "the scratch cwd stayed empty" - cwd is irrelevant for this case.
+          assert_no_root_writes() {
+            local desc="$1"; shift
+            local out rc
+            out="$(cd "$scratch" && "$@" 2>&1)"; rc=$?
+            if [ "$rc" -ne 2 ]; then
+              echo "FAIL: $desc exited $rc, expected 2"; echo "$out"; exit 1
+            fi
+            for area in commands agents hooks templates skills; do
+              if [ -e "/$area" ]; then
+                echo "FAIL: $desc created /$area"; exit 1
+              fi
+            done
+            echo "OK (2, no root writes): $desc"
+          }
+
+          # Whitespace-only / missing-value cases never reach path-building logic
+          # (the new guards fire first), so the scratch cwd must stay empty.
+          assert_scratch_empty() {
+            local desc="$1"; shift
+            local out rc n
+            out="$(cd "$scratch" && "$@" 2>&1)"; rc=$?
+            if [ "$rc" -ne 2 ]; then
+              echo "FAIL: $desc exited $rc, expected 2"; echo "$out"; exit 1
+            fi
+            n="$(find "$scratch" -mindepth 1 | wc -l | tr -d ' ')"
+            if [ "$n" -ne 0 ]; then
+              echo "FAIL: $desc left $n item(s) in scratch cwd"; find "$scratch"; exit 1
+            fi
+            echo "OK (2, scratch empty): $desc"
+          }
+
+          for script in install/install.sh install/uninstall.sh; do
+            assert_no_root_writes "$script --base-path ''" \
+              "$repo_root/$script" --base-path "" --force
+            assert_scratch_empty "$script --base-path '   '" \
+              "$repo_root/$script" --base-path "   " --force
+            assert_scratch_empty "$script --base-path (no value)" \
+              "$repo_root/$script" --base-path
+            assert_scratch_empty "$script --prefix (no value)" \
+              "$repo_root/$script" --prefix
+          done
+
+          rm -rf "$scratch"
+          echo "negative-case validation OK"
+
+      - name: Install/uninstall argument validation negative cases (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $repoRoot = $PWD.Path
+          $scratch = Join-Path $env:RUNNER_TEMP 'sd-basepath-negative'
+          if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
+          New-Item -ItemType Directory -Path $scratch -Force | Out-Null
+
+          function Test-Rejected {
+              param(
+                  [string]$Desc,
+                  [string]$ScriptRelPath,
+                  [string[]]$InstallArgs,
+                  [int]$ExpectedExitCode = -1   # -1 = "any non-zero" (documented ps1 binder deviation)
+              )
+              Push-Location $scratch
+              try {
+                  & pwsh -NoProfile -File (Join-Path $repoRoot $ScriptRelPath) @InstallArgs *>&1 | Out-Null
+                  $rc = $LASTEXITCODE
+              } finally {
+                  Pop-Location
+              }
+              if ($ExpectedExitCode -ge 0) {
+                  if ($rc -ne $ExpectedExitCode) {
+                      Write-Error "FAIL: $Desc exited $rc, expected $ExpectedExitCode"
+                      exit 1
+                  }
+              } elseif ($rc -eq 0) {
+                  Write-Error "FAIL: $Desc exited 0, expected non-zero"
+                  exit 1
+              }
+              $leftover = Get-ChildItem -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+              if ($leftover) {
+                  Write-Error "FAIL: $Desc left $($leftover.Count) item(s) in scratch"
+                  exit 1
+              }
+              Write-Host "OK ($rc): $Desc"
+          }
+
+          foreach ($scriptRel in 'install\install.ps1', 'install\uninstall.ps1') {
+              Test-Rejected -Desc "$scriptRel -BasePath ''" -ScriptRelPath $scriptRel `
+                  -InstallArgs @('-BasePath', '', '-Force') -ExpectedExitCode 2
+              Test-Rejected -Desc "$scriptRel -BasePath '   '" -ScriptRelPath $scriptRel `
+                  -InstallArgs @('-BasePath', '   ', '-Force') -ExpectedExitCode 2
+              # Documented deviation: PowerShell's own parameter binder rejects this
+              # before the script body runs (exit 1, its own message) - see SW-45.
+              # Non-zero + zero writes is asserted, not the literal exit code.
+              Test-Rejected -Desc "$scriptRel -BasePath (no value)" -ScriptRelPath $scriptRel `
+                  -InstallArgs @('-BasePath')
+          }
+
+          Remove-Item -Recurse -Force $scratch
+          Write-Host 'negative-case validation OK'
+
+          # GitHub Actions appends an implicit `exit $LASTEXITCODE` to every pwsh
+          # step; the last child pwsh invocation above correctly returned non-zero,
+          # so without this reset the step would fail on its own passing assertions
+          # (same trap documented at the lesson-validator step above).
+          exit 0

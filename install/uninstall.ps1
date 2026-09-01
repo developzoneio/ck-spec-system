@@ -76,6 +76,16 @@ if ([string]::IsNullOrWhiteSpace($Prefix) -or
     exit 1
 }
 
+# ---- base-path safety guard -------------------------------------------------
+# Mirrors install.ps1's guard exactly - install and uninstall must accept the
+# same set of base paths, or a base path legal for one and rejected by the
+# other leaves orphaned or unreachable files.
+
+if ([string]::IsNullOrWhiteSpace($BasePath)) {
+    Write-Fail "Invalid base path '$BasePath'. Must not be empty or whitespace-only."
+    exit 2
+}
+
 Write-Section 'specwright uninstaller'
 Write-Info  "Script:    $PSCommandPath"
 Write-Info  "Base path: $BasePath"

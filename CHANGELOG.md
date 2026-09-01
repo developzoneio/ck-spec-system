@@ -497,6 +497,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   established for corruption targets. The ticket's secondary finding (a hand-maintained
   `PROJECT-SNAPSHOT.md` needing generation or trimming) does not apply - that file does not exist
   in this repo and never has.
+- **`install.sh`/`install.ps1` did not validate `BASE_PATH`** (SW-45) - an empty or
+  whitespace-only `--base-path`/`-BasePath` silently resolved path building against filesystem
+  root (bash) or the caller's CWD (PowerShell, confirmed empirically), writable on a permissive
+  environment (container, CI as root, WSL). A new guard in all four install/uninstall scripts
+  rejects empty/whitespace `BASE_PATH` with a clear error and exit 2 (bash uses `[[:space:]]`,
+  not the PREFIX guard's spaces-only idiom, so the check agrees with PowerShell's
+  `IsNullOrWhiteSpace` on tabs/CR/LF). Separately, `--base-path`/`--prefix` given with no
+  following value used to abort inside `shift 2` under `set -euo pipefail` with zero diagnostic
+  output; both bash scripts now check argument count before consuming it and print usage + exit
+  2. PowerShell's native parameter binder already rejects a missing `-BasePath` value before the
+  script body runs (exit 1, its own message, zero files written) - documented as an accepted
+  deviation from bash's exit 2 rather than replacing the idiomatic `param()` block. CI gains
+  negative-case coverage on both platforms for both install/uninstall pairs: empty,
+  whitespace-only, and missing-value, asserting exit code and zero files written. Relative
+  `BASE_PATH` normalization and the `--base-path --force`-value-looks-like-a-flag case are
+  deliberately out of scope, deferred to a follow-up ticket.
 
 ## [1.5.0] - 2026-07-23
 
