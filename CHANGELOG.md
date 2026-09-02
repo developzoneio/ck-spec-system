@@ -311,6 +311,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snapshot. `scripts/selftest-root-guard.{sh,ps1}` proves the check bites, same posture as
   `selftest-docs.{sh,ps1}`. `CONTRIBUTING.md` now states explicitly that review findings become
   Jira issues, not files in the tree.
+- **`CL204` (BLOCK): an unused declared tool on a write-capable agent** (SW-48) - `CL203` narrows to
+  agents with no write tool of their own (stays WARN); `CL204` is its new BLOCK sibling for agents
+  whose own `tools:` line carries `Write`/`Edit`/`MultiEdit`, checked off disk the same way `CL200`
+  decides write-capability - never `contractLint.readOnlyAgents`, a declared promise about a fixed
+  three agents, not a live predicate. A new rule id, not a conditional severity inside `CL203`:
+  severity is looked up from the manifest per rule id and never computed by a rule, the invariant
+  that keeps the bash/PowerShell twins from diverging on BLOCK vs WARN.
+  - **All 12 standing warnings from v1.6.0 resolved, each decided individually, not blanket-suppressed.**
+    `sd-spec-architect`'s unused `Edit`/`Write` (the two `CL203` findings on the one agent that holds
+    write power - the original motivation for this ticket) now have explicit body mentions, since
+    the agent genuinely writes and edits spec files. `sd-docs-writer`'s `Glob`/`Grep` and
+    `sd-debugger`'s and `sd-implementer`'s `Glob` were genuinely unused and dropped (minimal tool
+    allowlists, CLAUDE.md rule 5). `sd-code-explorer`'s five `TASK = callers/definition/trace/
+    pattern/structure` headings are sub-routines reached only through `TASK = standalone`'s internal
+    `DETECTED_INTENT` routing, never invoked directly by a command - each now carries a
+    `contract-lint: allow CL101` suppression naming that reason. `sd-reviewer`'s `per-task` task
+    type was dead: `/sd:feature` and `/sd:refactor` deliberately review the whole changeset via
+    `holistic` instead of once per task (a documented cost decision), so nothing ever set
+    `TASK_TYPE = per-task`. Its checklist wasn't dead, though - `holistic` builds on it - so it moved
+    into a non-invocable "Baseline checklist" section rather than being deleted outright.
+  - **AC-2's `(file, rule, token)`-keyed exception list was not built.** After the above, no `CL203`/
+    `CL204` finding needed one: the only same-line collision case (`spec-architect.md`'s Edit and
+    Write sharing one `tools:` line) is exactly the one AC-3 already forced a real fix for. The five
+    `CL101` items that did need an exception are each on their own line, so the existing
+    `<!-- contract-lint: allow -->` suppression convention already gives per-item granularity - and
+    `docs/contract-lint.md` had already recorded once (for `CL306`) that a second declared-exception
+    surface duplicating that convention was rejected. Building an unused mechanism was skipped.
+  - **`contractLint.warnBudget` (0): a standing-warning ratchet in `scripts/validate.{sh,ps1}` Check
+    8.** Counts every WARN finding except `CL500` and `CL202`, which stay WARN permanently by design
+    (a byte-budget ratchet and a hand-maintained tool allowlist, respectively) and would otherwise
+    fail the build through rules explicitly meant not to. Exceeding the budget fails validate;
+    lowering the actual count requires lowering the budget in the same commit - the point is that a
+    13th warning next release is exactly as visible as the first one was.
+  - Fixture coverage: `tests/contract-lint/fixtures/cl204-write-capable-agent-block/` (new, must
+    FIRE), the existing `cl203-declared-tool-never-mentioned` case re-verified as still WARN (its
+    agent stays non-write-capable), and `CL204` added to every fixture manifest's `rules[]` registry
+    (root, `_base`, and the nine case-local overlay manifests) to keep `run-selftest.ps1`'s registry
+    parity guard - and its own internal one inside each linter - green.
 
 ### Changed
 - **`README.md` cut from 390 to 282 lines (-28%) with no claim dropped.** The restructure below

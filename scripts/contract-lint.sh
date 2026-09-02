@@ -270,6 +270,7 @@ CL200
 CL201
 CL202
 CL203
+CL204
 CL300
 CL301
 CL302
@@ -653,6 +654,17 @@ collect_agent_tools() {
 }
 
 collect_agent_tools
+
+# WRITE_CAPABLE_AGENTS - derived from disk (AGENT_TOOL_REFS), not declared.
+# Mirrors how CL200 itself decides write-capability: an agent whose own
+# tools: line carries Write/Edit/MultiEdit right now, regardless of whether
+# anyone remembers to list it anywhere. Used by CL203/CL204 to pick severity.
+WRITE_CAPABLE_AGENTS=""
+while IFS=$'\x1f' read -r _wca _wct _wcf _wcl; do
+    [[ -z "$_wca" ]] && continue
+    is_write_tool "$_wct" || continue
+    set_add WRITE_CAPABLE_AGENTS "$_wca"
+done <<< "$AGENT_TOOL_REFS"
 
 body_start_of() { # agent_name -> stdout 1-based first body line
     local _n="$1" _an _al
@@ -1134,10 +1146,16 @@ rule_CL202() {
     done <<< "$REFS"
 }
 
-# CL203 - a tool this agent's own frontmatter declares, that its own body
-# (everything after the closing ---) never mentions by name.
-rule_CL203() {
-    local _a _tool _f _l _start _i _used
+# CL203/CL204 - a tool this agent's own frontmatter declares, that its own
+# body (everything after the closing ---) never mentions by name. WARN
+# (CL203) when the agent has no write tool of its own; BLOCK (CL204) when
+# the agent is write-capable - an unexplained unused Write/Edit/MultiEdit
+# sibling on the one class of agent that holds write power is the
+# highest-value thing this check can find. Severity is still looked up from
+# the manifest at emit time per rule id (never computed) - CL204 is a
+# distinct rule id precisely so that invariant holds.
+rule_CL203_CL204() {
+    local _a _tool _f _l _start _i _used _rid
     while IFS=$'\x1f' read -r _a _tool _f _l; do
         [[ -z "$_a" ]] && continue
         load_file "$_f"
@@ -1149,7 +1167,9 @@ rule_CL203() {
             esac
         done
         if [[ $_used -eq 0 ]]; then
-            add_finding CL203 "$_f" "$_l" "agent '$_a' declares tool '$_tool' but its body never mentions it"
+            _rid="CL203"
+            set_has WRITE_CAPABLE_AGENTS "$_a" && _rid="CL204"
+            add_finding "$_rid" "$_f" "$_l" "agent '$_a' declares tool '$_tool' but its body never mentions it"
         fi
     done <<< "$AGENT_TOOL_REFS"
 }
@@ -1442,7 +1462,7 @@ rule_CL101
 rule_CL200
 rule_CL201
 rule_CL202
-rule_CL203
+rule_CL203_CL204
 rule_CL300_CL301_CL305_CL306
 rule_CL302_CL303_CL304
 rule_CL400_CL401_CL402

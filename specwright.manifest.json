@@ -355,7 +355,8 @@
       { "id": "CL200", "severity": "BLOCK", "wave": 3, "summary": "agent with no write tool is instructed to write, append or create" },
       { "id": "CL201", "severity": "BLOCK", "wave": 3, "summary": "agent listed in contractLint.readOnlyAgents declares a write tool" },
       { "id": "CL202", "severity": "WARN",  "wave": 3, "summary": "mcp__* name absent from contractLint.knownMcpTools" },
-      { "id": "CL203", "severity": "WARN",  "wave": 3, "summary": "agent frontmatter declares a tool never mentioned in its own body" },
+      { "id": "CL203", "severity": "WARN",  "wave": 3, "summary": "agent frontmatter declares a tool never mentioned in its own body, on an agent with no write tool of its own" },
+      { "id": "CL204", "severity": "BLOCK", "wave": 3, "summary": "agent frontmatter declares a tool never mentioned in its own body, on a write-capable agent (Write/Edit/MultiEdit present) - CL203's BLOCK sibling" },
 
       { "id": "CL300", "severity": "BLOCK", "wave": 1, "summary": "gate block containing no literal STOP" },
       { "id": "CL301", "severity": "BLOCK", "wave": 1, "summary": "gate block offering no option set" },
@@ -508,6 +509,21 @@
       "byte, ~2% difference for identical content. Line count was rejected for the same",
       "reason CLAUDE.md rejects it elsewhere: it is not a measure both implementations can",
       "agree on without arguing about line endings."
+    ],
+
+    "warnBudget": 0,
+
+    "$warnBudgetComment": [
+      "scripts/validate.{sh,ps1} Check 8's ceiling: the max standing WARN count across every",
+      "rule EXCEPT CL500 and CL202, which stay WARN permanently by design (see their comments",
+      "above) and never count against this budget - otherwise a legitimate CL500 byte-budget",
+      "bump would fail the build through a rule explicitly meant not to.",
+      "",
+      "A RATCHET, not a ceiling to raise on demand: 0 because SW-48 drove every standing",
+      "warning at the time to zero (fixed, removed, or suppressed with a one-line reason - see",
+      "CHANGELOG). Lowering the actual count below this number requires lowering this number",
+      "in the SAME commit. Raising it to make a new warning pass quietly defeats the entire",
+      "point - a 13th warning next release must be as visible as the first."
     ]
   },
 

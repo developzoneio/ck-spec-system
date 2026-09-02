@@ -61,6 +61,7 @@ wording can improve in one commit while a divergence still fails.
 | `cl201-readonly-agent-declares-write-tool` | CL201 |
 | `cl202-unknown-mcp-tool-name` | CL202 |
 | `cl203-declared-tool-never-mentioned` | CL203 |
+| `cl204-write-capable-agent-block` | CL204 |
 | `cl300-gate-without-stop` | CL300 |
 | `cl301-gate-without-options` | CL301 |
 | `cl302-gate-count-disagrees` | CL302 |

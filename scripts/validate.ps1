@@ -673,6 +673,7 @@ if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
     # both twins stay identical and neither learns about colours or [OK] tags.
     $clBlocks = 0
     $clWarns = 0
+    $clWarnsBudgeted = 0
     foreach ($row in @($lintOut)) {
         if ([string]::IsNullOrWhiteSpace($row)) { continue }
         $parts = $row.Split([char]9)
@@ -685,6 +686,11 @@ if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
         } else {
             Write-WarnMsg $text
             $clWarns++
+            # CL500/CL202 are permanent-WARN ratchets by design (byte
+            # budgets, unrecognized MCP tool names) - never counted against
+            # the standing-warning budget below, or a legitimate CL500 bump
+            # would fail the build through a rule explicitly meant not to.
+            if ($parts[0] -cne 'CL500' -and $parts[0] -cne 'CL202') { $clWarnsBudgeted++ }
         }
     }
     if ($lintExit -ge 2) {
@@ -692,11 +698,27 @@ if (-not (Test-Path -LiteralPath $lintPs1 -PathType Leaf)) {
         # is the failure mode this whole check exists to prevent.
         Write-FailMsg "contract-lint could not run (exit $lintExit)"
         Add-Failure "contract-lint: exit $lintExit"
-    } elseif ($clBlocks -eq 0) {
-        if ($clWarns -eq 0) {
-            Write-Ok 'no contract violations'
-        } else {
-            Write-Ok "no BLOCK violations ($clWarns warning(s) above)"
+    } else {
+        # Ratchet, not a ceiling: contractLint.warnBudget is the max standing
+        # WARN count (excluding CL500/CL202). Lowering it below actual requires
+        # lowering it in the SAME commit that resolves the warnings - never
+        # raise it to make a new warning pass quietly.
+        $warnBudget = 0
+        try {
+            $budgetManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            if ($null -ne $budgetManifest.contractLint.warnBudget) {
+                $warnBudget = [int]$budgetManifest.contractLint.warnBudget
+            }
+        } catch {}
+        if ($clBlocks -eq 0 -and $clWarnsBudgeted -le $warnBudget) {
+            if ($clWarns -eq 0) {
+                Write-Ok 'no contract violations'
+            } else {
+                Write-Ok "no BLOCK violations ($clWarns warning(s) above, $clWarnsBudgeted/$warnBudget standing-warning budget)"
+            }
+        } elseif ($clBlocks -eq 0) {
+            Write-FailMsg "standing-warning budget exceeded: $clWarnsBudgeted budgeted warning(s) > contractLint.warnBudget ($warnBudget)"
+            Add-Failure "contract-lint: warn budget $clWarnsBudgeted > $warnBudget"
         }
     }
 }

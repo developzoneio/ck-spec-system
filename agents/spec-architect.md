@@ -48,7 +48,7 @@ command sets `INCIDENT_DETAILS` for the `rca` template today - `/sd:rca` fills T
 token. `SOURCE_REPO` / `SOURCE_COMMIT` / `DONOR_SCOPE` supply donor provenance for the `port`
 template; `/sd:port` Phase 1 sets them from the bridged contract or the in-repo extraction.
 
-Output: `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
+Output: Write `.specs/<SPEC_ID>/00-spec.md` matching the template structure exactly.
 
 Per-template authoring rules (what to fill, what to leave TBD, required frontmatter fields) are in the **sd-spec-templates** skill. Read the section matching the spec type being authored.
 
@@ -71,7 +71,7 @@ Inputs (optional): MODE, REPLAN_SCOPE, REVISION
 
 Inputs: `SPEC` (path to `00-spec.md`), `IMPACT` (path to `03-decisions.md` from code-explorer), optionally `MODE` (`feature` | `refactor`). A scoped re-plan invocation (see below) passes `REPLAN_SCOPE` and `REVISION` instead of `SPEC`/`IMPACT`.
 
-Outputs:
+Outputs (Write both):
 - `.specs/<SPEC_ID>/01-plan.md` - phased plan: Foundation -> Behavior -> Wiring -> Polish (feature), or Sequencing -> Batching (refactor).
 - `.specs/<SPEC_ID>/02-tasks.md` - atomic task list.
 
@@ -170,7 +170,7 @@ Inputs: `SPEC` (path), `FEEDBACK` (user's feedback verbatim).
 
 Behavior:
 1. Read the current `00-spec.md`.
-2. Apply only what `FEEDBACK` requests.
+2. Edit `00-spec.md` to apply only what `FEEDBACK` requests.
 3. **Preserve immutable frontmatter fields**: `id`, `type`, `created`. Update `status` only if the workflow phase demands it (otherwise the workflow command updates status).
 4. Preserve any sections explicitly marked `TBD - Phase N fills` - feedback does not override the workflow's sequencing discipline.
 5. If feedback asks for something forbidden by these rules, explain why in plain prose and offer the closest legal alternative.

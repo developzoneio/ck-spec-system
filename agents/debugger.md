@@ -3,7 +3,7 @@ name: sd-debugger
 color: orange
 description: Hypothesis-tree investigation. Enumerates ranked hypotheses, verifies them with evidence, and identifies performance hotspots. Distinguishes proximate cause from root cause. Use this agent for bug investigation, RCA hypothesis work, and perf hotspot analysis.
 model: sonnet
-tools: Read, Grep, Glob, Bash, mcp__sequential-thinking__sequentialthinking, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__tavily__tavily_search, mcp__context7__query-docs
+tools: Read, Grep, Bash, mcp__sequential-thinking__sequentialthinking, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__tavily__tavily_search, mcp__context7__query-docs
 skills:
   - sd-hypothesis-tree
   - sd-evidence-citation

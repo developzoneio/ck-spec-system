@@ -658,6 +658,7 @@ else
 
     cl_blocks=0
     cl_warns=0
+    cl_warns_budgeted=0
     if [[ -n "$lint_out" ]]; then
         while IFS=$'\t' read -r cl_rule cl_sev cl_file cl_line cl_msg; do
             [[ -z "$cl_rule" ]] && continue
@@ -668,6 +669,15 @@ else
             else
                 warn "$cl_file:$cl_line $cl_rule - $cl_msg"
                 cl_warns=$((cl_warns + 1))
+                # CL500/CL202 are permanent-WARN ratchets by design (byte
+                # budgets, unrecognized MCP tool names) - never counted
+                # against the standing-warning budget below, or a legitimate
+                # CL500 bump would fail the build through a rule explicitly
+                # meant not to.
+                case "$cl_rule" in
+                    CL500|CL202) : ;;
+                    *) cl_warns_budgeted=$((cl_warns_budgeted + 1)) ;;
+                esac
             fi
         done <<< "$lint_out"
     fi
@@ -677,11 +687,25 @@ else
         # is the failure mode this whole check exists to prevent.
         fail "contract-lint could not run (exit $lint_exit)"
         add_failure "contract-lint: exit $lint_exit"
-    elif [[ $cl_blocks -eq 0 ]]; then
-        if [[ $cl_warns -eq 0 ]]; then
-            ok "no contract violations"
-        else
-            ok "no BLOCK violations ($cl_warns warning(s) above)"
+    else
+        # Ratchet, not a ceiling: contractLint.warnBudget is the max standing
+        # WARN count (excluding CL500/CL202). Lowering it below actual requires
+        # lowering it in the SAME commit that resolves the warnings - never
+        # raise it to make a new warning pass quietly.
+        warn_budget=0
+        if command -v jq >/dev/null 2>&1; then
+            _wb="$(jq -r '.contractLint.warnBudget // 0' "$manifest" 2>/dev/null)"
+            [[ "$_wb" =~ ^[0-9]+$ ]] && warn_budget="$_wb"
+        fi
+        if [[ $cl_blocks -eq 0 && $cl_warns_budgeted -le $warn_budget ]]; then
+            if [[ $cl_warns -eq 0 ]]; then
+                ok "no contract violations"
+            else
+                ok "no BLOCK violations ($cl_warns warning(s) above, $cl_warns_budgeted/$warn_budget standing-warning budget)"
+            fi
+        elif [[ $cl_blocks -eq 0 ]]; then
+            fail "standing-warning budget exceeded: $cl_warns_budgeted budgeted warning(s) > contractLint.warnBudget ($warn_budget)"
+            add_failure "contract-lint: warn budget $cl_warns_budgeted > $warn_budget"
         fi
     fi
 fi

@@ -102,7 +102,8 @@ cannot auto-fix. That guarantee is only as good as the prompt text agreeing with
 | `CL200` | BLOCK | an agent with no write tool is instructed to write, append or create |
 | `CL201` | BLOCK | an agent listed in `contractLint.readOnlyAgents` declares a write tool |
 | `CL202` | WARN | an `mcp__*` name in scan scope is absent from `contractLint.knownMcpTools` |
-| `CL203` | WARN | an agent's own frontmatter declares a tool its own body never mentions |
+| `CL203` | WARN | a non-write-capable agent's own frontmatter declares a tool its own body never mentions |
+| `CL204` | BLOCK | a write-capable agent's own frontmatter declares a tool its own body never mentions |
 
 A **write tool** is exactly `Write`, `Edit` or `MultiEdit` -- never `Bash`, which technically can
 write a file but is a different, harder problem, deliberately out of scope here.
@@ -124,9 +125,21 @@ rule in this band that reads prose intent rather than pure structure, which is w
 first: **CL200 promoted to BLOCK on 2026-07-31, once the engine tree ran clean under both
 implementations.**
 
-`CL203` searches an agent's own **body** -- everything after its closing `---` -- for the declared
-tool's exact name. A tool mentioned only inside the `tools:` line itself (its own declaration) does
-not count as "used."
+`CL203`/`CL204` search an agent's own **body** -- everything after its closing `---` -- for the
+declared tool's exact name. A tool mentioned only inside the `tools:` line itself (its own
+declaration) does not count as "used." They are two rule ids sharing one check because severity is
+looked up from the manifest per rule id, never computed by a rule -- the same invariant that keeps a
+BLOCK/WARN divergence between the bash and PowerShell twins structurally impossible (see
+`docs/architecture.md` or either script's own header comment). `CL204` fires on a **write-capable**
+agent: `Write`, `Edit` or `MultiEdit` present in that agent's *own* `tools:` line right now, read off
+disk the same way `CL200` decides write-capability -- never `contractLint.readOnlyAgents`, which is
+a declared promise about a fixed, named set of agents, not a live predicate over all of them. An unexplained,
+unused write tool on the one class of agent that holds write power is the highest-value thing this
+check can find, so it blocks; the same finding on a read-only agent's unused `Glob` stays WARN.
+
+**`CL204` shipped BLOCK from its introduction on 2026-09-02** (SW-48) -- unlike `CL200`/`CL306`/`CL400`,
+it did not need a WARN-first rollout window, because it is a new rule id rather than a promoted
+existing one: nothing depended on its prior severity.
 
 ### CL3xx -- gate integrity
 
@@ -275,6 +288,7 @@ and never touch `areas`, `derived` or `docClaims`.
 | `readOnlyAgents` | agent names CL201 checks for a write tool gained since being declared read-only |
 | `knownMcpTools` | the `mcp__*` allowlist CL202 checks scan-scope tokens against |
 | `budgets.commandsBytes` / `.agentsBytes` / `.skillsBytes` | the per-area byte ceiling CL500 checks a file's normalized size against |
+| `warnBudget` | max standing WARN count (excluding CL500/CL202) `scripts/validate.{sh,ps1}` Check 8 allows before failing - a ratchet, checked by validate, not by the linter itself |
 
 `scanScope` is load-bearing. `CLAUDE.md` and `CONTRIBUTING.md` use `sd-test` as a sandbox path and
 `docs/architecture.md` carries a `name: sd-debugger` frontmatter example, so widening the scope to
@@ -307,7 +321,7 @@ implementation, one fixture, one row in the tables above.
 |---|---|---|
 | 1 | CL0xx reference resolution, CL3xx gate integrity, CL9xx suppression hygiene | shipped, BLOCK |
 | 2 | CL1xx invocation contract (agent input declarations) | shipped, BLOCK+WARN |
-| 3a | CL2xx role and tool integrity (CL200-CL203) | shipped, BLOCK (CL200 promoted from WARN; CL202/CL203 stay WARN) |
+| 3a | CL2xx role and tool integrity (CL200-CL204) | shipped, BLOCK (CL200 promoted from WARN; CL202/CL203 stay WARN; CL204 added 2026-09-02, BLOCK from the start) |
 | 3b | CL4xx stack-agnostic prose, CL306 | shipped 2026-07-30 WARN, now BLOCK (CL400/CL306 promoted 2026-07-31; CL401 stays WARN) |
 | 4 | CL5xx file budgets | shipped 2026-07-30, stays WARN |
 

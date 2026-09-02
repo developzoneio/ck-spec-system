@@ -214,7 +214,7 @@ foreach ($r in $cl.rules) {
 $dispatchIds = @(
     'CL001', 'CL002', 'CL003', 'CL004', 'CL005', 'CL006', 'CL007', 'CL008',
     'CL100', 'CL101', 'CL102', 'CL103', 'CL104',
-    'CL200', 'CL201', 'CL202', 'CL203',
+    'CL200', 'CL201', 'CL202', 'CL203', 'CL204',
     'CL300', 'CL301', 'CL302', 'CL303', 'CL304', 'CL305', 'CL306',
     'CL400', 'CL401', 'CL402',
     'CL500',
@@ -559,6 +559,15 @@ foreach ($name in $agentOrder) {
         }
     }
     $agentBodyStart[$name] = $bodyStart
+}
+
+# writeCapableAgents - derived from disk (agentToolRefs), not declared. Mirrors
+# how CL200 itself decides write-capability: an agent whose own tools: line
+# carries Write/Edit/MultiEdit right now, regardless of whether anyone
+# remembers to list it anywhere. Used by CL203/CL204 to pick severity.
+$writeCapableAgents = New-OrdinalSet
+foreach ($t in $agentToolRefs) {
+    if ($writeTools.Contains($t.Tool)) { [void]$writeCapableAgents.Add($t.Agent) }
 }
 
 # ---- mode declaration index (CL1xx) -----------------------------------------
@@ -958,8 +967,14 @@ foreach ($r in $refs) {
     Add-Finding 'CL202' $r.File $r.Line "mcp tool name '$($r.Target)' is absent from contractLint.knownMcpTools"
 }
 
-# CL203 - a tool this agent's own frontmatter declares, that its own body
-# (everything after the closing ---) never mentions by name.
+# CL203/CL204 - a tool this agent's own frontmatter declares, that its own
+# body (everything after the closing ---) never mentions by name. WARN
+# (CL203) when the agent has no write tool of its own; BLOCK (CL204) when
+# the agent is write-capable - an unexplained unused Write/Edit/MultiEdit
+# sibling on the one class of agent that holds write power is the
+# highest-value thing this check can find. Severity is still looked up from
+# the manifest at emit time per rule id (never computed) - CL204 is a
+# distinct rule id precisely so that invariant holds.
 foreach ($t in $agentToolRefs) {
     $lines = $fileLines[$t.File]
     $start = $agentBodyStart[$t.Agent]
@@ -968,7 +983,8 @@ foreach ($t in $agentToolRefs) {
         if ($lines[$i].IndexOf($t.Tool, [System.StringComparison]::Ordinal) -ge 0) { $used = $true; break }
     }
     if (-not $used) {
-        Add-Finding 'CL203' $t.File $t.Line "agent '$($t.Agent)' declares tool '$($t.Tool)' but its body never mentions it"
+        $rid = if ($writeCapableAgents.Contains($t.Agent)) { 'CL204' } else { 'CL203' }
+        Add-Finding $rid $t.File $t.Line "agent '$($t.Agent)' declares tool '$($t.Tool)' but its body never mentions it"
     }
 }
 

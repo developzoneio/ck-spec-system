@@ -119,6 +119,12 @@
         "summary": "agent frontmatter declares a tool never mentioned in its own body"
       },
       {
+        "id": "CL204",
+        "severity": "BLOCK",
+        "wave": 3,
+        "summary": "agent frontmatter declares a tool never mentioned in its own body, on a write-capable agent (Write/Edit/MultiEdit present) - CL203's BLOCK sibling"
+      },
+      {
         "id": "CL300",
         "severity": "BLOCK",
         "wave": 1,

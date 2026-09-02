@@ -3,7 +3,7 @@ name: sd-implementer
 color: green
 description: Executes ONE atomic task per invocation. Scope-disciplined - edits only files declared in TASK_DETAILS.Files. Workflow-specific constraints for feature/bug/refactor/perf/port. Main thread can override to sonnet model for complex tasks.
 model: haiku
-tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
+tools: Read, Write, Edit, MultiEdit, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 skills:
   - sd-atomic-task-format
   - sd-pattern-discipline
